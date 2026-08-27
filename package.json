@@ -1,11 +1,8 @@
 {
-  "name": "enishio-education",
+  "name": "enishio-assessment-prototype",
   "version": "1.0.0",
-  "description": "",
+  "description": "AI対話中の検証行動を抽出・採点するアセスメントエンジンの縦切りプロトタイプ",
   "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -18,7 +15,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "UNLICENSED",
   "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.121.0",
