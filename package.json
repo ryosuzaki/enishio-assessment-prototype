@@ -16,7 +16,8 @@
     "check:no-leak": "node scripts/check-no-leaked-secrets.mjs",
     "check:flaw-detection": "tsx scripts/check-flaw-detection-resistance.ts",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "capture:screenshots": "playwright test e2e/capture-screenshots.spec.ts"
   },
   "keywords": [],
   "author": "",

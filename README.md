@@ -85,6 +85,7 @@ npm run dev
 ```bash
 npm run test                  # 単体テスト（Vitest 34件）
 npm run test:e2e              # E2Eテスト（Playwright・API全モック 3テスト）
+npm run capture:screenshots   # 提案書用UIスクリーンショット自動取得（全6画面PNG出力）
 npm run check:flaw-detection  # 代行無効化チェック（Claude / Gemini マルチプロバイダ実測）
 npm run check:no-leak         # クライアントバンドルへの正答鍵・秘密情報非漏洩チェック
 ```
