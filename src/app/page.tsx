@@ -20,6 +20,11 @@ import {
   ChevronRight,
   Sliders,
   AlertCircle,
+  Eye,
+  Trash2,
+  Plus,
+  CheckSquare,
+  FileCheck,
 } from "lucide-react";
 import { DEMO_DYNAMIC_TASK } from "@/data/dynamic-task";
 import { levenshtein } from "@/lib/edit-distance";
@@ -44,6 +49,12 @@ interface ChatMessage {
   turnSeq: number;
   role: "user" | "assistant" | "system";
   content: string;
+}
+
+export interface FocusItem {
+  focusSeq: number;
+  selectedText: string;
+  note?: string;
 }
 
 const DISAGREEMENT_OPTIONS = [
@@ -77,7 +88,14 @@ export default function AssessmentPrototypePage() {
   const [sessionSeq, setSessionSeq] = useState<number>(1);
   const [learnerId, setLearnerId] = useState<string>("");
   const [currentStep, setCurrentStep] = useState<
-    "init" | "anchor_q1" | "anchor_q2" | "anchor_conf" | "anchor_complete" | "dialogue_session" | "evaluation_report"
+    | "init"
+    | "anchor_q1"
+    | "anchor_q2"
+    | "anchor_conf"
+    | "anchor_complete"
+    | "dialogue_session"
+    | "preliminary_judgement"
+    | "evaluation_report"
   >("init");
 
   // Anchor State (W2)
@@ -100,6 +118,17 @@ export default function AssessmentPrototypePage() {
   const [cffActiveWarning, setCffActiveWarning] = useState<string | null>(null);
   // 直近に記録した成果物。次ターンの編集距離をこれとの差分で測る（MVP 4.4）
   const [lastLoggedArtifact, setLastLoggedArtifact] = useState<string>(DEMO_DYNAMIC_TASK.initial_ai_draft);
+
+  // Verification Focus Panel State (W3 3rd-Pane) [MVP 4.4, T-17b]
+  const [focusItems, setFocusItems] = useState<FocusItem[]>([]);
+  const [focusInputText, setFocusInputText] = useState<string>("");
+  const [focusInputNote, setFocusInputNote] = useState<string>("");
+
+  // CFF: Force Decision First & Mandatory Justification State [MVP 2.5, T-17b]
+  const [prelimAction, setPrelimAction] = useState<"approve" | "remand" | "">("");
+  const [prelimScore, setPrelimScore] = useState<number>(3);
+  const [prelimJustification, setPrelimJustification] = useState<string>("");
+  const [prelimError, setPrelimError] = useState<string | null>(null);
 
   // Evaluation & XAI State (W4, W5)
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
@@ -323,18 +352,104 @@ export default function AssessmentPrototypePage() {
     }
   };
 
-  // Trigger 2-Stage AutoSCORE Evaluation (W4)
-  const handleFinalizeAndEvaluate = async () => {
+  // Verification Focus Panel Handlers [MVP 4.4, T-17b]
+  const handleAddFocusItem = (textSnippet?: string, noteText?: string) => {
+    const text = (textSnippet ?? focusInputText).trim();
+    if (!text) return;
+    const nextSeq = focusItems.length + 1;
+    setFocusItems((prev) => [
+      ...prev,
+      {
+        focusSeq: nextSeq,
+        selectedText: text,
+        note: (noteText ?? focusInputNote).trim() || undefined,
+      },
+    ]);
+    setFocusInputText("");
+    setFocusInputNote("");
+    addTelemetry(`Verification focus item #${nextSeq} added to panel`);
+  };
+
+  const handleRemoveFocusItem = (seq: number) => {
+    setFocusItems((prev) =>
+      prev
+        .filter((item) => item.focusSeq !== seq)
+        .map((item, idx) => ({ ...item, focusSeq: idx + 1 }))
+    );
+    addTelemetry(`Verification focus item #${seq} removed from panel`);
+  };
+
+  // Advance to CFF: Force Decision First & Mandatory Justification Step [MVP 2.5, T-17b]
+  const handleProceedToPreliminaryJudgement = () => {
     if (chatHistory.length < 2) {
       alert("最低1回以上AI同僚と対話してから完了してください。");
       return;
     }
+    setPrelimError(null);
+    setCurrentStep("preliminary_judgement");
+    addTelemetry(
+      "Review completed. Advancing to Force Decision First (CFF) - Preliminary Judgement"
+    );
+  };
 
+  // Confirm Preliminary Judgement & Execute AutoSCORE Evaluation (W4)
+  const handleConfirmPreliminaryAndEvaluate = async () => {
+    if (!prelimAction) {
+      setPrelimError("成果物の判定（承認または差し戻し）を選択してください。");
+      return;
+    }
+    if (!prelimJustification.trim()) {
+      setPrelimError("判断理由の記述は必須です（Mandatory Justification・空文字不可）。");
+      return;
+    }
+
+    setPrelimError(null);
     setIsEvaluating(true);
-    addTelemetry(`Triggering AutoSCORE 2-Stage Evaluator (Axis 4)...`);
+    addTelemetry("Submitting Preliminary Judgement & Mandatory Justification...");
 
     try {
-      const res = await fetch("/api/dialogue/evaluate", {
+      // 1. Record preliminary judgement (CFF)
+      const prelimRes = await fetch("/api/dialogue/preliminary-judgement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          stepId: "step-dynamic-fintech-01",
+          action: prelimAction,
+          selfEstimatedScore: prelimScore,
+          justification: prelimJustification.trim(),
+        }),
+      });
+      const prelimData = await prelimRes.json();
+      if (!prelimData.success) {
+        alert("暫定判断記録エラー: " + prelimData.error);
+        setIsEvaluating(false);
+        return;
+      }
+      addTelemetry(
+        `Preliminary judgement recorded: ${prelimAction} (Self Band: ${prelimScore})`
+      );
+
+      // 2. Record verification focus sequence if any items selected
+      if (focusItems.length > 0) {
+        await fetch("/api/dialogue/focus", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            focusItems: focusItems.map((f) => ({
+              focusSeq: f.focusSeq,
+              selectedText: f.selectedText,
+              note: f.note,
+            })),
+          }),
+        });
+        addTelemetry(`Verification focus sequence recorded (${focusItems.length} items)`);
+      }
+
+      // 3. Trigger 2-Stage AutoSCORE Evaluation (W4)
+      addTelemetry(`Triggering AutoSCORE 2-Stage Evaluator (Axis 4)...`);
+      const evalRes = await fetch("/api/dialogue/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -344,7 +459,7 @@ export default function AssessmentPrototypePage() {
         }),
       });
 
-      const data = await res.json();
+      const data = await evalRes.json();
       if (data.success) {
         setEvaluation(data);
         setCurrentStep("evaluation_report");
@@ -356,9 +471,7 @@ export default function AssessmentPrototypePage() {
       } else if (data.scoringUnavailable) {
         // 採点できないときに推測値で埋めない。埋めると ratings に偽の評点が残る。
         alert(
-          `採点を実行できませんでした（${data.stage === "extract" ? "第1段階" : "第2段階"}）。
-
-` +
+          `採点を実行できませんでした（${data.stage === "extract" ? "第1段階" : "第2段階"}）。\n\n` +
             data.error
         );
       } else {
@@ -684,28 +797,21 @@ export default function AssessmentPrototypePage() {
                   <h2 className="text-base font-bold text-white">{DEMO_DYNAMIC_TASK.title}</h2>
                 </div>
                 <button
-                  onClick={handleFinalizeAndEvaluate}
-                  disabled={isEvaluating}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold hover:from-emerald-500 hover:to-teal-500 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                  onClick={handleProceedToPreliminaryJudgement}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/20"
                 >
-                  {isEvaluating ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      レビュー完了＆評価実行
-                      <Award className="w-4 h-4" />
-                    </>
-                  )}
+                  レビュー完了 ➔ 暫定判断へ進む
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* 3-Pane Layout Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Left Pane: Scenario & Requirements */}
-                <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+              {/* 3-Pane Layout Grid (Left: Requirements / Middle: Artifact / Right: Verification Panel) */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Left Pane (1): Scenario & Requirements */}
+                <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-3 flex flex-col h-[480px] overflow-y-auto">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300 border-b border-slate-800 pb-2">
                     <FileText className="w-3.5 h-3.5 text-blue-400" />
-                    業務要件と制約条件
+                    【第1ペイン】業務要件と制約条件
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed">
                     {DEMO_DYNAMIC_TASK.scenario_intro}
@@ -728,20 +834,87 @@ export default function AssessmentPrototypePage() {
                   </div>
                 </div>
 
-                {/* Right Pane: AI Artifact Code */}
-                <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2 flex flex-col h-[400px]">
-                  <div className="flex items-center justify-between">
+                {/* Middle Pane (2): AI Artifact Code Editor */}
+                <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2 flex flex-col h-[480px]">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
                       <Code className="w-3.5 h-3.5 text-emerald-400" />
-                      成果物ドラフト（TypeScript）
+                      【第2ペイン】成果物ドラフト
                     </div>
-                    <span className="text-[10px] font-mono text-slate-500">Live Artifact Editor</span>
+                    <span className="text-[10px] font-mono text-slate-500">Live Editor</span>
                   </div>
                   <textarea
                     value={artifactCode}
                     onChange={(e) => setArtifactCode(e.target.value)}
                     className="w-full flex-1 bg-slate-900/90 font-mono text-[11px] text-slate-200 p-3 rounded-lg border border-slate-800 resize-none focus:outline-none focus:border-blue-500"
                   />
+                  {/* Quick Focus Add Bar */}
+                  <div className="pt-1 flex gap-1.5">
+                    <input
+                      type="text"
+                      value={focusInputText}
+                      onChange={(e) => setFocusInputText(e.target.value)}
+                      placeholder="検証対象とするコード断片・キーワード"
+                      className="flex-1 bg-slate-900 text-[11px] text-slate-200 px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500"
+                    />
+                    <button
+                      onClick={() => handleAddFocusItem()}
+                      disabled={!focusInputText.trim()}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white text-[11px] font-medium transition-all disabled:opacity-40 flex items-center gap-1 shrink-0"
+                    >
+                      <Plus className="w-3 h-3" />
+                      検証パネルへ追加
+                    </button>
+                  </div>
+                </div>
+
+                {/* Right Pane (3): Verification Focus Panel [MVP 4.4, T-17b] */}
+                <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2 flex flex-col h-[480px]">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+                      <Eye className="w-3.5 h-3.5 text-purple-400" />
+                      【第3ペイン】検証パネル
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      focus_seq 順序記録
+                    </span>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                    {focusItems.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-500 text-xs">
+                        <CheckSquare className="w-8 h-8 mb-2 opacity-30" />
+                        <p>成果物の確認箇所を選択・入力して「検証パネルへ追加」を押すと、検証順序がここに記録されます。</p>
+                      </div>
+                    ) : (
+                      focusItems.map((item) => (
+                        <div
+                          key={item.focusSeq}
+                          className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1 relative group"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">
+                              #{item.focusSeq}
+                            </span>
+                            <button
+                              onClick={() => handleRemoveFocusItem(item.focusSeq)}
+                              className="text-slate-500 hover:text-red-400 p-0.5 transition-colors"
+                              title="削除"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <p className="text-[11px] font-mono text-slate-200 bg-slate-950 p-1.5 rounded border border-slate-800/80 break-all">
+                            {item.selectedText}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800/80 text-[10px] text-slate-500 leading-tight">
+                    ※ 選択箇所と順序は <code className="text-purple-400">verification_focus_sequence</code> ログとして保存されます（AI採点には入力されません）。
+                  </div>
                 </div>
               </div>
 
@@ -780,7 +953,7 @@ export default function AssessmentPrototypePage() {
                   ))}
                 </div>
 
-                {/* CFF-1 Warning Toast if triggered */}
+                {/* Intent-Action Gap Warning Toast if triggered */}
                 {cffActiveWarning && (
                   <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
                     <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
@@ -807,6 +980,167 @@ export default function AssessmentPrototypePage() {
                     送信
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5.5: CFF Force Decision First & Mandatory Justification [MVP 2.5, T-17b] */}
+          {currentStep === "preliminary_judgement" && (
+            <div className="glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/80 shadow-2xl space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <FileCheck className="w-6 h-6 text-indigo-400" />
+                  <div>
+                    <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                      CFF: Force Decision First & Mandatory Justification [MVP 2.5]
+                    </span>
+                    <h2 className="text-lg font-bold text-white mt-1">成果物の最終判定と判断理由の言語化</h2>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                AIによる自動採点およびXAIレポートを開示する前に、受講者自身の判定と理由を先に入力・確定させます。
+                AIの根拠提示前に受講者の自律的判断を取ることで、AI出力を無検証で追従するバイアスを排除します。
+              </p>
+
+              {prelimError && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{prelimError}</span>
+                </div>
+              )}
+
+              {/* 1. Decision Action */}
+              <div className="space-y-3">
+                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                  ① この成果物ドラフトに対する最終判断（必須）
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label
+                    className={`flex items-start gap-3 p-4 rounded-xl border transition-all cursor-pointer ${
+                      prelimAction === "remand"
+                        ? "bg-amber-600/15 border-amber-500 text-white shadow-lg shadow-amber-500/10"
+                        : "bg-slate-950/40 border-slate-800 text-slate-300 hover:border-slate-700"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="prelim_action"
+                      value="remand"
+                      checked={prelimAction === "remand"}
+                      onChange={() => setPrelimAction("remand")}
+                      className="mt-1 text-amber-600 focus:ring-0"
+                    />
+                    <div>
+                      <div className="text-sm font-bold text-amber-400">⚠️ 差し戻し（修正が必要）</div>
+                      <p className="text-xs text-slate-400 mt-1">
+                        セキュリティ基準違反や要件不備、暗黙の前提破綻があり、本番リリース不可と判断。
+                      </p>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-3 p-4 rounded-xl border transition-all cursor-pointer ${
+                      prelimAction === "approve"
+                        ? "bg-emerald-600/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/10"
+                        : "bg-slate-950/40 border-slate-800 text-slate-300 hover:border-slate-700"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="prelim_action"
+                      value="approve"
+                      checked={prelimAction === "approve"}
+                      onChange={() => setPrelimAction("approve")}
+                      className="mt-1 text-emerald-600 focus:ring-0"
+                    />
+                    <div>
+                      <div className="text-sm font-bold text-emerald-400">✅ 承認（リリース可能）</div>
+                      <p className="text-xs text-slate-400 mt-1">
+                        要件を満たしており、セキュリティ・可用性基準に適合していると判断。
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* 2. Self-Estimated Band */}
+              <div className="space-y-3">
+                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                  ② 軸4（評価的判断力）の観点で、自分は何点相当だと思いますか？
+                </label>
+                <div className="grid grid-cols-6 gap-2">
+                  {[0, 1, 2, 3, 4, 5].map((band) => (
+                    <button
+                      key={band}
+                      onClick={() => setPrelimScore(band)}
+                      type="button"
+                      className={`p-3 rounded-xl border text-center transition-all ${
+                        prelimScore === band
+                          ? "bg-blue-600 border-blue-500 text-white font-bold shadow-md shadow-blue-500/20"
+                          : "bg-slate-950/40 border-slate-800 text-slate-300 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="text-base font-bold">Band {band}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {band === 0 && "未達"}
+                        {band === 1 && "盲目追従"}
+                        {band === 2 && "違和感"}
+                        {band === 3 && "前提摘発"}
+                        {band === 4 && "卓越弁別"}
+                        {band === 5 && "指導的"}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  ※ この自己評点はAI採点には入力されず、バイアス度合いの観測ログとして記録されます。
+                </p>
+              </div>
+
+              {/* 3. Mandatory Justification */}
+              <div className="space-y-3">
+                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block flex items-center justify-between">
+                  <span>③ 判断理由・根拠（必須記述・Mandatory Justification）</span>
+                  <span className="text-rose-400 text-[10px] font-normal font-mono">※ 省略不可・空文字不可</span>
+                </label>
+                <textarea
+                  value={prelimJustification}
+                  onChange={(e) => setPrelimJustification(e.target.value)}
+                  placeholder="承認または差し戻しと判断した具体的な根拠・理由を記述してください（例: JWT署名検証のみではRedis側のトークン失効伝播が確認できず、PCI DSSの強制ログアウト要件に違反しているため）"
+                  className="w-full bg-slate-950 text-xs text-slate-100 p-3.5 rounded-xl border border-slate-700 h-28 focus:outline-none focus:border-blue-500 resize-none leading-relaxed"
+                />
+                <p className="text-[11px] text-slate-400">
+                  ※ 承認・差し戻しのいずれの場合も、理由の記述は省略できません。素通し防止のためサーバ側でも必須チェックされます。
+                </p>
+              </div>
+
+              <div className="pt-4 flex justify-between items-center border-t border-slate-800">
+                <button
+                  onClick={() => setCurrentStep("dialogue_session")}
+                  disabled={isEvaluating}
+                  className="text-xs text-slate-400 hover:text-slate-200 underline"
+                >
+                  ← 対話画面へ戻る
+                </button>
+                <button
+                  onClick={handleConfirmPreliminaryAndEvaluate}
+                  disabled={isEvaluating || !prelimAction || !prelimJustification.trim()}
+                  className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold hover:from-emerald-500 hover:to-teal-500 transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-40"
+                >
+                  {isEvaluating ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      評価実行中（Stage 1 抽出 ➔ Stage 2 採点）...
+                    </>
+                  ) : (
+                    <>
+                      暫定判断を確定し、AI評価を実行する
+                      <Award className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           )}
@@ -1032,7 +1366,7 @@ export default function AssessmentPrototypePage() {
               </div>
               <div className="flex justify-between py-1 border-b border-slate-800/60">
                 <span className="text-slate-500">Scorer Version:</span>
-                <span className="text-slate-400 text-[10px]">claude-opus-5/extract-v1</span>
+                <span className="text-slate-400 text-[10px]">claude-opus-5/extract-v2/score-v2</span>
               </div>
             </div>
 
@@ -1061,9 +1395,10 @@ export default function AssessmentPrototypePage() {
               未踏アドバンスト審査用仕様準拠
             </div>
             <ul className="space-y-1.5 text-[11px] list-disc list-inside">
-              <li>データモデル: `learners`, `sessions`, `ratings` 本番準拠</li>
-              <li>AutoSCORE: 自由記述CoTを排した2段階構造化採点</li>
-              <li>CFF機能: 意図確認（CFF-1）インターロック動作</li>
+              <li>データモデル: `learners`, `sessions`, `ratings`, `learner_preliminary_judgements`, `verification_focus_sequences` 本番準拠</li>
+              <li>AutoSCORE: 自由記述CoTを排した2段階構造化採点（claude-opus-5）</li>
+              <li>CFF機能: Force Decision First & Mandatory Justification</li>
+              <li>3ペイン: 要件・成果物エディタ・検証パネル（focus_seq 順序追跡）</li>
               <li>XAIレポート: 根拠スパンの可視化と異議申立導線（MVP 4.5）</li>
             </ul>
           </div>

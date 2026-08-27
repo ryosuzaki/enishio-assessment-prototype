@@ -280,3 +280,75 @@ export async function recordScoreFeedback(params: RecordScoreFeedbackParams) {
     },
   });
 }
+
+export interface RecordPreliminaryJudgementParams {
+  sessionId: string;
+  stepId: string;
+  action: "approve" | "remand";
+  selfEstimatedScore: number; // 0..5
+  justification: string;
+}
+
+/**
+ * Record CFF preliminary judgement and mandatory justification [MVP 2.5, 4.4, T-17b]
+ * Must be executed before showing AI evaluation report (Force Decision First).
+ * Justification is mandatory for both approval and remand (Mandatory Justification).
+ */
+export async function recordPreliminaryJudgement(params: RecordPreliminaryJudgementParams) {
+  if (!params.justification || params.justification.trim().length === 0) {
+    throw new Error(
+      "Validation error: justification is mandatory for preliminary judgement [MVP 2.5, T-17b]"
+    );
+  }
+  if (params.selfEstimatedScore < 0 || params.selfEstimatedScore > 5) {
+    throw new Error(
+      `Validation error: self_estimated_score must be between 0 and 5, received: ${params.selfEstimatedScore}`
+    );
+  }
+  if (params.action !== "approve" && params.action !== "remand") {
+    throw new Error(
+      `Validation error: action must be 'approve' or 'remand', received: ${params.action}`
+    );
+  }
+
+  return await (prisma as any).learnerPreliminaryJudgement.create({
+    data: {
+      session_id: params.sessionId,
+      step_id: params.stepId,
+      action: params.action,
+      self_estimated_score: params.selfEstimatedScore,
+      justification: params.justification.trim(),
+    },
+  });
+}
+
+export interface VerificationFocusItem {
+  focusSeq: number;
+  lineStart?: number | null;
+  lineEnd?: number | null;
+  selectedText: string;
+  note?: string | null;
+}
+
+/**
+ * Record verification focus sequence (selected code/artifact spans in order of examination) [MVP 4.4, T-17b]
+ */
+export async function recordVerificationFocusSequence(
+  sessionId: string,
+  items: VerificationFocusItem[]
+) {
+  if (!items || items.length === 0) return 0;
+  const result = await (prisma as any).verificationFocusSequence.createMany({
+    data: items.map((item) => ({
+      session_id: sessionId,
+      focus_seq: item.focusSeq,
+      line_start: item.lineStart ?? null,
+      line_end: item.lineEnd ?? null,
+      selected_text: item.selectedText,
+      note: item.note ?? null,
+    })),
+    skipDuplicates: true,
+  });
+  return result.count;
+}
+

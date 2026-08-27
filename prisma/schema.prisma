@@ -33,6 +33,8 @@ model Session {
   artifact_edit_series  ArtifactEditDistanceSeries[]
   injected_flaw_map     InjectedFlawMap[]
   score_feedback        ScoreFeedback[]
+  preliminary_judgements LearnerPreliminaryJudgement[]
+  verification_focuses  VerificationFocusSequence[]
 
   @@unique([learner_id, session_seq])
   @@index([learner_id, session_seq])
@@ -166,3 +168,36 @@ model ScoreFeedback {
   @@index([session_id])
   @@map("score_feedback")
 }
+
+model LearnerPreliminaryJudgement {
+  id                   String   @id @default(uuid())
+  session_id           String
+  step_id              String   // e.g. "step-dynamic-fintech-01"
+  action               String   // "approve" | "remand" (承認 / 差し戻し)
+  self_estimated_score Int      // 0..5 (自己評価バンド)
+  justification        String   @db.Text // Mandatory Justification: 理由記述（必須・空文字不可）
+  created_at           DateTime @default(now())
+
+  session Session @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
+
+  @@index([session_id])
+  @@map("learner_preliminary_judgements")
+}
+
+model VerificationFocusSequence {
+  id            String   @id @default(uuid())
+  session_id    String
+  focus_seq     Int      // 明示の順序連番（1, 2, 3...）
+  line_start    Int?     // 選択開始行
+  line_end      Int?     // 選択終了行
+  selected_text String   @db.Text // 選択されたコード/テキスト
+  note          String?  @db.Text // 受講者任意メモ
+  created_at    DateTime @default(now())
+
+  session Session @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
+
+  @@unique([session_id, focus_seq])
+  @@index([session_id, focus_seq])
+  @@map("verification_focus_sequences")
+}
+

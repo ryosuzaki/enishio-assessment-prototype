@@ -44,7 +44,7 @@ Next.js 16（App Router）／ TypeScript ／ React 19 ／ Tailwind CSS v4 ／ Po
 
 ## データモデル
 
-`prisma/schema.prisma` に9テーブル。評点の正本は `Rating`。
+`prisma/schema.prisma` に11テーブル。評点の正本は `Rating`。
 
 | テーブル | 役割 |
 | :--- | :--- |
@@ -54,6 +54,8 @@ Next.js 16（App Router）／ TypeScript ／ React 19 ／ Tailwind CSS v4 ／ Po
 | `PromptTurn` | 対話の全ターン全文 |
 | `ArtifactEditDistanceSeries` | 成果物の編集距離の時系列 |
 | `InjectedFlawMap` | 仕込んだ誤りの位置と類型、**および正常箇所のラベル**（これがないと過剰指摘を判定できない） |
+| `LearnerPreliminaryJudgement` | CFF（Force Decision First / Mandatory Justification）による事前暫定判断（承認/差し戻し、自己評価点、必須理由記述） |
+| `VerificationFocusSequence` | 3ペイン検証パネルで受講者が選択したコードスパンと明示順序（`focus_seq`） |
 | `ScoreFeedback` | 異議申立。自由記述の理由を必須にしている |
 
 ## 動かす
@@ -81,10 +83,6 @@ npm run dev
 
 **まだ実装していないもの**（作らないと決めたものではなく、単に未了である）:
 
-- **CFF 2種**——Force Decision First（AIの根拠を開く前に受検者の暫定判断を取る）と
-  Mandatory Justification（承認・差し戻しのいずれにも理由記述を必須にする）。
-  現在入っているのは「意図-行動ギャップのインターロック」だけで、これは上記2種のいずれでもない
-- **検証パネル**——成果物のどの箇所を検証対象として選んだかを取る第3ペイン
 - **根拠ハイライト**——抽出された `quoted_span` は一覧として出るが、対話ログ上での
   ハイライト表示にはなっていない
 
