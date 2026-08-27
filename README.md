@@ -77,6 +77,48 @@ npm run dev
 
 ログ基盤だけを単体で確かめる場合は `npm run seed`（DBへ書き込む検証スクリプト）。
 
+## 公開デプロイ手順（二次審査用）
+
+二次審査（URL提示）に向けた Vercel + サーバーレス PostgreSQL（Supabase / Neon）への公開デプロイ手順です。
+
+> **注意**: 本設定は手順書の提供であり、外部サービスへの本番プロビジョニング・契約・デプロイ実行は人間側の判断で行います。
+
+### 1. サーバーレス PostgreSQL データベースの準備
+1. [Supabase](https://supabase.com) または [Neon](https://neon.tech) で新規プロジェクトを作成します。
+2. 接続文字列（Connection String）を取得します。
+   - **Prisma 接続プーリングの注意点**: Vercel 等のサーバーレス環境では接続過多（Connection Exhaustion）を防ぐため、**プーリング接続文字列（Transaction pooler / ポート 6543 / `?pgbouncer=true`）** を使用してください。
+   - 例: `postgresql://postgres:[PASSWORD]@[HOST]:6543/postgres?pgbouncer=true&connection_limit=1`
+
+### 2. スキーマ適用とアンカーデータの初期シード
+デプロイ前に、手元の環境から対象データベースに対してスキーマとアンカー項目を投入します。
+```bash
+# 接続先を対象のデータベースURLに設定して実行
+export DATABASE_URL="postgresql://postgres:[PASSWORD]@[HOST]:6543/postgres?pgbouncer=true"
+
+# スキーマの反映（11テーブル作成）
+npx prisma db push
+
+# アンカー項目のパースとDB初期シード
+npm run parse:anchors
+npm run seed:anchors
+```
+
+### 3. Vercel へのインポートと環境変数設定
+1. [Vercel](https://vercel.com) でリポジトリをインポートします。
+   - **Framework Preset**: `Next.js`
+   - **Build Command**: `next build`（デフォルトのままで可）
+2. **Environment Variables** に以下を設定します:
+   - `DATABASE_URL`: 手順1で取得したプーリング接続文字列
+   - `ANTHROPIC_API_KEY`: Anthropic API キー（`sk-ant-...`）
+   - `GEMINI_API_KEY`: （任意）Google Gemini API キー
+
+### 4. デプロイと動作検証
+1. **Deploy** を実行します。
+2. デプロイ完了後、発行された URL にアクセスし、以下を確認します:
+   - トップページでアンカー20件がロードされること
+   - 「セッションを開始する」でアンカー出題へ進めること
+   - 動的課題の対話および AutoSCORE 2段階採点が正常に動作し、XAIレポートが表示されること
+
 ## 意図的に作っていないもの
 
 評価者HITL画面／認証・SSO・マルチテナント／管理者ダッシュボード／課金／シナリオの自動生成（動的課題は人手で書いた1本を固定で出す）／IRT較正・等化・アンカー項目の昇格判定。
