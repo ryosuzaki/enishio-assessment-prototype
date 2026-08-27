@@ -15,7 +15,13 @@ import {
   MessageSquare,
   RefreshCw,
   Award,
+  Code,
+  Layers,
+  ChevronRight,
+  Sliders,
+  AlertCircle,
 } from "lucide-react";
+import { DEMO_DYNAMIC_TASK } from "@/data/dynamic-task";
 
 interface AnchorItem {
   anchor_id: string;
@@ -33,14 +39,38 @@ interface AnchorItem {
   };
 }
 
+interface ChatMessage {
+  turnSeq: number;
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+interface EvaluationResult {
+  ratingId: string;
+  ratingCategory: number;
+  levelLabel: string;
+  evidenceSummary: string;
+  diagnosticFeedback: string;
+  evidenceComponents: {
+    turn_index: number;
+    quoted_span: string;
+    component_type: string;
+    injected_flaw_id: string | null;
+    rationale_summary: string;
+  }[];
+  scorerModelVersion: string;
+}
+
 export default function AssessmentPrototypePage() {
-  // Session State
+  // Session & Phase State
   const [sessionId, setSessionId] = useState<string>("");
   const [sessionSeq, setSessionSeq] = useState<number>(1);
   const [learnerId, setLearnerId] = useState<string>("");
-  const [currentStep, setCurrentStep] = useState<"init" | "anchor_q1" | "anchor_q2" | "anchor_conf" | "anchor_complete" | "dialogue">("init");
+  const [currentStep, setCurrentStep] = useState<
+    "init" | "anchor_q1" | "anchor_q2" | "anchor_conf" | "anchor_complete" | "dialogue_session" | "evaluation_report"
+  >("init");
 
-  // Anchor State
+  // Anchor State (W2)
   const [anchorList, setAnchorList] = useState<{ anchor_id: string; title: string; family: string }[]>([]);
   const [selectedAnchorId, setSelectedAnchorId] = useState<string>("ANCHOR-A-01");
   const [currentAnchor, setCurrentAnchor] = useState<AnchorItem | null>(null);
@@ -52,11 +82,24 @@ export default function AssessmentPrototypePage() {
   const [q1DurationMs, setQ1DurationMs] = useState<number>(0);
   const [q2DurationMs, setQ2DurationMs] = useState<number>(0);
 
-  // Status & Telemetry
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Dynamic Session State (W3)
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [userPromptInput, setUserPromptInput] = useState<string>("");
+  const [artifactCode, setArtifactCode] = useState<string>(DEMO_DYNAMIC_TASK.initial_ai_draft);
+  const [turnCounter, setTurnCounter] = useState<number>(1);
+  const [cffActiveWarning, setCffActiveWarning] = useState<string | null>(null);
+
+  // Evaluation & XAI State (W4, W5)
+  const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
+  const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
+  const [disputeReason, setDisputeReason] = useState<string>("");
+  const [disputeSubmitted, setDisputeSubmitted] = useState<boolean>(false);
+
+  // Telemetry Monitor
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [telemetryLog, setTelemetryLog] = useState<string[]>([]);
 
-  // Load anchor list
+  // Load anchor list on mount
   useEffect(() => {
     fetch("/api/anchor")
       .then((res) => res.json())
@@ -70,7 +113,7 @@ export default function AssessmentPrototypePage() {
 
   const addTelemetry = (msg: string) => {
     const time = new Date().toLocaleTimeString();
-    setTelemetryLog((prev) => [`[${time}] ${msg}`, ...prev.slice(0, 19)]);
+    setTelemetryLog((prev) => [`[${time}] ${msg}`, ...prev.slice(0, 24)]);
   };
 
   // Start Session
@@ -99,7 +142,7 @@ export default function AssessmentPrototypePage() {
           setCurrentAnchor(anchorData.anchor);
           setCurrentStep("anchor_q1");
           setQ1StartTime(Date.now());
-          addTelemetry(`Anchor stimulus loaded (${selectedAnchorId}) - pretest mode active`);
+          addTelemetry(`Anchor stimulus loaded (${selectedAnchorId}) - pretest mode`);
         }
       }
     } catch (e: any) {
@@ -109,7 +152,7 @@ export default function AssessmentPrototypePage() {
     }
   };
 
-  // Step Transitions in Anchor Flow
+  // Anchor Flow Step Handlers
   const handleQ1Next = () => {
     if (!q1Choice) return;
     const duration = Date.now() - q1StartTime;
@@ -148,7 +191,7 @@ export default function AssessmentPrototypePage() {
       });
       const data = await res.json();
       if (data.success) {
-        addTelemetry(`Anchor completed & recorded (Rating ID: ${data.ratingId.slice(0, 8)}..., unscored)`);
+        addTelemetry(`Anchor completed & recorded (Rating ID: ${data.ratingId.slice(0, 8)}..., unscored pretest)`);
         setCurrentStep("anchor_complete");
       }
     } catch (e: any) {
@@ -158,29 +201,169 @@ export default function AssessmentPrototypePage() {
     }
   };
 
+  // Transition to Dynamic Dialogue Session (W3)
+  const handleStartDialogueSession = () => {
+    setCurrentStep("dialogue_session");
+    setChatHistory([
+      {
+        turnSeq: 1,
+        role: "assistant",
+        content: `決済APIのレートリミットおよびトークン認証ミドルウェアを作成しました。右側のコードを確認いただき、本番リリースに向けたレビューをお願いします！`,
+      },
+    ]);
+    setTurnCounter(2);
+    addTelemetry(`Dynamic Task initiated (TASK-FINTECH-AUTH-01) - 3-pane active`);
+  };
+
+  // Send User Prompt in Dialogue Session (W3)
+  const handleSendDialogueTurn = async () => {
+    if (!userPromptInput.trim()) return;
+
+    const currentTurn = turnCounter;
+    const userText = userPromptInput;
+    setUserPromptInput("");
+    setCffActiveWarning(null);
+
+    // Optimistically update chat
+    const updatedHistory: ChatMessage[] = [
+      ...chatHistory,
+      { turnSeq: currentTurn, role: "user", content: userText },
+    ];
+    setChatHistory(updatedHistory);
+    addTelemetry(`Prompt turn #${currentTurn} sent (Length: ${userText.length} chars)`);
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/dialogue/turn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          turnSeq: currentTurn,
+          userMessage: userText,
+          currentArtifactText: artifactCode,
+          editDistance: 0,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const nextTurn = data.assistantTurnSeq + 1;
+        setTurnCounter(nextTurn);
+
+        setChatHistory([
+          ...updatedHistory,
+          {
+            turnSeq: data.assistantTurnSeq,
+            role: "assistant",
+            content: data.assistantMessage,
+          },
+        ]);
+
+        if (data.isCffTriggered) {
+          setCffActiveWarning(data.assistantMessage);
+          addTelemetry(`CFF-1 Interlock triggered (Intent-Action Gap)`);
+        } else {
+          addTelemetry(`AI Peer response recorded (Turn #${data.assistantTurnSeq})`);
+        }
+
+        if (data.updatedArtifact) {
+          setArtifactCode(data.updatedArtifact);
+          addTelemetry(`Artifact draft updated by AI Peer`);
+        }
+      }
+    } catch (e: any) {
+      alert("対話送信エラー: " + e.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Trigger 2-Stage AutoSCORE Evaluation (W4)
+  const handleFinalizeAndEvaluate = async () => {
+    if (chatHistory.length < 2) {
+      alert("最低1回以上AI同僚と対話してから完了してください。");
+      return;
+    }
+
+    setIsEvaluating(true);
+    addTelemetry(`Triggering AutoSCORE 2-Stage Evaluator (Axis 4)...`);
+
+    try {
+      const res = await fetch("/api/dialogue/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          learnerId,
+          sessionSeq,
+          transcript: chatHistory,
+          finalArtifact: artifactCode,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setEvaluation(data);
+        setCurrentStep("evaluation_report");
+        addTelemetry(`Evaluation complete: ${data.levelLabel} (Rating ID: ${data.ratingId.slice(0, 8)}...)`);
+      } else {
+        alert("評価エラー: " + data.error);
+      }
+    } catch (e: any) {
+      alert("評価リクエスト失敗: " + e.message);
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
+
+  // Submit Score Dispute (MVP 4.5 / W5)
+  const handleSubmitDispute = async () => {
+    if (!disputeReason.trim() || !evaluation) return;
+
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ratingId: evaluation.ratingId,
+          disagreementDirection: "too_low",
+          freeTextReason: disputeReason,
+          scorerModelVersion: evaluation.scorerModelVersion,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDisputeSubmitted(true);
+        addTelemetry(`Score dispute recorded in score_feedback (ID: ${data.feedbackId.slice(0, 8)}...)`);
+      }
+    } catch (e: any) {
+      alert("異議申立エラー: " + e.message);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Assessment Flow */}
+        {/* Main Content Area */}
         <div className="lg:col-span-2 space-y-6">
           {/* STEP 0: Initialization */}
           {currentStep === "init" && (
-            <div className="glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl">
-              <div className="flex items-center gap-3 mb-4 text-blue-400 font-semibold text-sm">
+            <div className="glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl space-y-6">
+              <div className="flex items-center gap-3 text-blue-400 font-semibold text-sm">
                 <Sparkles className="w-5 h-5" />
-                <span>審査用縦切りプロトタイプ（T-17 W1〜W2）</span>
+                <span>未踏アドバンスト審査用 縦切りプロトタイプ（T-17 W1〜W6）</span>
               </div>
-              <h1 className="text-2xl font-bold text-white mb-3">
-                評価的判断力 動的アセスメント セッション開始
+              <h1 className="text-2xl font-bold text-white tracking-tight">
+                評価的判断力 動的アセスメント＆テレメトリ基盤
               </h1>
-              <p className="text-slate-300 text-sm leading-relaxed mb-6">
-                本システムは、受講者がAI同僚の生成した成果物ドラフトを批判的に検証する対話プロセスを解析し、
-                「前提・トレードオフの可視化力（軸4）」を測定する動的アセスメントの検証デモです。
+              <p className="text-slate-300 text-sm leading-relaxed">
+                本プロトタイプは、単一セッションが端から端まで通る縦切り1本の実装です。
+                「①固定アンカー出題」→「②動的3ペイン対話セッション」→「③AutoSCORE 2段階根拠抽出＆軸4採点」→「④XAIレポート」の全フローを検証できます。
               </p>
 
-              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-4 mb-6">
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  出題する共通アンカー項目の選択（T-05バンク / 全20項目）
+                  出題する共通アンカー項目（T-05バンク / 全20項目から選択）
                 </label>
                 <select
                   value={selectedAnchorId}
@@ -189,12 +372,12 @@ export default function AssessmentPrototypePage() {
                 >
                   {anchorList.map((a) => (
                     <option key={a.anchor_id} value={a.anchor_id}>
-                      [{a.anchor_id}] {a.title} ({a.family === "A" ? "設計" : "プロセス"})
+                      [{a.anchor_id}] {a.title} ({a.family === "A" ? "設計領域" : "プロセス領域"})
                     </option>
                   ))}
                 </select>
                 <p className="text-xs text-slate-500">
-                  ※実稼働時はセッション列の7回に1回、受講者には告知されずランダムに自動混入されます（`anchor_status: pretest`）。
+                  ※実稼働時はセッション列の7回に1回、ランダムに自動混入されます（`anchor_status: pretest`・無得点運用）。
                 </p>
               </div>
 
@@ -296,7 +479,7 @@ export default function AssessmentPrototypePage() {
                   共通アンカー項目: {currentAnchor.anchor_id}
                 </span>
                 <span className="text-xs text-slate-400 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" /> 設問 2 / 2（トレードオフ・リスクの深掘り）
+                  <Clock className="w-3.5 h-3.5" /> 設問 2 / 2（トレードオフの深掘り）
                 </span>
               </div>
 
@@ -344,7 +527,7 @@ export default function AssessmentPrototypePage() {
             </div>
           )}
 
-          {/* STEP 3: Confidence Scale */}
+          {/* STEP 3: Confidence */}
           {currentStep === "anchor_conf" && (
             <div className="glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl space-y-6">
               <div className="flex items-center gap-2 text-indigo-400 font-semibold text-sm">
@@ -396,13 +579,13 @@ export default function AssessmentPrototypePage() {
             </div>
           )}
 
-          {/* STEP 4: Anchor Completed Screen */}
+          {/* STEP 4: Anchor Completed Transition */}
           {currentStep === "anchor_complete" && (
             <div className="glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl space-y-6">
               <div className="flex items-center gap-3 text-emerald-400">
                 <CheckCircle2 className="w-8 h-8" />
                 <div>
-                  <h2 className="text-xl font-bold text-white">共通アンカー課題の記録が完了しました</h2>
+                  <h2 className="text-xl font-bold text-white">共通アンカー項目の記録が完了しました</h2>
                   <p className="text-xs text-slate-400">
                     ステータス: <span className="font-mono text-emerald-400">anchor_status = pretest</span>（尺度較正用・無得点運用）
                   </p>
@@ -410,29 +593,283 @@ export default function AssessmentPrototypePage() {
               </div>
 
               <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-sm text-slate-300 space-y-2">
-                <p className="font-semibold text-slate-200">📌 測定理論上の運用仕様（MVP 2.6.2 / D-51）:</p>
-                <ul className="list-disc list-inside space-y-1 text-xs text-slate-400">
-                  <li>受講者には正誤判定や得点は表示されず、回答・確信度・所要時間がテレメトリへ直ちに記録されます。</li>
-                  <li>Stage 0では全項目pretest（無得点）として蓄積され、一定観測量（50〜100件）蓄積後にMFRM較正を経てoperationalへ昇格します。</li>
-                </ul>
+                <p className="font-semibold text-slate-200">🚀 続いて動的課題の対話セッション（W3）へ進みます:</p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  次はAI同僚が作成した実際の業務コード（決済セキュリティミドルウェア）をレビューする3ペイン対話セッションです。
+                  AI同僚のコードに含まれる前提の隠蔽や不備を対話で指摘し、修正指示を出してください。
+                </p>
               </div>
 
-              <div className="pt-2 flex justify-between items-center">
+              <div className="pt-2 flex justify-end">
+                <button
+                  onClick={handleStartDialogueSession}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/25"
+                >
+                  動的対話セッションへ進む
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: Dynamic 3-Pane Dialogue Session (W3) */}
+          {currentStep === "dialogue_session" && (
+            <div className="space-y-6">
+              {/* Task Header */}
+              <div className="glass-panel p-5 rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <div className="text-xs font-mono text-blue-400 mb-1 flex items-center gap-2">
+                    <Layers className="w-3.5 h-3.5" /> 動的課題: {DEMO_DYNAMIC_TASK.task_id}
+                  </div>
+                  <h2 className="text-base font-bold text-white">{DEMO_DYNAMIC_TASK.title}</h2>
+                </div>
+                <button
+                  onClick={handleFinalizeAndEvaluate}
+                  disabled={isEvaluating}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold hover:from-emerald-500 hover:to-teal-500 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                >
+                  {isEvaluating ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      レビュー完了＆評価実行
+                      <Award className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* 3-Pane Layout Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Left Pane: Scenario & Requirements */}
+                <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+                    <FileText className="w-3.5 h-3.5 text-blue-400" />
+                    業務要件と制約条件
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {DEMO_DYNAMIC_TASK.scenario_intro}
+                  </p>
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[11px] font-bold text-slate-400">必須要件:</span>
+                    {DEMO_DYNAMIC_TASK.business_requirements.map((req, i) => (
+                      <div key={i} className="text-xs text-slate-300 bg-slate-900/70 p-2 rounded border border-slate-800">
+                        {req}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[11px] font-bold text-amber-400">制約・セキュリティ基準:</span>
+                    {DEMO_DYNAMIC_TASK.constraints.map((c, i) => (
+                      <div key={i} className="text-xs text-amber-200/90 bg-amber-950/20 p-2 rounded border border-amber-900/30">
+                        {c}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right Pane: AI Artifact Code */}
+                <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2 flex flex-col h-[400px]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+                      <Code className="w-3.5 h-3.5 text-emerald-400" />
+                      成果物ドラフト（TypeScript）
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-500">Live Artifact Editor</span>
+                  </div>
+                  <textarea
+                    value={artifactCode}
+                    onChange={(e) => setArtifactCode(e.target.value)}
+                    className="w-full flex-1 bg-slate-900/90 font-mono text-[11px] text-slate-200 p-3 rounded-lg border border-slate-800 resize-none focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Chat & Prompt Dialogue Pane */}
+              <div className="glass-panel p-5 rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+                    <MessageSquare className="w-4 h-4 text-purple-400" />
+                    AI同僚との対話・修正指示（マルチターン対話）
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">Turn #{turnCounter}</span>
+                </div>
+
+                {/* Chat Message List */}
+                <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                  {chatHistory.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex flex-col ${
+                        msg.role === "user" ? "items-end" : "items-start"
+                      }`}
+                    >
+                      <div className="text-[10px] text-slate-500 mb-1 font-mono">
+                        {msg.role === "user" ? "You (受講者)" : "AI Peer (同僚エージェント)"}
+                      </div>
+                      <div
+                        className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
+                          msg.role === "user"
+                            ? "bg-blue-600 text-white rounded-tr-sm"
+                            : "bg-slate-800/90 text-slate-100 rounded-tl-sm border border-slate-700/60"
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* CFF-1 Warning Toast if triggered */}
+                {cffActiveWarning && (
+                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="leading-relaxed">{cffActiveWarning}</div>
+                  </div>
+                )}
+
+                {/* Input Prompt Box */}
+                <div className="flex gap-2 pt-2">
+                  <input
+                    type="text"
+                    value={userPromptInput}
+                    onChange={(e) => setUserPromptInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !isSubmitting && handleSendDialogueTurn()}
+                    placeholder="AI同僚に指示・指摘を入力（例: JWT検証のみだと強制ログアウト時に無効化できないリスクがあります）"
+                    className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    onClick={handleSendDialogueTurn}
+                    disabled={isSubmitting || !userPromptInput.trim()}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-500 transition-all disabled:opacity-40"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    送信
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: XAI Evaluation Report Screen (W5) */}
+          {currentStep === "evaluation_report" && evaluation && (
+            <div className="glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/70 shadow-2xl space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center font-bold text-white text-lg">
+                    {evaluation.ratingCategory}
+                  </div>
+                  <div>
+                    <span className="text-xs font-mono text-emerald-400 uppercase tracking-wider">
+                      AutoSCORE 2段階評価結果（XAIレポート）
+                    </span>
+                    <h2 className="text-lg font-bold text-white">{evaluation.levelLabel}</h2>
+                  </div>
+                </div>
+                <span className="text-xs font-mono px-2.5 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                  {evaluation.scorerModelVersion}
+                </span>
+              </div>
+
+              {/* Rationale & Feedback */}
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    判定根拠（Evidence Summary）
+                  </h3>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {evaluation.evidenceSummary}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-blue-950/30 border border-blue-900/40 space-y-2">
+                  <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider">
+                    形成的診断アドバイス（Diagnostic Feedback）
+                  </h3>
+                  <p className="text-xs text-blue-200/90 leading-relaxed">
+                    {evaluation.diagnosticFeedback}
+                  </p>
+                </div>
+              </div>
+
+              {/* Evidence Components Highlight Spans */}
+              <div className="space-y-3 pt-2">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  抽出された受講者の検証行動スパン（Stage 1 構造化出力）
+                </h3>
+                <div className="space-y-2.5">
+                  {evaluation.evidenceComponents.map((comp, i) => (
+                    <div
+                      key={i}
+                      className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5"
+                    >
+                      <div className="flex justify-between items-center text-[10px] font-mono">
+                        <span className="text-purple-400 font-bold">
+                          [Turn {comp.turn_index}] {comp.component_type}
+                        </span>
+                        {comp.injected_flaw_id && (
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            Match: {comp.injected_flaw_id}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs font-medium text-slate-200 bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono">
+                        &quot;{comp.quoted_span}&quot;
+                      </div>
+                      <p className="text-[11px] text-slate-400">{comp.rationale_summary}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Score Feedback & Dispute Section [MVP 4.5] */}
+              <div className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-3 pt-4">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                  <HelpCircle className="w-4 h-4 text-amber-400" />
+                  評点に対する異議申立・フィードバック（MVP 4.5 準拠）
+                </div>
+                {disputeSubmitted ? (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
+                    ✓ 異議申立が `score_feedback` テーブルへ記録されました。SME評価者による再検証対象となります。
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <textarea
+                      value={disputeReason}
+                      onChange={(e) => setDisputeReason(e.target.value)}
+                      placeholder="「ターン3で触れたフォールバック要件の指摘が反映されていません」など、異議の理由を具体的に記述してください（必須）"
+                      className="w-full bg-slate-900 text-xs text-slate-200 p-3 rounded-xl border border-slate-700 resize-none h-20 focus:outline-none focus:border-blue-500"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleSubmitDispute}
+                        disabled={!disputeReason.trim()}
+                        className="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 text-xs font-medium hover:bg-slate-700 border border-slate-700 disabled:opacity-40"
+                      >
+                        異議を申し立てる（記録）
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-4 flex justify-between items-center border-t border-slate-800">
                 <button
                   onClick={() => setCurrentStep("init")}
                   className="text-xs text-slate-400 hover:text-slate-200 underline"
                 >
-                  ← 別のアンカー項目を試す
+                  ← トップへ戻り最初からやり直す
                 </button>
-                <div className="text-xs text-slate-500 font-mono">
-                  W1・W2 縦切り検証完了
+                <div className="text-xs text-emerald-400 font-mono flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" />
+                  W1〜W5 全フロー縦切り動作完了
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Right Column: Live Telemetry & System Diagnostics */}
+        {/* Right Column: Live Telemetry Monitor & System Architecture */}
         <div className="space-y-6">
           {/* Telemetry Card */}
           <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl space-y-4">
@@ -461,15 +898,19 @@ export default function AssessmentPrototypePage() {
               </div>
               <div className="flex justify-between py-1 border-b border-slate-800/60">
                 <span className="text-slate-500">Target Axis:</span>
-                <span className="text-purple-400 font-semibold">軸4（Epistemic & Ethical）</span>
+                <span className="text-purple-400 font-semibold">軸4（前提・倫理）</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800/60">
+                <span className="text-slate-500">Scorer Version:</span>
+                <span className="text-slate-400 text-[10px]">claude-opus-5/extract-v1</span>
               </div>
             </div>
 
             <div>
               <div className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
-                Event Log
+                Telemetry Event Stream
               </div>
-              <div className="h-52 overflow-y-auto bg-slate-950/80 p-3 rounded-lg border border-slate-800/80 font-mono text-[11px] text-slate-300 space-y-1.5">
+              <div className="h-60 overflow-y-auto bg-slate-950/90 p-3 rounded-lg border border-slate-800/80 font-mono text-[11px] text-slate-300 space-y-1.5">
                 {telemetryLog.length === 0 ? (
                   <div className="text-slate-600 italic">待機中... セッションを開始するとイベントが記録されます</div>
                 ) : (
@@ -483,16 +924,18 @@ export default function AssessmentPrototypePage() {
             </div>
           </div>
 
-          {/* Audit & Compliance Card */}
+          {/* Audit & Compliance Specs Card */}
           <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl space-y-3 text-xs text-slate-400">
             <div className="flex items-center gap-2 text-slate-200 font-semibold">
               <ShieldCheck className="w-4 h-4 text-blue-400" />
               未踏アドバンスト審査用仕様準拠
             </div>
-            <p className="leading-relaxed text-[11px]">
-              本プロトタイプは、[実行指示書 T-17](products/enishio-education/docs/実行指示書_T-17_審査用縦切りプロトタイプ.md)
-              で定義されたデータモデル（`learners`, `sessions`, `ratings`, `anchor_responses`）の本番仕様に完全準拠して動作しています。
-            </p>
+            <ul className="space-y-1.5 text-[11px] list-disc list-inside">
+              <li>データモデル: `learners`, `sessions`, `ratings` 本番準拠</li>
+              <li>AutoSCORE: 自由記述CoTを排した2段階構造化採点</li>
+              <li>CFF機能: 意図確認（CFF-1）インターロック動作</li>
+              <li>XAIレポート: 根拠スパンの可視化と異議申立導線（MVP 4.5）</li>
+            </ul>
           </div>
         </div>
       </div>
