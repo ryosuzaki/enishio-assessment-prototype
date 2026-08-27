@@ -1,0 +1,254 @@
+"use client";
+
+import React from "react";
+import {
+  Layers,
+  ArrowRight,
+  FileText,
+  Code,
+  Eye,
+  Plus,
+  Trash2,
+  CheckSquare,
+  MessageSquare,
+  AlertCircle,
+  Send,
+} from "lucide-react";
+import type { DynamicTaskScenario } from "@/data/dynamic-task";
+import type { ChatMessage, FocusItem } from "../types";
+
+interface DialogueSessionStepProps {
+  selectedTask: DynamicTaskScenario;
+  artifactCode: string;
+  setArtifactCode: (code: string) => void;
+  focusItems: FocusItem[];
+  focusInputText: string;
+  setFocusInputText: (text: string) => void;
+  chatHistory: ChatMessage[];
+  turnCounter: number;
+  userPromptInput: string;
+  setUserPromptInput: (input: string) => void;
+  cffActiveWarning: string | null;
+  isSubmitting: boolean;
+  onProceedToPreliminaryJudgement: () => void;
+  onAddFocusItem: (textSnippet?: string, noteText?: string) => void;
+  onRemoveFocusItem: (seq: number) => void;
+  onSendDialogueTurn: () => void;
+}
+
+export function DialogueSessionStep({
+  selectedTask,
+  artifactCode,
+  setArtifactCode,
+  focusItems,
+  focusInputText,
+  setFocusInputText,
+  chatHistory,
+  turnCounter,
+  userPromptInput,
+  setUserPromptInput,
+  cffActiveWarning,
+  isSubmitting,
+  onProceedToPreliminaryJudgement,
+  onAddFocusItem,
+  onRemoveFocusItem,
+  onSendDialogueTurn,
+}: DialogueSessionStepProps) {
+  return (
+    <div className="space-y-6">
+      {/* Task Header */}
+      <div className="glass-panel p-5 rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div className="text-xs font-mono text-blue-400 mb-1 flex items-center gap-2">
+            <Layers className="w-3.5 h-3.5" /> 動的課題: {selectedTask.task_id}
+          </div>
+          <h2 className="text-base font-bold text-white">{selectedTask.title}</h2>
+        </div>
+        <button
+          onClick={onProceedToPreliminaryJudgement}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/20"
+        >
+          レビュー完了 ➔ 暫定判断へ進む
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* 3-Pane Layout Grid (Left: Requirements / Middle: Artifact / Right: Verification Panel) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left Pane (1): Scenario & Requirements */}
+        <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-3 flex flex-col h-[480px] overflow-y-auto">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300 border-b border-slate-800 pb-2">
+            <FileText className="w-3.5 h-3.5 text-blue-400" />
+            【第1ペイン】業務要件と制約条件
+          </div>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            {selectedTask.scenario_intro}
+          </p>
+          <div className="space-y-1.5 pt-1">
+            <span className="text-[11px] font-bold text-slate-400">必須要件:</span>
+            {selectedTask.business_requirements.map((req, i) => (
+              <div key={i} className="text-xs text-slate-300 bg-slate-900/70 p-2 rounded border border-slate-800">
+                {req}
+              </div>
+            ))}
+          </div>
+          <div className="space-y-1.5 pt-1">
+            <span className="text-[11px] font-bold text-amber-400">制約・セキュリティ基準:</span>
+            {selectedTask.constraints.map((c, i) => (
+              <div key={i} className="text-xs text-amber-200/90 bg-amber-950/20 p-2 rounded border border-amber-900/30">
+                {c}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Middle Pane (2): AI Artifact Code Editor */}
+        <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2 flex flex-col h-[480px]">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+              <Code className="w-3.5 h-3.5 text-emerald-400" />
+              【第2ペイン】成果物ドラフト
+            </div>
+            <span className="text-[10px] font-mono text-slate-500">Live Editor</span>
+          </div>
+          <textarea
+            value={artifactCode}
+            onChange={(e) => setArtifactCode(e.target.value)}
+            className="w-full flex-1 bg-slate-900/90 font-mono text-[11px] text-slate-200 p-3 rounded-lg border border-slate-800 resize-none focus:outline-none focus:border-blue-500"
+          />
+          {/* Quick Focus Add Bar */}
+          <div className="pt-1 flex gap-1.5">
+            <input
+              type="text"
+              value={focusInputText}
+              onChange={(e) => setFocusInputText(e.target.value)}
+              placeholder="検証対象とするコード断片・キーワード"
+              className="flex-1 bg-slate-900 text-[11px] text-slate-200 px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500"
+            />
+            <button
+              onClick={() => onAddFocusItem()}
+              disabled={!focusInputText.trim()}
+              className="px-3 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white text-[11px] font-medium transition-all disabled:opacity-40 flex items-center gap-1 shrink-0"
+            >
+              <Plus className="w-3 h-3" />
+              検証パネルへ追加
+            </button>
+          </div>
+        </div>
+
+        {/* Right Pane (3): Verification Focus Panel [MVP 4.4, T-17b] */}
+        <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2 flex flex-col h-[480px]">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+              <Eye className="w-3.5 h-3.5 text-purple-400" />
+              【第3ペイン】検証パネル
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              focus_seq 順序記録
+            </span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            {focusItems.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-500 text-xs">
+                <CheckSquare className="w-8 h-8 mb-2 opacity-30" />
+                <p>成果物の確認箇所を選択・入力して「検証パネルへ追加」を押すと、検証順序がここに記録されます。</p>
+              </div>
+            ) : (
+              focusItems.map((item) => (
+                <div
+                  key={item.focusSeq}
+                  className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1 relative group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">
+                      #{item.focusSeq}
+                    </span>
+                    <button
+                      onClick={() => onRemoveFocusItem(item.focusSeq)}
+                      className="text-slate-500 hover:text-red-400 p-0.5 transition-colors"
+                      title="削除"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <p className="text-[11px] font-mono text-slate-200 bg-slate-950 p-1.5 rounded border border-slate-800/80 break-all">
+                    {item.selectedText}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-slate-800/80 text-[10px] text-slate-500 leading-tight">
+            ※ 選択箇所と順序は <code className="text-purple-400">verification_focus_sequence</code> ログとして保存されます（AI採点には入力されません）。
+          </div>
+        </div>
+      </div>
+
+      {/* Chat & Prompt Dialogue Pane */}
+      <div className="glass-panel p-5 rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+            <MessageSquare className="w-4 h-4 text-purple-400" />
+            AI同僚との対話・修正指示（マルチターン対話）
+          </div>
+          <span className="text-[10px] font-mono text-slate-400">Turn #{turnCounter}</span>
+        </div>
+
+        {/* Chat Message List */}
+        <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+          {chatHistory.map((msg, i) => (
+            <div
+              key={i}
+              className={`flex flex-col ${
+                msg.role === "user" ? "items-end" : "items-start"
+              }`}
+            >
+              <div className="text-[10px] text-slate-500 mb-1 font-mono">
+                {msg.role === "user" ? "You (受講者)" : "AI Peer (同僚エージェント)"}
+              </div>
+              <div
+                className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
+                  msg.role === "user"
+                    ? "bg-blue-600 text-white rounded-tr-sm"
+                    : "bg-slate-800/90 text-slate-100 rounded-tl-sm border border-slate-700/60"
+                }`}
+              >
+                {msg.content}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Intent-Action Gap Warning Toast if triggered */}
+        {cffActiveWarning && (
+          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="leading-relaxed">{cffActiveWarning}</div>
+          </div>
+        )}
+
+        {/* Input Prompt Box */}
+        <div className="flex gap-2 pt-2">
+          <input
+            type="text"
+            value={userPromptInput}
+            onChange={(e) => setUserPromptInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !isSubmitting && onSendDialogueTurn()}
+            placeholder="AI同僚に指示・指摘を入力（例: JWT検証のみだと強制ログアウト時に無効化できないリスクがあります）"
+            className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
+          />
+          <button
+            onClick={onSendDialogueTurn}
+            disabled={isSubmitting || !userPromptInput.trim()}
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-500 transition-all disabled:opacity-40"
+          >
+            <Send className="w-3.5 h-3.5" />
+            送信
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
