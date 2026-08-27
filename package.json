@@ -12,7 +12,10 @@
     "prisma:migrate": "prisma migrate dev",
     "parse:anchors": "node scripts/import-anchors.cjs",
     "seed": "tsx scripts/seed-demo.ts",
-    "seed:anchors": "tsx scripts/seed-anchors.ts"
+    "seed:anchors": "tsx scripts/seed-anchors.ts",
+    "check:no-leak": "node scripts/check-no-leaked-secrets.mjs",
+    "check:flaw-detection": "tsx scripts/check-flaw-detection-resistance.ts",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
@@ -39,6 +42,7 @@
     "prisma": "^5.22.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.12",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
   }
 }

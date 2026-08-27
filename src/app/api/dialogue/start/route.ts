@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { recordInjectedFlawMap, resolveSessionContext } from "@/lib/telemetry";
-import { INJECTED_FLAWS } from "@/data/dynamic-task.server";
-import { DEMO_DYNAMIC_TASK } from "@/data/dynamic-task";
+import { getInjectedFlaws } from "@/data/dynamic-task.server";
+import { getDynamicTask } from "@/data/dynamic-task";
 
 /**
  * POST /api/dialogue/start
@@ -15,16 +15,21 @@ import { DEMO_DYNAMIC_TASK } from "@/data/dynamic-task";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { sessionId } = body;
+    const { sessionId, taskId } = body;
 
-    if (!sessionId) {
-      return NextResponse.json({ success: false, error: "Missing sessionId" }, { status: 400 });
+    if (!sessionId || !taskId) {
+      return NextResponse.json({ success: false, error: "Missing sessionId or taskId" }, { status: 400 });
     }
+
+    // taskId が未知のIDなら getDynamicTask が投げる（黙って別課題にすり替えない）
+    const task = getDynamicTask(taskId);
+    const injectedFlaws = getInjectedFlaws(taskId);
+
     await resolveSessionContext(sessionId);
 
     const recorded = await recordInjectedFlawMap(
       sessionId,
-      INJECTED_FLAWS.map((f) => ({
+      injectedFlaws.map((f) => ({
         flaw_id: f.flaw_id,
         flaw_type: f.flaw_type,
         span_text: f.span_text,
@@ -35,10 +40,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      taskId: DEMO_DYNAMIC_TASK.task_id,
+      taskId: task.task_id,
       recordedSpanCount: recorded,
-      flawCount: INJECTED_FLAWS.filter((f) => f.is_flaw).length,
-      normalSpanCount: INJECTED_FLAWS.filter((f) => !f.is_flaw).length,
+      flawCount: injectedFlaws.filter((f) => f.is_flaw).length,
+      normalSpanCount: injectedFlaws.filter((f) => !f.is_flaw).length,
     });
   } catch (error: any) {
     console.error("Dialogue start error:", error);

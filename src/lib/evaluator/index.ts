@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { INJECTED_FLAWS } from "@/data/dynamic-task.server";
+import { getInjectedFlaws, getRubricHint } from "@/data/dynamic-task.server";
 
 // Stage 1 Schema: Evidence Components Extraction [MVP 2.6, W4]
 export const EvidenceComponentSchema = z.object({
@@ -64,7 +64,9 @@ export function levelLabelFor(ratingCategory: number): string {
 }
 
 // モデルID＋プロンプト版の複合文字列（実行指示書 §5）。プロンプトを直したら必ず上げる。
-export const SCORER_MODEL_VERSION = "claude-opus-5/extract-v2/score-v2";
+// v3: extractEvidence/computeBandScore を taskId 引数化し、ルーブリックをタスク非依存の
+// 一般記述へ書き換えたため v2 から更新（T-06a）。
+export const SCORER_MODEL_VERSION = "claude-opus-5/extract-v3/score-v3";
 
 // これを下回った判定は rater_type = "pending_human" として記録し、スコアを確定させない（W4-3）
 export const HITL_CONFIDENCE_THRESHOLD = 0.7;
@@ -104,9 +106,11 @@ function getClient(stage: "extract" | "score"): Anthropic {
  */
 export async function extractEvidence(
   transcript: { turnSeq: number; role: string; content: string }[],
-  finalArtifact: string
+  finalArtifact: string,
+  taskId: string
 ): Promise<EvidenceExtractionOutput> {
   const client = getClient("extract");
+  const injectedFlaws = getInjectedFlaws(taskId);
 
   const promptText = `
 あなたは教育心理測定学に基づくアセスメントの「第1段階：根拠抽出パーサー」です。
@@ -119,7 +123,7 @@ export async function extractEvidence(
 - avoided_false_positives は、受講者が正常箇所を明示的に「これは妥当だ」と判断した場合のみ true です。言及が無い場合は false です。
 
 【課題シナリオと仕込み不備の基準マップ】
-${JSON.stringify(INJECTED_FLAWS, null, 2)}
+${JSON.stringify(injectedFlaws, null, 2)}
 
 【対話ログ】
 ${transcript.map((t) => `[Turn ${t.turnSeq}] ${t.role.toUpperCase()}: ${t.content}`).join("\n")}
@@ -147,9 +151,11 @@ ${finalArtifact}
  * 入力は第1段階の構造化出力のみ。対話ログの生テキストは渡さない（実行指示書 §6.1-2）。
  */
 export async function computeBandScore(
-  evidence: EvidenceExtractionOutput
+  evidence: EvidenceExtractionOutput,
+  taskId: string
 ): Promise<ScoringOutput> {
   const client = getClient("score");
+  const rubricHint = getRubricHint(taskId);
 
   const promptText = `
 あなたは教育測定学に基づくアセスメントの「第2段階：軸4 バンド採点器」です。
@@ -158,13 +164,16 @@ export async function computeBandScore(
 【第1段階の構造化根拠データ】
 ${JSON.stringify(evidence, null, 2)}
 
-【軸4 ルーブリック基準】
+【軸4 ルーブリック基準（タスク非依存の一般記述）】
 - Level 0: 判定材料が無い（根拠要素が空、または検証行動が1件も抽出されていない）
 - Level 1: AIの提案を無批判に受け入れている（blind_acceptance がある）
 - Level 2: 不備の存在には気づいているが、理由やトレードオフが言語化できず曖昧
-- Level 3: トークン失効（強制ログアウト）や単一障害点のリスクを具体的に指摘できている
-- Level 4: 不備を正確に指摘しつつ、正常箇所（過去キー許容）を過剰指摘せず**明示的に正当と判断している**
+- Level 3: 業務要件・制約から生じる前提やトレードオフのリスクを具体的に指摘できている
+- Level 4: 不備を正確に指摘しつつ、正常だが疑わしい箇所を過剰指摘せず**明示的に正当と判断している**
 - Level 5: 代替アーキテクチャやフォールバック設計を明確に指示できている
+
+【この課題固有の着眼点（参考。ルーブリックの判定基準そのものではない）】
+${rubricHint}
 
 【厳守事項】
 - 抽出された根拠に無い事実を evidence_summary に書いてはいけません。受講者が正常箇所に言及していないなら「正常箇所を正しく弁別した」と書いてはいけません。

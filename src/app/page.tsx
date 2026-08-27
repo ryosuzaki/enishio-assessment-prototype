@@ -26,7 +26,7 @@ import {
   CheckSquare,
   FileCheck,
 } from "lucide-react";
-import { DEMO_DYNAMIC_TASK } from "@/data/dynamic-task";
+import { DYNAMIC_TASKS, getDynamicTask } from "@/data/dynamic-task";
 import { levenshtein } from "@/lib/edit-distance";
 
 interface AnchorItem {
@@ -82,6 +82,65 @@ interface EvaluationResult {
   scorerModelVersion: string;
 }
 
+type EvidenceComponent = EvaluationResult["evidenceComponents"][number];
+
+// 対話ログの1メッセージ本文に対し、同一ターンの evidenceComponents.quoted_span が
+// 部分一致する箇所を <mark> でハイライトする。完全一致は要求しない（LLM抽出のため）。
+// 見つからない場合は何もハイライトせず、元の文字列（配列内の単一要素）を返す。
+function renderChatContentWithHighlights(
+  content: string,
+  turnComponents: EvidenceComponent[]
+): React.ReactNode[] {
+  type Range = { start: number; end: number; comp: EvidenceComponent };
+  const ranges: Range[] = [];
+  for (const comp of turnComponents) {
+    const span = comp.quoted_span;
+    if (!span) continue;
+    const idx = content.indexOf(span);
+    if (idx === -1) continue; // 静かにフォールバック（エラーにしない）
+    ranges.push({ start: idx, end: idx + span.length, comp });
+  }
+  if (ranges.length === 0) return [content];
+
+  ranges.sort((a, b) => a.start - b.start);
+  const accepted: Range[] = [];
+  let lastEnd = -1;
+  for (const r of ranges) {
+    // 重複範囲は先勝ちでスキップ（<mark> の入れ子を避ける）
+    if (r.start >= lastEnd) {
+      accepted.push(r);
+      lastEnd = r.end;
+    }
+  }
+
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  accepted.forEach((r, idx) => {
+    if (r.start > cursor) {
+      nodes.push(content.slice(cursor, r.start));
+    }
+    const isFlawLinked = !!r.comp.injected_flaw_id;
+    nodes.push(
+      <mark
+        key={`hl-${idx}`}
+        title={`${r.comp.component_type} / ${r.comp.rationale_summary}`}
+        className={
+          isFlawLinked
+            ? "bg-emerald-500/25 text-emerald-100 rounded px-0.5 not-italic"
+            : "bg-indigo-500/20 text-indigo-100 rounded px-0.5 not-italic"
+        }
+      >
+        {content.slice(r.start, r.end)}
+      </mark>
+    );
+    cursor = r.end;
+  });
+  if (cursor < content.length) {
+    nodes.push(content.slice(cursor));
+  }
+  return nodes;
+}
+
 export default function AssessmentPrototypePage() {
   // Session & Phase State
   const [sessionId, setSessionId] = useState<string>("");
@@ -110,14 +169,18 @@ export default function AssessmentPrototypePage() {
   const [q1DurationMs, setQ1DurationMs] = useState<number>(0);
   const [q2DurationMs, setQ2DurationMs] = useState<number>(0);
 
+  // Dynamic Task Selection (T-06a) — 取り組む動的課題をレジストリから選択する
+  const [selectedTaskId, setSelectedTaskId] = useState<string>(DYNAMIC_TASKS[0].task_id);
+  const selectedTask = getDynamicTask(selectedTaskId);
+
   // Dynamic Session State (W3)
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [userPromptInput, setUserPromptInput] = useState<string>("");
-  const [artifactCode, setArtifactCode] = useState<string>(DEMO_DYNAMIC_TASK.initial_ai_draft);
+  const [artifactCode, setArtifactCode] = useState<string>(DYNAMIC_TASKS[0].initial_ai_draft);
   const [turnCounter, setTurnCounter] = useState<number>(1);
   const [cffActiveWarning, setCffActiveWarning] = useState<string | null>(null);
   // 直近に記録した成果物。次ターンの編集距離をこれとの差分で測る（MVP 4.4）
-  const [lastLoggedArtifact, setLastLoggedArtifact] = useState<string>(DEMO_DYNAMIC_TASK.initial_ai_draft);
+  const [lastLoggedArtifact, setLastLoggedArtifact] = useState<string>(DYNAMIC_TASKS[0].initial_ai_draft);
 
   // Verification Focus Panel State (W3 3rd-Pane) [MVP 4.4, T-17b]
   const [focusItems, setFocusItems] = useState<FocusItem[]>([]);
@@ -252,7 +315,7 @@ export default function AssessmentPrototypePage() {
       const res = await fetch("/api/dialogue/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ sessionId, taskId: selectedTaskId }),
       });
       const data = await res.json();
       if (data.success) {
@@ -269,16 +332,17 @@ export default function AssessmentPrototypePage() {
     }
 
     setCurrentStep("dialogue_session");
+    setArtifactCode(selectedTask.initial_ai_draft);
     setChatHistory([
       {
         turnSeq: 1,
         role: "assistant",
-        content: `決済APIのレートリミットおよびトークン認証ミドルウェアを作成しました。右側のコードを確認いただき、本番リリースに向けたレビューをお願いします！`,
+        content: `${selectedTask.title}に関する成果物を作成しました。右側のコードを確認いただき、本番リリースに向けたレビューをお願いします！`,
       },
     ]);
     setTurnCounter(2);
-    setLastLoggedArtifact(DEMO_DYNAMIC_TASK.initial_ai_draft);
-    addTelemetry(`Dynamic Task initiated (${DEMO_DYNAMIC_TASK.task_id})`);
+    setLastLoggedArtifact(selectedTask.initial_ai_draft);
+    addTelemetry(`Dynamic Task initiated (${selectedTask.task_id})`);
   };
 
   // Send User Prompt in Dialogue Session (W3)
@@ -305,6 +369,7 @@ export default function AssessmentPrototypePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
+          taskId: selectedTaskId,
           turnSeq: currentTurn,
           userMessage: userText,
           currentArtifactText: artifactCode,
@@ -414,7 +479,7 @@ export default function AssessmentPrototypePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
-          stepId: "step-dynamic-fintech-01",
+          stepId: `step-dynamic-${selectedTaskId}`,
           action: prelimAction,
           selfEstimatedScore: prelimScore,
           justification: prelimJustification.trim(),
@@ -454,6 +519,7 @@ export default function AssessmentPrototypePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
+          taskId: selectedTaskId,
           transcript: chatHistory,
           finalArtifact: artifactCode,
         }),
@@ -551,6 +617,26 @@ export default function AssessmentPrototypePage() {
                 </select>
                 <p className="text-xs text-slate-500">
                   ※実稼働時はセッション列の7回に1回、ランダムに自動混入されます（`anchor_status: pretest`・無得点運用）。
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  取り組む動的課題（T-06a タスクレジストリ / 全{DYNAMIC_TASKS.length}件から選択）
+                </label>
+                <select
+                  value={selectedTaskId}
+                  onChange={(e) => setSelectedTaskId(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+                >
+                  {DYNAMIC_TASKS.map((t) => (
+                    <option key={t.task_id} value={t.task_id}>
+                      [{t.task_id}] {t.title}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500">
+                  ※選択した課題のドラフトコードをAI同僚がレビュー用に提示します（ドメイン: {selectedTask.domain}）。
                 </p>
               </div>
 
@@ -792,9 +878,9 @@ export default function AssessmentPrototypePage() {
               <div className="glass-panel p-5 rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                   <div className="text-xs font-mono text-blue-400 mb-1 flex items-center gap-2">
-                    <Layers className="w-3.5 h-3.5" /> 動的課題: {DEMO_DYNAMIC_TASK.task_id}
+                    <Layers className="w-3.5 h-3.5" /> 動的課題: {selectedTask.task_id}
                   </div>
-                  <h2 className="text-base font-bold text-white">{DEMO_DYNAMIC_TASK.title}</h2>
+                  <h2 className="text-base font-bold text-white">{selectedTask.title}</h2>
                 </div>
                 <button
                   onClick={handleProceedToPreliminaryJudgement}
@@ -814,11 +900,11 @@ export default function AssessmentPrototypePage() {
                     【第1ペイン】業務要件と制約条件
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    {DEMO_DYNAMIC_TASK.scenario_intro}
+                    {selectedTask.scenario_intro}
                   </p>
                   <div className="space-y-1.5 pt-1">
                     <span className="text-[11px] font-bold text-slate-400">必須要件:</span>
-                    {DEMO_DYNAMIC_TASK.business_requirements.map((req, i) => (
+                    {selectedTask.business_requirements.map((req, i) => (
                       <div key={i} className="text-xs text-slate-300 bg-slate-900/70 p-2 rounded border border-slate-800">
                         {req}
                       </div>
@@ -826,7 +912,7 @@ export default function AssessmentPrototypePage() {
                   </div>
                   <div className="space-y-1.5 pt-1">
                     <span className="text-[11px] font-bold text-amber-400">制約・セキュリティ基準:</span>
-                    {DEMO_DYNAMIC_TASK.constraints.map((c, i) => (
+                    {selectedTask.constraints.map((c, i) => (
                       <div key={i} className="text-xs text-amber-200/90 bg-amber-950/20 p-2 rounded border border-amber-900/30">
                         {c}
                       </div>
@@ -1223,6 +1309,49 @@ export default function AssessmentPrototypePage() {
                   <p className="text-xs text-blue-200/90 leading-relaxed">
                     {evaluation.diagnosticFeedback}
                   </p>
+                </div>
+              </div>
+
+              {/* Dialogue Log with Evidence Highlights [根拠ハイライト] */}
+              <div className="space-y-3 pt-2">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  対話ログ（根拠ハイライト付き）
+                </h3>
+                <p className="text-[10px] text-slate-500 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-emerald-500/25 border border-emerald-500/40" />
+                    仕込み不備・正常箇所に対応する検証行動
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 rounded-sm bg-indigo-500/20 border border-indigo-500/40" />
+                    それ以外の一般的な検証行動
+                  </span>
+                </p>
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2 bg-slate-950/60 border border-slate-800 rounded-xl p-4">
+                  {chatHistory.map((msg, i) => {
+                    const turnComponents = evaluation.evidenceComponents.filter(
+                      (c) => c.turn_index === msg.turnSeq
+                    );
+                    return (
+                      <div
+                        key={i}
+                        className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
+                      >
+                        <div className="text-[10px] text-slate-500 mb-1 font-mono">
+                          {msg.role === "user" ? "You (受講者)" : "AI Peer (同僚エージェント)"} ・ Turn {msg.turnSeq}
+                        </div>
+                        <div
+                          className={`max-w-[90%] p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
+                            msg.role === "user"
+                              ? "bg-blue-600/90 text-white rounded-tr-sm"
+                              : "bg-slate-800/90 text-slate-100 rounded-tl-sm border border-slate-700/60"
+                          }`}
+                        >
+                          {renderChatContentWithHighlights(msg.content, turnComponents)}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

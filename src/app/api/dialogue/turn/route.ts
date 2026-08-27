@@ -3,8 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { recordPromptTurn, recordEditDistance, resolveSessionContext } from "@/lib/telemetry";
-import { AI_PEER_SYSTEM_PROMPT } from "@/data/dynamic-task.server";
-import { DEMO_DYNAMIC_TASK } from "@/data/dynamic-task";
+import { getAiPeerSystemPrompt, getIntentGapMessage } from "@/data/dynamic-task.server";
+import { getDynamicTask } from "@/data/dynamic-task";
 import { prisma } from "@/lib/db";
 
 // AI同僚の応答。**仕込み不備の位置は渡さない** —— 渡すとAI同僚が自分から不備を
@@ -19,25 +19,25 @@ const AiPeerReplySchema = z.object({
 
 // 意図-行動ギャップのインターロック。
 // **これは実行指示書 §7 W3 が指定する CFF 2種（Force Decision First /
-// Mandatory Justification）ではない。**それらは未実装である（README の
-// 「作っていないもの」を参照）。
+// Mandatory Justification）ではない。**それらは preliminary-judgement 側で別途実装されている。
 const INTENT_GAP_PATTERN = /^(了解|ok|OK|いいよ|これでよし|これで進めて|問題なし|オッケー)$/i;
-const INTENT_GAP_MESSAGE =
-  "⚠️ 【インターロック: 意図確認】AIの提案内容を具体的に検証しましたか？ セキュリティ基準（PCI DSS失効伝播）や可用性要件（Redis障害時の挙動）に適合しているか、具体的な理由を言語化してください。";
 
 // POST /api/dialogue/turn - process user prompt & AI peer response
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { sessionId, turnSeq, userMessage, currentArtifactText, editDistance } = body;
+    const { sessionId, taskId, turnSeq, userMessage, currentArtifactText, editDistance } = body;
 
-    if (!sessionId || !userMessage) {
+    if (!sessionId || !taskId || !userMessage) {
       return NextResponse.json({ success: false, error: "Missing required parameters" }, { status: 400 });
     }
     await resolveSessionContext(sessionId);
 
+    // taskId が未知のIDなら getDynamicTask が投げる（黙って別課題にすり替えない）
+    const task = getDynamicTask(taskId);
+
     const artifactText =
-      typeof currentArtifactText === "string" ? currentArtifactText : DEMO_DYNAMIC_TASK.initial_ai_draft;
+      typeof currentArtifactText === "string" ? currentArtifactText : task.initial_ai_draft;
 
     // 1. Record user prompt turn
     await recordPromptTurn(sessionId, Number(turnSeq), "user", userMessage);
@@ -51,10 +51,11 @@ export async function POST(req: Request) {
 
     // 3. Intent-action gap interlock
     if (userMessage.trim().match(INTENT_GAP_PATTERN)) {
-      await recordPromptTurn(sessionId, assistantTurnSeq, "assistant", INTENT_GAP_MESSAGE);
+      const intentGapMessage = getIntentGapMessage(taskId);
+      await recordPromptTurn(sessionId, assistantTurnSeq, "assistant", intentGapMessage);
       return NextResponse.json({
         success: true,
-        assistantMessage: INTENT_GAP_MESSAGE,
+        assistantMessage: intentGapMessage,
         isInterlockTriggered: true,
         assistantTurnSeq,
       });
@@ -84,16 +85,16 @@ export async function POST(req: Request) {
     const res = await client.messages.parse({
       model: "claude-opus-5",
       max_tokens: 16000,
-      system: `${AI_PEER_SYSTEM_PROMPT}
+      system: `${getAiPeerSystemPrompt(taskId)}
 
 【あなたが書いた現在のコード】
 ${artifactText}
 
 【この課題の業務要件】
-${DEMO_DYNAMIC_TASK.business_requirements.join("\n")}
+${task.business_requirements.join("\n")}
 
 【制約】
-${DEMO_DYNAMIC_TASK.constraints.join("\n")}
+${task.constraints.join("\n")}
 
 受講者から具体的な指摘を受けてコードを直す場合のみ updated_artifact にコード全文を入れてください。
 自分から不備を列挙して先回りしてはいけません。指摘されていない箇所は直さないでください。`,
