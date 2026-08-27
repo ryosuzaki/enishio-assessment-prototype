@@ -128,7 +128,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
 
     // 画面タイトル・ヘッダー確認
     await expect(page.locator("h1")).toContainText("評価的判断力 動的アセスメント＆テレメトリ基盤");
-    await expect(page.getByText("未踏アドバンスト審査用 縦切りプロトタイプ")).toBeVisible();
+    await expect(page.getByText("評価的判断力 動的アセスメント 縦切りプロトタイプ")).toBeVisible();
 
     // アンカー項目のドロップダウン（全20項目）
     const anchorSelect = page.locator("select").first();

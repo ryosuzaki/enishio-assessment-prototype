@@ -75,7 +75,7 @@ export function TelemetryPanel({
       <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl space-y-3 text-xs text-slate-400">
         <div className="flex items-center gap-2 text-slate-200 font-semibold">
           <ShieldCheck className="w-4 h-4 text-blue-400" />
-          未踏アドバンスト審査用仕様準拠
+          検証・テレメトリ仕様準拠
         </div>
         <ul className="space-y-1.5 text-[11px] list-disc list-inside">
           <li>データモデル: `learners`, `sessions`, `ratings`, `learner_preliminary_judgements`, `verification_focus_sequences` 本番準拠</li>

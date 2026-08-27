@@ -29,7 +29,7 @@ export function InitStep({
     <div className="glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl space-y-6">
       <div className="flex items-center gap-3 text-blue-400 font-semibold text-sm">
         <Sparkles className="w-5 h-5" />
-        <span>未踏アドバンスト審査用 縦切りプロトタイプ（T-17 W1〜W6）</span>
+        <span>評価的判断力 動的アセスメント 縦切りプロトタイプ（W1〜W6）</span>
       </div>
       <h1 className="text-2xl font-bold text-white tracking-tight">
         評価的判断力 動的アセスメント＆テレメトリ基盤
