@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    env:
+      # CI環境用のダミーDB接続文字列。Prisma generate や型チェックで使用される（Secrets不要）
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/enishio_test?schema=public"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit
+
+      - name: Run unit tests (Vitest)
+        run: npm run test
+
+      - name: Build Next.js application
+        run: npm run build
+
+      - name: Check for secret leaks in client bundle
+        run: npm run check:no-leak
+
+      # E2Eテストは全APIルートをモック（page.route）しているため、実DBや実LLM APIキーなしで実行可能
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        run: npm run test:e2e
+        env:
+          CI: "true"

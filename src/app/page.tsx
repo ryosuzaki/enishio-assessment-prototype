@@ -531,6 +531,9 @@ export default function AssessmentPrototypePage() {
             <EvaluationReportStep
               evaluation={evaluation}
               chatHistory={chatHistory}
+              prelimAction={prelimAction}
+              prelimScore={prelimScore}
+              prelimJustification={prelimJustification}
               disputeReason={disputeReason}
               setDisputeReason={setDisputeReason}
               disputeDirection={disputeDirection}

@@ -247,6 +247,13 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("抽出された受講者の検証行動スパン")).toBeVisible();
     await expect(page.getByText("評点に対する異議申立・フィードバック")).toBeVisible();
 
+    // CFF Discrepancy Highlighting の表示確認（一致ケース）
+    await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
+    await expect(page.getByTestId("self-score-display")).toContainText("Band 3");
+    await expect(page.getByTestId("ai-score-display")).toContainText("Band 3");
+    await expect(page.getByTestId("score-diff-match")).toBeVisible();
+    await expect(page.getByTestId("prelim-action-display")).toContainText("差し戻し (Remand)");
+
     // 異議申立の入力と送信テスト
     await page.locator("input[value='too_low']").check();
     const disputeTextarea = page.getByPlaceholder(/異議の理由を具体的に記述してください/);
@@ -259,5 +266,71 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     // トップへ戻るボタンの動作確認
     await page.getByRole("button", { name: "← トップへ戻り最初からやり直す" }).click();
     await expect(page.locator("h1")).toContainText("評価的判断力 動的アセスメント＆テレメトリ基盤");
+  });
+
+  test("CFF Discrepancy Highlighting（自己評価とAI評価の乖離明示および不備抽出対比）が動作する", async ({ page }) => {
+    // 評価APIのレスポンスを評点Band 2（差異発生）に差し替えるモック
+    await page.route("**/api/dialogue/evaluate", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          ratingId: "mock-rating-diff-001",
+          isPendingHumanReview: false,
+          ratingCategory: 2,
+          levelLabel: "Band 2: 表層的修正・定型指摘",
+          scoringConfidence: 0.88,
+          evidenceSummary: "受講者は基本的な指摘を行ったが、根本的なアーキテクチャ欠陥への追及は部分的であった。",
+          diagnosticFeedback: "単一障害点の指摘にとどまらず、フェイルオーバーの具体的な復旧手順まで提案を深めると高評価に繋がります。",
+          evidenceComponents: [
+            {
+              turn_index: 1,
+              quoted_span: "Redisの単一障害点について考慮が必要です",
+              component_type: "SurfaceVerification",
+              injected_flaw_id: "FLAW-02",
+              rationale_summary: "単一障害点について言及",
+            },
+          ],
+          scorerModelVersion: "claude-opus-5/extract-v1/score-v1",
+        }),
+      });
+    });
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
+    await page.locator("input[name='q1']").first().check();
+    await page.getByRole("button", { name: "設問2へ進む" }).click();
+    await page.locator("input[name='q2']").first().check();
+    await page.getByRole("button", { name: "確信度評定へ" }).click();
+    await page.getByRole("button", { name: /5\s*非常に確信/ }).click();
+    await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
+    await expect(page.getByText("共通アンカー項目の記録が完了しました")).toBeVisible();
+    await page.getByRole("button", { name: "動的対話セッションへ進む" }).click();
+
+    // 1ターン対話
+    const promptInput = page.getByPlaceholder(/AI同僚に指示・指摘を入力/);
+    await promptInput.fill("Redisの単一障害点について考慮が必要です");
+    await page.getByRole("button", { name: "送信" }).click();
+    await expect(page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時")).toBeVisible();
+
+    // CFF画面へ
+    await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
+    await page.locator("input[value='remand']").check();
+    // 自己評価 Band 5 を選択（AI採点 Band 2 との間に3バンドの乖離）
+    await page.getByRole("button", { name: /Band 5\s*指導的/ }).click();
+    const justificationTextarea = page.getByPlaceholder(/承認または差し戻しと判断した具体的な根拠・理由を記述/);
+    await justificationTextarea.fill("高可用性設計とフェイルオーバー要件を提示し、全面的に差し戻したため。");
+    await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
+
+    // XAIレポート画面での乖離ハイライト確認
+    await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
+    await expect(page.getByTestId("self-score-display")).toContainText("Band 5");
+    await expect(page.getByTestId("ai-score-display")).toContainText("Band 2");
+    await expect(page.getByTestId("score-diff-discrepancy")).toBeVisible();
+    await expect(page.getByTestId("score-diff-discrepancy")).toContainText("3 バンドの食い違い");
+    await expect(page.getByTestId("prelim-action-display")).toContainText("差し戻し (Remand)");
+    await expect(page.getByTestId("matched-flaws-count")).toContainText("1件 (FLAW-02)");
+    await expect(page.getByTestId("prelim-justification-display")).toContainText("高可用性設計とフェイルオーバー要件を提示し、全面的に差し戻したため。");
   });
 });

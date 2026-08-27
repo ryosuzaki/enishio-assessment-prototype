@@ -1,5 +1,7 @@
 # Enishio Assessment Prototype
 
+[![CI](https://github.com/ryosuzaki/enishio-business/actions/workflows/ci.yml/badge.svg)](https://github.com/ryosuzaki/enishio-business/actions/workflows/ci.yml)
+
 **AIとの対話中に現れる「検証行動」を測って説明するアセスメントエンジンの、端から端まで通る縦切りプロトタイプ。**
 
 生成AIが答えを出せる時代に、人の能力をどう測るか。本プロトタイプが取る立場は「AIを遮断して素の力を測る」でも「成果物の出来を採点する」でもない。**AIの出力を鵜呑みにせず検証・修正できるか**という過程そのものを、対話ログから証拠つきで抽出して採点する。

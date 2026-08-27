@@ -230,6 +230,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
     await expect(page.getByText("AutoSCORE 2段階評価結果（XAIレポート）")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Band 3: 前提摘発・要件検証行動" })).toBeVisible();
+    await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
     await expect(page.getByText("判定根拠（Evidence Summary）")).toBeVisible();
     await expect(page.getByText("形成的診断アドバイス（Diagnostic Feedback）")).toBeVisible();
     await expect(page.getByText("抽出された受講者の検証行動スパン")).toBeVisible();
