@@ -1,3 +1,5 @@
+// scripts/import-anchors.cjs
+// npm run parse:anchors の実体スクリプト。共通アンカー項目バンクMarkdownを解析して anchors.json を生成する。
 const fs = require("fs");
 const path = require("path");
 

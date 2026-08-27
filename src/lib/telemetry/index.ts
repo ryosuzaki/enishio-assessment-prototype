@@ -311,7 +311,7 @@ export async function recordPreliminaryJudgement(params: RecordPreliminaryJudgem
     );
   }
 
-  return await (prisma as any).learnerPreliminaryJudgement.create({
+  return await prisma.learnerPreliminaryJudgement.create({
     data: {
       session_id: params.sessionId,
       step_id: params.stepId,
@@ -338,7 +338,7 @@ export async function recordVerificationFocusSequence(
   items: VerificationFocusItem[]
 ) {
   if (!items || items.length === 0) return 0;
-  const result = await (prisma as any).verificationFocusSequence.createMany({
+  const result = await prisma.verificationFocusSequence.createMany({
     data: items.map((item) => ({
       session_id: sessionId,
       focus_seq: item.focusSeq,

@@ -70,6 +70,8 @@ npm run seed:anchors      # anchors.json → anchor_items テーブル（これ�
 npm run dev
 ```
 
+詳細なステップ・バイ・ステップの画面操作手順、テレメトリ確認項目、トラブルシューティングについては、[プロトタイプ動作確認手順書](../enishio-education/docs/プロトタイプ動作確認手順書.md) を参照。
+
 `npm run parse:anchors` は隣の `enishio-education` リポジトリの Markdown を読む。
 親リポジトリ側で `git submodule update --init products/enishio-education` が済んでいること。
 
