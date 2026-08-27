@@ -7,7 +7,7 @@
 | 探すもの | 場所 |
 | :--- | :--- |
 | 実装指示（W0〜W6の作業単位） | `../enishio-education/docs/実行指示書_T-17_審査用縦切りプロトタイプ.md` |
-| 動作確認・検証手順書 | `../enishio-education/docs/プロトタイプ動作確認手順書.md` |
+| 動作確認・検証手順書 | `docs/プロトタイプ動作確認手順書.md` |
 | ログスキーマの正本（4.1・4.1.1・4.4・4.5） | `../enishio-education/docs/AIアセスメントMVP定義書.md` |
 | 採点軸・アンカーの設計根拠 | `../enishio-education/docs/設計決定記録.md` |
 | アンカー項目バンク（20項目の本文） | `../enishio-education/docs/共通アンカー項目バンク初版_T-05.md` |
