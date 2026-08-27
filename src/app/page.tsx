@@ -22,6 +22,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { DEMO_DYNAMIC_TASK } from "@/data/dynamic-task";
+import { levenshtein } from "@/lib/edit-distance";
 
 interface AnchorItem {
   anchor_id: string;
@@ -45,10 +46,19 @@ interface ChatMessage {
   content: string;
 }
 
+const DISAGREEMENT_OPTIONS = [
+  { value: "too_high", label: "評点が高すぎる" },
+  { value: "too_low", label: "評点が低すぎる" },
+  { value: "axis_mismatch", label: "軸の割り当てが違う" },
+  { value: "evidence_wrong", label: "根拠として示された箇所が違う" },
+] as const;
+
 interface EvaluationResult {
   ratingId: string;
-  ratingCategory: number;
-  levelLabel: string;
+  isPendingHumanReview: boolean;
+  ratingCategory: number | null;
+  levelLabel: string | null;
+  scoringConfidence: number;
   evidenceSummary: string;
   diagnosticFeedback: string;
   evidenceComponents: {
@@ -88,11 +98,14 @@ export default function AssessmentPrototypePage() {
   const [artifactCode, setArtifactCode] = useState<string>(DEMO_DYNAMIC_TASK.initial_ai_draft);
   const [turnCounter, setTurnCounter] = useState<number>(1);
   const [cffActiveWarning, setCffActiveWarning] = useState<string | null>(null);
+  // 直近に記録した成果物。次ターンの編集距離をこれとの差分で測る（MVP 4.4）
+  const [lastLoggedArtifact, setLastLoggedArtifact] = useState<string>(DEMO_DYNAMIC_TASK.initial_ai_draft);
 
   // Evaluation & XAI State (W4, W5)
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [disputeReason, setDisputeReason] = useState<string>("");
+  const [disputeDirection, setDisputeDirection] = useState<string>("");
   const [disputeSubmitted, setDisputeSubmitted] = useState<boolean>(false);
 
   // Telemetry Monitor
@@ -179,8 +192,6 @@ export default function AssessmentPrototypePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
-          learnerId,
-          sessionSeq,
           anchorId: currentAnchor.anchor_id,
           q1Selection: q1Choice,
           q2Selection: q2Choice,
@@ -191,8 +202,12 @@ export default function AssessmentPrototypePage() {
       });
       const data = await res.json();
       if (data.success) {
-        addTelemetry(`Anchor completed & recorded (Rating ID: ${data.ratingId.slice(0, 8)}..., unscored pretest)`);
+        addTelemetry(
+          `Anchor recorded (Response ID: ${data.responseId.slice(0, 8)}..., ${data.anchorStatus} / 無得点)`
+        );
         setCurrentStep("anchor_complete");
+      } else {
+        alert("アンカー記録エラー: " + data.error);
       }
     } catch (e: any) {
       alert("送信エラー: " + e.message);
@@ -202,7 +217,28 @@ export default function AssessmentPrototypePage() {
   };
 
   // Transition to Dynamic Dialogue Session (W3)
-  const handleStartDialogueSession = () => {
+  const handleStartDialogueSession = async () => {
+    // 仕込み不備と「正常箇所」のラベルをこのセッションに対して確定させる [P-15]
+    try {
+      const res = await fetch("/api/dialogue/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        addTelemetry(
+          `injected_flaw_map recorded (不備 ${data.flawCount} 件 + 正常箇所 ${data.normalSpanCount} 件)`
+        );
+      } else {
+        alert("課題開始エラー: " + data.error);
+        return;
+      }
+    } catch (e: any) {
+      alert("課題開始エラー: " + e.message);
+      return;
+    }
+
     setCurrentStep("dialogue_session");
     setChatHistory([
       {
@@ -212,7 +248,8 @@ export default function AssessmentPrototypePage() {
       },
     ]);
     setTurnCounter(2);
-    addTelemetry(`Dynamic Task initiated (TASK-FINTECH-AUTH-01) - 3-pane active`);
+    setLastLoggedArtifact(DEMO_DYNAMIC_TASK.initial_ai_draft);
+    addTelemetry(`Dynamic Task initiated (${DEMO_DYNAMIC_TASK.task_id})`);
   };
 
   // Send User Prompt in Dialogue Session (W3)
@@ -242,10 +279,18 @@ export default function AssessmentPrototypePage() {
           turnSeq: currentTurn,
           userMessage: userText,
           currentArtifactText: artifactCode,
-          editDistance: 0,
+          // 前回記録時点からの実測 Levenshtein 距離（MVP 4.4）
+          editDistance: levenshtein(lastLoggedArtifact, artifactCode),
         }),
       });
       const data = await res.json();
+      if (!data.success) {
+        alert("対話エラー: " + data.error);
+        setChatHistory(chatHistory);
+        setUserPromptInput(userText);
+        return;
+      }
+      setLastLoggedArtifact(artifactCode);
       if (data.success) {
         const nextTurn = data.assistantTurnSeq + 1;
         setTurnCounter(nextTurn);
@@ -259,9 +304,9 @@ export default function AssessmentPrototypePage() {
           },
         ]);
 
-        if (data.isCffTriggered) {
+        if (data.isInterlockTriggered) {
           setCffActiveWarning(data.assistantMessage);
-          addTelemetry(`CFF-1 Interlock triggered (Intent-Action Gap)`);
+          addTelemetry(`Interlock triggered (Intent-Action Gap)`);
         } else {
           addTelemetry(`AI Peer response recorded (Turn #${data.assistantTurnSeq})`);
         }
@@ -294,8 +339,6 @@ export default function AssessmentPrototypePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
-          learnerId,
-          sessionSeq,
           transcript: chatHistory,
           finalArtifact: artifactCode,
         }),
@@ -305,7 +348,19 @@ export default function AssessmentPrototypePage() {
       if (data.success) {
         setEvaluation(data);
         setCurrentStep("evaluation_report");
-        addTelemetry(`Evaluation complete: ${data.levelLabel} (Rating ID: ${data.ratingId.slice(0, 8)}...)`);
+        addTelemetry(
+          data.isPendingHumanReview
+            ? `Evaluation pending human review (confidence ${data.scoringConfidence.toFixed(2)} < 0.70)`
+            : `Evaluation complete: ${data.levelLabel} (Rating ID: ${data.ratingId.slice(0, 8)}...)`
+        );
+      } else if (data.scoringUnavailable) {
+        // 採点できないときに推測値で埋めない。埋めると ratings に偽の評点が残る。
+        alert(
+          `採点を実行できませんでした（${data.stage === "extract" ? "第1段階" : "第2段階"}）。
+
+` +
+            data.error
+        );
       } else {
         alert("評価エラー: " + data.error);
       }
@@ -318,7 +373,7 @@ export default function AssessmentPrototypePage() {
 
   // Submit Score Dispute (MVP 4.5 / W5)
   const handleSubmitDispute = async () => {
-    if (!disputeReason.trim() || !evaluation) return;
+    if (!disputeReason.trim() || !disputeDirection || !evaluation) return;
 
     try {
       const res = await fetch("/api/feedback", {
@@ -326,12 +381,17 @@ export default function AssessmentPrototypePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ratingId: evaluation.ratingId,
-          disagreementDirection: "too_low",
+          sessionId,
+          disagreementDirection: disputeDirection,
           freeTextReason: disputeReason,
           scorerModelVersion: evaluation.scorerModelVersion,
         }),
       });
       const data = await res.json();
+      if (!data.success) {
+        alert("異議申立エラー: " + data.error);
+        return;
+      }
       if (data.success) {
         setDisputeSubmitted(true);
         addTelemetry(`Score dispute recorded in score_feedback (ID: ${data.feedbackId.slice(0, 8)}...)`);
@@ -756,20 +816,60 @@ export default function AssessmentPrototypePage() {
             <div className="glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/70 shadow-2xl space-y-6">
               <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center font-bold text-white text-lg">
-                    {evaluation.ratingCategory}
+                  <div
+                    className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-white text-lg ${
+                      evaluation.isPendingHumanReview
+                        ? "bg-slate-700"
+                        : "bg-gradient-to-tr from-emerald-500 to-teal-500"
+                    }`}
+                  >
+                    {evaluation.isPendingHumanReview ? "—" : evaluation.ratingCategory}
                   </div>
                   <div>
                     <span className="text-xs font-mono text-emerald-400 uppercase tracking-wider">
                       AutoSCORE 2段階評価結果（XAIレポート）
                     </span>
-                    <h2 className="text-lg font-bold text-white">{evaluation.levelLabel}</h2>
+                    <h2 className="text-lg font-bold text-white">
+                      {evaluation.isPendingHumanReview
+                        ? "評点保留（人間の確認待ち）"
+                        : evaluation.levelLabel}
+                    </h2>
                   </div>
                 </div>
                 <span className="text-xs font-mono px-2.5 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">
                   {evaluation.scorerModelVersion}
                 </span>
               </div>
+
+              {/* 暫定値ラベル [D-22]。スコア表示には必ず併記する */}
+              {evaluation.isPendingHumanReview ? (
+                <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-600 space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
+                    <AlertCircle className="w-4 h-4 text-slate-400" />
+                    この判定は確定していません
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    採点器の確信度が閾値（0.70）を下回ったため（
+                    {evaluation.scoringConfidence.toFixed(2)}）、バンドを確定させず
+                    `rater_type = pending_human` として記録しました。評点は人間の評価者が確認してから確定します。
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-amber-950/25 border border-amber-900/40 space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                    <AlertTriangle className="w-4 h-4" />
+                    これは開発中の推定器による「暫定値」です
+                  </div>
+                  <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                    妥当性は未検証であり、能力の確定的な評価ではありません。固定した行動アンカーに対する位置づけであって、
+                    他者との比較・序列ではありません。判定に納得できない場合は下の異議申立からお知らせください
+                    （申立の有無は評点に影響しません）。
+                    <span className="ml-1 font-mono text-amber-200/60">
+                      確信度 {evaluation.scoringConfidence.toFixed(2)}
+                    </span>
+                  </p>
+                </div>
+              )}
 
               {/* Rationale & Feedback */}
               <div className="space-y-4">
@@ -833,7 +933,37 @@ export default function AssessmentPrototypePage() {
                     ✓ 異議申立が `score_feedback` テーブルへ記録されました。SME評価者による再検証対象となります。
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] text-slate-400">
+                        どこが違うと考えますか（必須）
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        {DISAGREEMENT_OPTIONS.map((opt) => (
+                          <label
+                            key={opt.value}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-xs transition-all ${
+                              disputeDirection === opt.value
+                                ? "border-blue-500 bg-blue-500/10 text-slate-100"
+                                : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-600"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="disagreement_direction"
+                              value={opt.value}
+                              checked={disputeDirection === opt.value}
+                              onChange={(e) => setDisputeDirection(e.target.value)}
+                              className="accent-blue-500"
+                            />
+                            <span>{opt.label}</span>
+                            <span className="ml-auto font-mono text-[10px] text-slate-500">
+                              {opt.value}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                     <textarea
                       value={disputeReason}
                       onChange={(e) => setDisputeReason(e.target.value)}
@@ -843,7 +973,7 @@ export default function AssessmentPrototypePage() {
                     <div className="flex justify-end">
                       <button
                         onClick={handleSubmitDispute}
-                        disabled={!disputeReason.trim()}
+                        disabled={!disputeReason.trim() || !disputeDirection}
                         className="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 text-xs font-medium hover:bg-slate-700 border border-slate-700 disabled:opacity-40"
                       >
                         異議を申し立てる（記録）

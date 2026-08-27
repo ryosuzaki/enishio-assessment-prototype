@@ -104,7 +104,16 @@ function parseAnchorBankMarkdown(filePath) {
   return items;
 }
 
-const mdPath = path.resolve(__dirname, "../docs/共通アンカー項目バンク初版_T-05.md");
+// 仕様・調査は隣の enishio-education リポジトリが持つ（AGENTS.md 参照）。
+// 親リポジトリ enishio-business の products/ 配下に並んでチェックアウトされる前提。
+const mdPath = path.resolve(__dirname, "../../enishio-education/docs/共通アンカー項目バンク初版_T-05.md");
+
+if (!fs.existsSync(mdPath)) {
+  console.error(`アンカー項目バンクが見つかりません: ${mdPath}`);
+  console.error("enishio-education サブモジュールがチェックアウトされているか確認してください:");
+  console.error("  git -C ../.. submodule update --init products/enishio-education");
+  process.exit(1);
+}
 const outDir = path.resolve(__dirname, "../src/data");
 const outPath = path.join(outDir, "anchors.json");
 

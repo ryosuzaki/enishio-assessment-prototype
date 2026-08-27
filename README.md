@@ -11,16 +11,20 @@
 ```
 ① アンカー項目の出題（固定4択＋確信度）
      ↓  無得点で記録（較正用の項目・受検者には非表示の役割）
-② 動的課題1本の対話セッション（3ペイン UI）
-     ↓  AIの提案に誤りが仕込まれている
+② 動的課題1本の対話セッション（AI同僚＝LLM・成果物は編集可）
+     ↓  AIの提案に誤りが仕込まれている。仕込み位置と「正常箇所」を記録
 ③ 検証行動の抽出（抽出エージェント）
      ↓  対話ログのどの発話が「検証」に当たるかを根拠つきで切り出す
 ④ 採点（採点エージェント・0〜5バンド）
      ↓  抽出結果のみを入力にする2段階分離
-⑤ XAIレポート（根拠ハイライト・暫定値ラベル・異議申立導線）
+     ↓  確信度が閾値未満なら評点を確定させず人間の確認待ちにする
+⑤ XAIレポート（根拠の提示・暫定値ラベル・異議申立導線）
 
   全ステップが ⓪ ログ基盤へ本番スキーマで書き込む
 ```
+
+**`ANTHROPIC_API_KEY` が無いと ②〜④ は動かない。**代わりのローカル判定は置いていない
+（理由は下の「設計上の判断」）。
 
 ## 設計上の判断
 
@@ -30,6 +34,8 @@
 | **抽出と採点を2つのエージェントに分ける** | 採点器に生ログを渡すと「何を根拠に何点にしたか」が事後に分離できない。抽出結果のみを採点入力にすることで、根拠と得点の対応がログ上で追跡可能になる |
 | **`temperature: 0` に依存しない** | 現行モデルで当該パラメータは利用できない。決定性は Structured Outputs と2段階分離で確保し、再現性は `scorer_model_version`（モデルID＋プロンプト版の複合文字列）の記録で担保する |
 | **採点軸を1本に絞る** | 複数軸を同時採点すると項目間の局所依存が生じ、実効項目数が落ちる。縦切りでは軸を1本に固定する |
+| **採点できないときは採点しない** | APIキーが無い・構造化出力が得られない場合に、キーワード一致等のローカル判定で代替しない。代替すると (a) 単語の出現を検証行動として測ってしまい、(b) LLMが走っていないのに `rater_type = "llm"` のログが残って `scorer_model_version` による再現性の担保が崩れる。**採点しないほうが正確である** |
+| **確信度が低い判定は確定させない** | 採点器が自己申告した確信度が 0.70 を下回る判定は `rater_type = "pending_human"` ・`rating_category = null` として記録する。推定器が迷った事実を潰さずに残す |
 | **単一スタックで通す** | Python 側の処理（IRT較正等）は本縦切りのスコープ外。2週間で端から端まで通すことを優先した |
 
 ## 技術スタック
@@ -43,8 +49,8 @@ Next.js 16（App Router）／ TypeScript ／ React 19 ／ Tailwind CSS v4 ／ Po
 | テーブル | 役割 |
 | :--- | :--- |
 | `Learner` / `Session` | `session_seq` を明示的に持つ（中断・再開・削除が混じるため日時から復元できない） |
-| `Rating` | 評点の正本。`scorer_model_version` / `stimulus_type` / `anchor_status` / `stimulus_features`(JSONB) |
-| `AnchorItem` / `AnchorResponse` | 較正用アンカー項目とその応答。`pretest` / `operational` の2状態 |
+| `Rating` | 評点の正本。`scorer_model_version` / `stimulus_type` / `anchor_status` / `stimulus_features`(JSONB)。`rating_category` は nullable で、null は「未採点」（人間の確認待ち）を表す |
+| `AnchorItem` / `AnchorResponse` | 較正用アンカー項目とその応答。`pretest` / `operational` の2状態。**アンカーは無得点なので `Rating` に行を作らない**——0点を入れるとルーブリック上の「Level 0」と区別できなくなり、将来の較正を汚す。応答時点の `anchor_status` は `AnchorResponse` 側に凍結して持つ |
 | `PromptTurn` | 対話の全ターン全文 |
 | `ArtifactEditDistanceSeries` | 成果物の編集距離の時系列 |
 | `InjectedFlawMap` | 仕込んだ誤りの位置と類型、**および正常箇所のラベル**（これがないと過剰指摘を判定できない） |
@@ -57,15 +63,30 @@ npm install
 cp .env.example .env      # DATABASE_URL と ANTHROPIC_API_KEY を設定
 npm run prisma:generate
 npm run prisma:push
-npm run parse:anchors     # アンカー項目バンクを投入
+npm run parse:anchors     # アンカー項目バンク（Markdown）→ src/data/anchors.json
+npm run seed:anchors      # anchors.json → anchor_items テーブル（これが無いと出題が落ちる）
 npm run dev
 ```
+
+`npm run parse:anchors` は隣の `enishio-education` リポジトリの Markdown を読む。
+親リポジトリ側で `git submodule update --init products/enishio-education` が済んでいること。
+
+ログ基盤だけを単体で確かめる場合は `npm run seed`（DBへ書き込む検証スクリプト）。
 
 ## 意図的に作っていないもの
 
 評価者HITL画面／認証・SSO・マルチテナント／管理者ダッシュボード／課金／シナリオの自動生成（動的課題は人手で書いた1本を固定で出す）／IRT較正・等化・アンカー項目の昇格判定。
 
 いずれも「あとで足す」ではなく「本縦切りでは作らない」と決めたものである。
+
+**まだ実装していないもの**（作らないと決めたものではなく、単に未了である）:
+
+- **CFF 2種**——Force Decision First（AIの根拠を開く前に受検者の暫定判断を取る）と
+  Mandatory Justification（承認・差し戻しのいずれにも理由記述を必須にする）。
+  現在入っているのは「意図-行動ギャップのインターロック」だけで、これは上記2種のいずれでもない
+- **検証パネル**——成果物のどの箇所を検証対象として選んだかを取る第3ペイン
+- **根拠ハイライト**——抽出された `quoted_span` は一覧として出るが、対話ログ上での
+  ハイライト表示にはなっていない
 
 ## ライセンス
 

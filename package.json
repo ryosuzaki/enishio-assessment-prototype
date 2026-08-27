@@ -11,7 +11,8 @@
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",
     "parse:anchors": "node scripts/import-anchors.cjs",
-    "seed": "node scripts/seed-demo.cjs"
+    "seed": "tsx scripts/seed-demo.ts",
+    "seed:anchors": "tsx scripts/seed-anchors.ts"
   },
   "keywords": [],
   "author": "",

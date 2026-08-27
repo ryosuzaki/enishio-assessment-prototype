@@ -8,6 +8,8 @@ import {
   recordScoreFeedback,
 } from "../src/lib/telemetry";
 import { prisma } from "../src/lib/db";
+import fs from "fs";
+import path from "path";
 
 async function main() {
   console.log("=== Enishio Telemetry & Data Layer Validation (W1) ===");
@@ -97,9 +99,27 @@ async function main() {
 
   // 6. Record Anchor Response
   console.log("\n[6] Testing anchor_responses logging (unscored)...");
+  // anchor_responses は anchor_items への外部キーを持つ。項目が無ければ先に入れる。
+  const bank = JSON.parse(
+    fs.readFileSync(path.resolve(process.cwd(), "src/data/anchors.json"), "utf-8")
+  );
+  const demoItem = bank.find((a: any) => a.anchor_id === "ANCHOR-A-01");
+  if (!demoItem) throw new Error("ANCHOR-A-01 が anchors.json にありません");
+  await prisma.anchorItem.upsert({
+    where: { anchor_id: "ANCHOR-A-01" },
+    update: {},
+    create: {
+      anchor_id: "ANCHOR-A-01",
+      family: demoItem.family,
+      anchor_status: "pretest",
+      content: demoItem,
+    },
+  });
+
   const aResp = await recordAnchorResponse({
     sessionId: s3.session_id,
     anchorId: "ANCHOR-A-01",
+    anchorStatus: "pretest",
     q1Selection: "A",
     q2Selection: "A",
     confidence: 4,
@@ -112,8 +132,9 @@ async function main() {
   console.log("\n[7] Testing score_feedback dispute mechanism...");
   const feedback = await recordScoreFeedback({
     ratingId: anchorRating.rating_id,
+    sessionId: s3.session_id,
     actorRole: "learner",
-    disagreementDirection: "too_low",
+    disagreementDirection: "evidence_wrong",
     freeTextReason: "トレードオフについて言及した発言（ターン3）が抽出から漏れています。",
     citedEvidenceRef: "turn:3",
     scorerModelVersion: "claude-opus-5/extract-v1/score-v1",

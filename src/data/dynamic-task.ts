@@ -1,13 +1,7 @@
 // Fixed Single Scenario for Vertical Prototype (W3) compliant with [P-15]
-
-export interface InjectedFlaw {
-  flaw_id: string;
-  flaw_type: "type_A" | "type_B" | "type_C";
-  title: string;
-  span_text: string;
-  is_flaw: boolean; // false indicates intentional valid code that looks suspicious but MUST be approved [P-15]
-  description: string;
-}
+//
+// このモジュールはクライアントバンドルへ含まれる。受検者へ提示してよい情報だけを置く。
+// 仕込み不備・正常箇所ラベル・AI同僚のシステムプロンプトは dynamic-task.server.ts にある。
 
 export interface DynamicTaskScenario {
   task_id: string;
@@ -17,8 +11,6 @@ export interface DynamicTaskScenario {
   business_requirements: string[];
   constraints: string[];
   initial_ai_draft: string;
-  injected_flaws: InjectedFlaw[];
-  ai_peer_system_prompt: string;
 }
 
 export const DEMO_DYNAMIC_TASK: DynamicTaskScenario = {
@@ -83,34 +75,5 @@ export async function paymentSecurityMiddleware(req: Request, res: Response, nex
 function verifyJwtSignatureOnly(token: string) {
   // ローカル公開鍵での署名検証のみ実行（ブラックリストDBは見ない）
   return { userId: "user-12345", role: "merchant" };
-}`,
-  injected_flaws: [
-    {
-      flaw_id: "FLAW-01",
-      flaw_type: "type_B",
-      title: "トークン失効（強制ログアウト）の完全無視（結果整合性・セキュリティ前提の隠蔽）",
-      span_text: "JWT署名のみをローカル検証し、Redis/DBでの失効チェックはスキップ",
-      is_flaw: true,
-      description: "PCI DSSおよび要件2に反し、ログアウトや不正検知で失効したトークンが24時間有効なまま通過してしまう重大なセキュリティ欠陥。",
-    },
-    {
-      flaw_id: "FLAW-02",
-      flaw_type: "type_A",
-      title: "単一障害点（Redis障害時に決済全体が全停止する過剰なフェイルクローズ）",
-      span_text: "全リクエストを一律500エラーで落とす",
-      is_flaw: true,
-      description: "要件3の耐障害性要件に反し、Redisの瞬断で全加盟店の決済が完全停止してしまう。",
-    },
-    {
-      flaw_id: "VALID-01",
-      flaw_type: "type_C",
-      title: "正常箇所：過去世代キーIDの許容（一見疑わしいが承認すべきローテーション設計）",
-      span_text: "過去2世代のキーIDを許容するフェイルセーフ設計",
-      is_flaw: false,
-      description: "鍵更新時のゼロダウンタイム移行に不可欠な正当設計。[P-15]に基づき、AI過信ではなく正当な判断として承認すべき箇所。",
-    },
-  ],
-  ai_peer_system_prompt: `あなたは決済開発チームのAI同僚（エージェント）です。
-自分の書いたコードにプライドを持っていますが、受講者から具体的・論理的な指摘（トレードオフや要件との不整合）を受けた場合は、素直に修正案を提示します。
-ただし、受講者が「適当に修正して」「なんか直して」等の曖昧な指示を出した場合は、「具体的にどの要件・リスクを問題視されていますか？」と問い返してください。`,
+}`
 };

@@ -32,7 +32,9 @@ model Session {
   prompt_turns          PromptTurn[]
   artifact_edit_series  ArtifactEditDistanceSeries[]
   injected_flaw_map     InjectedFlawMap[]
+  score_feedback        ScoreFeedback[]
 
+  @@unique([learner_id, session_seq])
   @@index([learner_id, session_seq])
   @@map("sessions")
 }
@@ -44,8 +46,9 @@ model Rating {
   session_seq          Int
   step_id              String
   axis_id              String    // e.g. "axis_4"
-  rating_category      Int       // 0..5
-  rater_type           String    // "llm" | "human"
+  rating_category      Int?      // 0..5。null = 未採点（アンカー無得点 / HITL確認待ち）
+  rater_type           String    // "llm" | "human" | "pending_human"
+  scoring_confidence   Float?    // 第2エージェントの自己申告確信度。閾値未満は pending_human へ回す
   rater_id             String
   scorer_model_version String    // "model_id/extract-v1/score-v1"
   stimulus_ref         String
@@ -81,6 +84,9 @@ model AnchorResponse {
   response_id    String   @id @default(uuid())
   session_id     String
   anchor_id      String
+  // 応答時点の anchor_status を凍結して持つ。anchor_items 側は昇格で書き換わるため、
+  // ここに残さないと「この応答が pretest 期のものか」を後から復元できない（MVP 4.1.1）。
+  anchor_status  String   @default("pretest")
   q1_selection   String
   q2_selection   String
   confidence     Int      // 1..5
@@ -91,6 +97,7 @@ model AnchorResponse {
   session     Session    @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
   anchor_item AnchorItem @relation(fields: [anchor_id], references: [anchor_id], onDelete: Cascade)
 
+  @@unique([session_id, anchor_id])
   @@index([session_id])
   @@index([anchor_id])
   @@map("anchor_responses")
@@ -106,6 +113,7 @@ model PromptTurn {
 
   session Session @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
 
+  @@unique([session_id, turn_seq])
   @@index([session_id, turn_seq])
   @@map("prompt_turns")
 }
@@ -134,6 +142,7 @@ model InjectedFlawMap {
 
   session Session @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
 
+  @@unique([session_id, flaw_id])
   @@index([session_id])
   @@map("injected_flaw_map")
 }
@@ -141,16 +150,19 @@ model InjectedFlawMap {
 model ScoreFeedback {
   feedback_id            String   @id @default(uuid())
   rating_id              String
-  actor_role             String   // "learner" | "evaluator"
-  disagreement_direction String   // "too_low" | "too_high" | "unclear"
+  session_id             String   // MVP 4.5。総合スコアへの申立は rating_id を持たない場合があるため必須
+  actor_role             String   // "learner" | "supervisor" | "hr"
+  disagreement_direction String   // "too_high" | "too_low" | "axis_mismatch" | "evidence_wrong"
   free_text_reason       String   @db.Text // mandatory [P-12]
   cited_evidence_ref     String?
   scorer_model_version   String
   resolution             String?  @db.Text
   created_at             DateTime @default(now())
 
-  rating Rating @relation(fields: [rating_id], references: [rating_id], onDelete: Cascade)
+  rating  Rating  @relation(fields: [rating_id], references: [rating_id], onDelete: Cascade)
+  session Session @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
 
   @@index([rating_id])
+  @@index([session_id])
   @@map("score_feedback")
 }

@@ -1,6 +1,29 @@
 import { NextResponse } from "next/server";
-import { recordPromptTurn, recordEditDistance } from "@/lib/telemetry";
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { recordPromptTurn, recordEditDistance, resolveSessionContext } from "@/lib/telemetry";
+import { AI_PEER_SYSTEM_PROMPT } from "@/data/dynamic-task.server";
 import { DEMO_DYNAMIC_TASK } from "@/data/dynamic-task";
+import { prisma } from "@/lib/db";
+
+// AI同僚の応答。**仕込み不備の位置は渡さない** —— 渡すとAI同僚が自分から不備を
+// 白状してしまい、受講者が検証したのかAIが教えたのかlog上で分離できなくなる。
+const AiPeerReplySchema = z.object({
+  reply: z.string().describe("受講者への返答。1〜3段落程度"),
+  updated_artifact: z
+    .string()
+    .nullable()
+    .describe("指摘を受けて修正したコード全文。修正しない場合は null"),
+});
+
+// 意図-行動ギャップのインターロック。
+// **これは実行指示書 §7 W3 が指定する CFF 2種（Force Decision First /
+// Mandatory Justification）ではない。**それらは未実装である（README の
+// 「作っていないもの」を参照）。
+const INTENT_GAP_PATTERN = /^(了解|ok|OK|いいよ|これでよし|これで進めて|問題なし|オッケー)$/i;
+const INTENT_GAP_MESSAGE =
+  "⚠️ 【インターロック: 意図確認】AIの提案内容を具体的に検証しましたか？ セキュリティ基準（PCI DSS失効伝播）や可用性要件（Redis障害時の挙動）に適合しているか、具体的な理由を言語化してください。";
 
 // POST /api/dialogue/turn - process user prompt & AI peer response
 export async function POST(req: Request) {
@@ -11,72 +34,94 @@ export async function POST(req: Request) {
     if (!sessionId || !userMessage) {
       return NextResponse.json({ success: false, error: "Missing required parameters" }, { status: 400 });
     }
+    await resolveSessionContext(sessionId);
+
+    const artifactText =
+      typeof currentArtifactText === "string" ? currentArtifactText : DEMO_DYNAMIC_TASK.initial_ai_draft;
 
     // 1. Record user prompt turn
     await recordPromptTurn(sessionId, Number(turnSeq), "user", userMessage);
 
     // 2. Record artifact edit distance if present
     if (typeof editDistance === "number") {
-      await recordEditDistance(sessionId, editDistance, currentArtifactText);
+      await recordEditDistance(sessionId, editDistance, artifactText);
     }
 
-    // 3. Apply Cognitive Friction Feature (CFF-1): Intent-Action Gap detection
-    const trimmed = userMessage.trim();
-    if (trimmed.match(/^(了解|ok|OK|いいよ|これでよし|これで進めて|問題なし|オッケー)$/i)) {
-      const cffWarning = "⚠️ 【CFF警告: 意図確認】AIの提案内容を具体的に検証しましたか？ セキュリティ基準（PCI DSS失効伝播）や可用性要件（Redis障害時の挙動）に適合しているか、具体的な理由を言語化してください。";
-      
-      const assistantTurnSeq = Number(turnSeq) + 1;
-      await recordPromptTurn(sessionId, assistantTurnSeq, "assistant", cffWarning);
+    const assistantTurnSeq = Number(turnSeq) + 1;
 
+    // 3. Intent-action gap interlock
+    if (userMessage.trim().match(INTENT_GAP_PATTERN)) {
+      await recordPromptTurn(sessionId, assistantTurnSeq, "assistant", INTENT_GAP_MESSAGE);
       return NextResponse.json({
         success: true,
-        assistantMessage: cffWarning,
-        isCffTriggered: true,
+        assistantMessage: INTENT_GAP_MESSAGE,
+        isInterlockTriggered: true,
         assistantTurnSeq,
       });
     }
 
-    // 4. Generate AI Peer Response
-    let reply = "";
-    let updatedArtifact = currentArtifactText;
-
-    if (trimmed.includes("トークン") || trimmed.includes("失効") || trimmed.includes("ログアウト") || trimmed.includes("JWT")) {
-      reply = `ご指摘ありがとうございます！確かに、JWTのローカル署名検証だけでは、強制ログアウトや権限剥奪された不正トークンが24時間通過してしまう重大なセキュリティリスク（PCI DSS違反）がありました。
-
-トークン失効ブラックリストをRedisで即座に参照するロジックを追加し、コードを更新しました。ご確認ください！`;
-      
-      updatedArtifact = currentArtifactText.replace(
-        "const decoded = verifyJwtSignatureOnly(token);",
-        `// 【修正済】トークン失効ブラックリストを即時検証
-    const isRevoked = await redis.get(\`revoked:\${token}\`);
-    if (isRevoked) {
-      return res.status(401).json({ error: "Token has been revoked" });
-    }
-    const decoded = verifyJwtSignatureOnly(token);`
+    // 4. Generate AI peer response
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey || apiKey === "your-anthropic-api-key-here") {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "ANTHROPIC_API_KEY が設定されていないため、AI同僚が応答できません。.env を設定してください。",
+        },
+        { status: 503 }
       );
-    } else if (trimmed.includes("Redis") || trimmed.includes("SPOF") || trimmed.includes("単一障害点") || trimmed.includes("500") || trimmed.includes("フォールバック")) {
-      reply = `なるほど、ごもっともです！Redisがダウンした際に一律500エラーで全決済APIを止めてしまうと、要件3の高可用性要件を満たせません。
-
-Redis障害を検知した場合は、インメモリのフォールバック・リミッターへ自動切り替え、決済処理を継続させるフェイルオープン設計に改訂しました。`;
-
-      updatedArtifact = currentArtifactText.replace(
-        `console.error("Security middleware critical error:", error);
-    return res.status(500).json({ error: "Internal Security Service Unavailable" });`,
-        `console.warn("Redis connectivity warning, activating in-memory fallback:", error);
-    // 【修正済】Redisダウン時も決済を止めずインメモリ保護で縮退運転
-    return next();`
-      );
-    } else {
-      reply = `レビューありがとうございます！ご指示の内容について、もう少し具体的に「どの要件やトレードオフ（セキュリティ、パフォーマンス、可用性等）を重視した変更か」を教えていただけますか？`;
     }
 
-    const assistantTurnSeq = Number(turnSeq) + 1;
+    // 直前までの対話は記録済みのログから読む（クライアントの申告を信用しない）
+    const priorTurns = await prisma.promptTurn.findMany({
+      where: { session_id: sessionId },
+      orderBy: { turn_seq: "asc" },
+      select: { turn_seq: true, role: true, content: true },
+    });
+
+    const client = new Anthropic({ apiKey });
+    const res = await client.messages.parse({
+      model: "claude-opus-5",
+      max_tokens: 16000,
+      system: `${AI_PEER_SYSTEM_PROMPT}
+
+【あなたが書いた現在のコード】
+${artifactText}
+
+【この課題の業務要件】
+${DEMO_DYNAMIC_TASK.business_requirements.join("\n")}
+
+【制約】
+${DEMO_DYNAMIC_TASK.constraints.join("\n")}
+
+受講者から具体的な指摘を受けてコードを直す場合のみ updated_artifact にコード全文を入れてください。
+自分から不備を列挙して先回りしてはいけません。指摘されていない箇所は直さないでください。`,
+      messages: [
+        {
+          role: "user",
+          content: priorTurns
+            .map((t) => `[Turn ${t.turn_seq}] ${t.role === "user" ? "受講者" : "あなた"}: ${t.content}`)
+            .join("\n"),
+        },
+      ],
+      output_config: { format: zodOutputFormat(AiPeerReplySchema) },
+    });
+
+    if (!res.parsed_output) {
+      return NextResponse.json(
+        { success: false, error: "AI同僚の応答が構造化出力として得られませんでした。" },
+        { status: 502 }
+      );
+    }
+
+    const { reply, updated_artifact } = res.parsed_output;
     await recordPromptTurn(sessionId, assistantTurnSeq, "assistant", reply);
 
     return NextResponse.json({
       success: true,
       assistantMessage: reply,
-      updatedArtifact,
+      updatedArtifact: updated_artifact ?? undefined,
       assistantTurnSeq,
     });
   } catch (error: any) {
