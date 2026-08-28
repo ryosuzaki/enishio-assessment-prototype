@@ -1,6 +1,6 @@
 # Enishio Assessment Prototype
 
-[![CI](https://github.com/ryosuzaki/enishio-business/actions/workflows/ci.yml/badge.svg)](https://github.com/ryosuzaki/enishio-business/actions/workflows/ci.yml)
+[![CI](https://github.com/ryosuzaki/enishio-assessment-prototype/actions/workflows/ci.yml/badge.svg)](https://github.com/ryosuzaki/enishio-assessment-prototype/actions/workflows/ci.yml)
 
 **AIとの対話中に現れる「検証行動」を測って説明するアセスメントエンジンの、端から端まで通る縦切りプロトタイプ。**
 

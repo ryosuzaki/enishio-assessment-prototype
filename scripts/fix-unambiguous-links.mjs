@@ -71,6 +71,9 @@ function fixUnambiguousLinks() {
         if (fs.existsSync(targetFullPath)) {
           let newRel = path.relative(path.dirname(file), targetFullPath).replace(/\\/g, "/");
           if (!newRel.startsWith(".")) newRel = "./" + newRel;
+          // Markdownのリンク先に生スペースが残るとリンクが壊れる（`](a b.md)` はパースに失敗する）。
+          // 既存文書の規約（`financial/2026%20年度下期未踏アドバンスト事業/`）に合わせて %20 へ寄せる。
+          newRel = newRel.replace(/ /g, "%20");
           fixedCount++;
           fileChanged = true;
           return `${textPart}(${newRel}${hashPart})`;
@@ -90,10 +93,9 @@ function fixUnambiguousLinks() {
 
       if (candidates.length === 1) {
         let newRelPath = path.relative(sourceDir, candidates[0]).replace(/\\/g, "/");
-        if (!newRelPath.startsWith(".")) {
-          // If in same dir or subdir, keep relative
-          // e.g. "TeSH GAPファンド申請/..."
-        }
+        // 生スペースを含むパスはMarkdownリンクとして壊れるため %20 へエンコードする
+        // （例: `TeSH GAPファンド申請/` → `TeSH%20GAPファンド申請/`）。
+        newRelPath = newRelPath.replace(/ /g, "%20");
         fixedCount++;
         fileChanged = true;
         console.log(`[FIX] ${path.relative(WORKSPACE_ROOT, file)}: ${trimmedTarget} -> ${newRelPath}${hashPart}`);
