@@ -31,6 +31,12 @@
    `npm run build && grep -rl "FLAW-01" .next/static/`（0件であること）
 6. **アンカー項目の正答（`note` / `hidden_premise` / `cheat_notes` / `distractor_notes`）を
    APIレスポンスへ含めない。**画面に描画していなくてもネットワークタブから読める。
+7. **アンカー項目バンクの供給源は2つあり、混同しない。**`src/data/anchors.json`（運用20項目）は
+   `.gitignore` 済みで**このリポジトリへ絶対にコミットしない**（項目露出）。
+   `src/data/anchors.sample.json`（公開デモ用2項目）は同梱してよく、**削除しない**
+   ——これが無いと clone しただけの利用者はアンカー出題を1問も動かせない。
+   どちらを読んだかは `src/lib/anchor-bank.ts` の `source` が返し、画面に明示される。
+   **サンプル2項目を運用20項目として提示しない。**
 
 <!-- BEGIN:nextjs-agent-rules -->
 

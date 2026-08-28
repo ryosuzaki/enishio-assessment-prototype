@@ -16,8 +16,8 @@
     "check:no-leak": "node scripts/check-no-leaked-secrets.mjs",
     "check:flaw-detection": "tsx scripts/check-flaw-detection-resistance.ts",
     "test": "vitest run",
-    "test:e2e": "playwright test",
-    "capture:screenshots": "playwright test e2e/capture-screenshots.spec.ts"
+    "test:e2e": "playwright test --project=chromium",
+    "capture:screenshots": "playwright test --project=capture"
   },
   "keywords": [],
   "author": "",
@@ -43,6 +43,7 @@
     "@types/react-dom": "^19.2.5",
     "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.5.4",
+    "dotenv": "^17.4.2",
     "postcss": "^8.5.26",
     "prisma": "^5.22.0",
     "tailwindcss": "^4.3.3",

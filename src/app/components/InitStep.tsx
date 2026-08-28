@@ -8,6 +8,8 @@ interface InitStepProps {
   selectedAnchorId: string;
   setSelectedAnchorId: (id: string) => void;
   anchorList: { anchor_id: string; title: string; family: string }[];
+  /** 読み込めたバンクの供給源。null は未取得 */
+  bankSource: "operational" | "demo_sample" | null;
   selectedTaskId: string;
   setSelectedTaskId: (id: string) => void;
   selectedTask: DynamicTaskScenario;
@@ -19,6 +21,7 @@ export function InitStep({
   selectedAnchorId,
   setSelectedAnchorId,
   anchorList,
+  bankSource,
   selectedTaskId,
   setSelectedTaskId,
   selectedTask,
@@ -40,13 +43,24 @@ export function InitStep({
       </p>
 
       <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
-        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
-          出題する共通アンカー項目（T-05バンク / 全20項目から選択）
-        </label>
+        <div className="flex items-start justify-between gap-3">
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+            出題する共通アンカー項目（全{anchorList.length}項目から選択）
+          </label>
+          {bankSource === "demo_sample" && (
+            <span
+              data-testid="anchor-bank-source-badge"
+              className="shrink-0 text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/50 text-amber-300 border border-amber-800/50"
+            >
+              公開デモ用サンプル
+            </span>
+          )}
+        </div>
         <select
           value={selectedAnchorId}
           onChange={(e) => setSelectedAnchorId(e.target.value)}
-          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+          disabled={anchorList.length === 0}
+          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500 disabled:opacity-50"
         >
           {anchorList.map((a) => (
             <option key={a.anchor_id} value={a.anchor_id}>
@@ -54,9 +68,19 @@ export function InitStep({
             </option>
           ))}
         </select>
-        <p className="text-xs text-slate-500">
-          ※実稼働時はセッション列の7回に1回、ランダムに自動混入されます（`anchor_status: pretest`・無得点運用）。
-        </p>
+        {bankSource === "demo_sample" ? (
+          /* サンプル2項目を運用20項目に見せない。何が動いていないかを正直に書く */
+          <p className="text-xs text-amber-200/70 leading-relaxed">
+            ※ここに出ているのは<strong>リポジトリ同梱の公開デモ用サンプル項目</strong>です。
+            運用中の共通アンカー項目バンク（20項目）は、受検者への事前露出を避けるため公開していません
+            （項目露出は MVP 2.6.2 の監視指標）。項目の中身は違いますが、出題から
+            `anchor_responses` への無得点記録までの経路は運用時と同一です。
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500">
+            ※実稼働時はセッション列の7回に1回、ランダムに自動混入されます（`anchor_status: pretest`・無得点運用）。
+          </p>
+        )}
       </div>
 
       <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">

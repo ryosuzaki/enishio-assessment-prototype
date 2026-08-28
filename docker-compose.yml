@@ -1,0 +1,28 @@
+# ローカル開発・動作確認用の PostgreSQL。
+#
+#   docker compose up -d
+#
+# 接続文字列は .env.example の DATABASE_URL と一致させてある。
+# 本番・公開デプロイでは使わない（README「公開デプロイ手順」を参照）。
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: enishio-assessment-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: enishio_education
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # prisma db push を叩く前に「受け付けられる状態か」を判定できるようにする
+      test: ["CMD-SHELL", "pg_isready -U user -d enishio_education"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:

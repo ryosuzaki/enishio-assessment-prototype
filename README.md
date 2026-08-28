@@ -65,20 +65,42 @@ Next.js 16（App Router）／ TypeScript ／ React 19 ／ Tailwind CSS v4 ／ Po
 
 ## 動かす
 
+このリポジトリを clone しただけの状態から、5コマンドで通る。
+
 ```bash
 npm install
-cp .env.example .env      # DATABASE_URL と ANTHROPIC_API_KEY を設定
-npm run prisma:generate
-npm run prisma:push
-npm run parse:anchors     # アンカー項目バンク（Markdown）→ src/data/anchors.json
-npm run seed:anchors      # anchors.json → anchor_items テーブル（これが無いと出題が落ちる）
+cp .env.example .env      # DATABASE_URL はそのままで docker-compose の設定と一致する
+docker compose up -d      # ローカル PostgreSQL（別途用意した DB を使うなら不要）
+npm run prisma:generate && npm run prisma:push
+npm run seed:anchors      # アンカー項目を anchor_items へ投入（これが無いと出題が落ちる）
 npm run dev
 ```
 
+`ANTHROPIC_API_KEY` を `.env` へ設定すると ②〜⑤（AI同僚との対話・AutoSCORE採点・XAIレポート）
+まで通る。未設定でも ① アンカー出題と ⓪ ログ基盤は動く。
+
 詳細なステップ・バイ・ステップの画面操作手順、テレメトリ確認項目、トラブルシューティングについては、[プロトタイプ動作確認手順書](docs/プロトタイプ動作確認手順書.md) を参照。
 
-`npm run parse:anchors` は隣の `enishio-education` リポジトリの Markdown を読む。
-親リポジトリ側で `git submodule update --init products/enishio-education` が済んでいること。
+### アンカー項目バンクの2つの供給源
+
+| 供給源 | 中身 | いつ使われるか |
+| :--- | :--- | :--- |
+| `src/data/anchors.json` | 運用中の共通アンカー項目バンク20項目 | 存在すれば常にこちらが優先される |
+| `src/data/anchors.sample.json` | **公開デモ用サンプル2項目**（リポジトリ同梱） | 上が無いときのフォールバック |
+
+**運用バンク20項目はこのリポジトリに含まれていない。**項目そのものを公開すると受検者が
+事前に読めてしまうためである（項目露出。MVP 2.6.2 の監視指標）。生成には隣の
+`enishio-education` リポジトリのチェックアウトが要る:
+
+```bash
+git -C ../.. submodule update --init products/enishio-education
+npm run parse:anchors     # Markdown → src/data/anchors.json
+npm run seed:anchors
+```
+
+同梱サンプルで動かしている間は、**出題画面に「公開デモ用サンプル」と明示される。**
+項目の中身は運用バンクと異なるが、出題から `anchor_responses` への無得点記録までの
+経路は同一である。
 
 ログ基盤だけを単体で確かめる場合は `npm run seed`（DBへ書き込む検証スクリプト）。
 
@@ -86,8 +108,8 @@ npm run dev
 
 ```bash
 npm run test                  # 単体テスト（Vitest 34件）
-npm run test:e2e              # E2Eテスト（Playwright・API全モック 3テスト）
-npm run capture:screenshots   # 提案書用UIスクリーンショット自動取得（全6画面PNG出力）
+npm run test:e2e              # E2Eテスト（Playwright・APIモック 5テスト）
+npm run capture:screenshots   # 提案書用UIスクリーンショット取得（全6画面PNG出力。test:e2e には含まれない）
 npm run check:flaw-detection  # 代行無効化チェック（Claude / Gemini マルチプロバイダ実測）
 npm run check:no-leak         # クライアントバンドルへの正答鍵・秘密情報非漏洩チェック
 ```

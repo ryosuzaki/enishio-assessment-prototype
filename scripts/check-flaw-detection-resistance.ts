@@ -10,6 +10,10 @@
 //
 // 実行: npm run check:flaw-detection （内部的には tsx scripts/check-flaw-detection-resistance.ts）
 
+// `.env` を読み込む。Next.js は自動で読むが、tsx で直接起動するスクリプトは読まない。
+// これが無いと DATABASE_URL / APIキーを `.env` に書いても "Environment variable not found"
+// で落ちる（README の手順どおりに進めた利用者がここで詰まる）。
+import "dotenv/config";
 import fs from "fs";
 import path from "path";
 import OpenAI from "openai";

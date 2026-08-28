@@ -130,11 +130,18 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.locator("h1")).toContainText("評価的判断力 動的アセスメント＆テレメトリ基盤");
     await expect(page.getByText("評価的判断力 動的アセスメント 縦切りプロトタイプ")).toBeVisible();
 
-    // アンカー項目のドロップダウン（全20項目）
+    // アンカー項目のドロップダウン。
+    // 項目数は供給源によって変わる（運用バンク20項目 / リポジトリ同梱の公開デモ用サンプル）。
+    // GET /api/anchor はモックせず実ルートを叩いているため、ここで件数を決め打ちすると
+    // 運用バンクを持つ手元と、持たないCIのどちらかで必ず落ちる。「空でないこと」を見る。
     const anchorSelect = page.locator("select").first();
     await expect(anchorSelect).toBeVisible();
-    const anchorOptions = anchorSelect.locator("option");
-    await expect(anchorOptions).toHaveCount(20);
+    // 項目はマウント後に GET /api/anchor で埋まる。件数を数えるだけの expect は
+    // リトライしないので、先に「埋まったこと」を待てる web-first assertion を置く
+    // （選択肢が空のあいだ select は disabled になる）。
+    await expect(anchorSelect).toBeEnabled();
+    await expect(anchorSelect).not.toHaveValue("");
+    expect(await anchorSelect.locator("option").count()).toBeGreaterThanOrEqual(1);
 
     // 動的課題のドロップダウン
     const taskSelect = page.locator("select").nth(1);
@@ -147,17 +154,52 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("Connected")).toBeVisible();
   });
 
+  test("同梱サンプルへフォールバックした場合、運用バンクではないことが画面に明示される", async ({ page }) => {
+    // 運用バンク（src/data/anchors.json）を持たない環境＝公開リポジトリのcloneを再現する。
+    // サンプル2項目を運用20項目に見せてはならない（README「主張を増やさない」）。
+    await page.route("**/api/anchor?*", async (route) => await route.continue());
+    await page.route("**/api/anchor", async (route) => {
+      if (route.request().method() !== "GET") return await route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          count: 2,
+          bankSource: "demo_sample",
+          anchors: [
+            { anchor_id: "ANCHOR-DEMO-A-01", family: "A", title: "【公開デモ用】検索結果キャッシュの導入" },
+            { anchor_id: "ANCHOR-DEMO-B-01", family: "B", title: "【公開デモ用】障害振り返り文書の自動生成" },
+          ],
+        }),
+      });
+    });
+
+    await page.goto("/");
+
+    await expect(page.getByTestId("anchor-bank-source-badge")).toHaveText("公開デモ用サンプル");
+    await expect(page.getByText("出題する共通アンカー項目（全2項目から選択）")).toBeVisible();
+    await expect(page.getByText(/運用中の共通アンカー項目バンク（20項目）は、受検者への事前露出を避けるため公開していません/)).toBeVisible();
+  });
+
   test("アンカー出題 → 設問回答 → 確信度評定 → 送信完了の一連のフローが動作する", async ({ page }) => {
     await page.goto("/");
+
+    // 出題される項目IDは供給源によって変わるため、選択中の値を読んでから進む。
+    // 読む前に、項目が埋まって select が有効になるのを待つ。
+    const anchorSelect = page.locator("select").first();
+    await expect(anchorSelect).toBeEnabled();
+    const selectedAnchorId = await anchorSelect.inputValue();
+    expect(selectedAnchorId).not.toBe("");
 
     // セッション開始
     const startButton = page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" });
     await expect(startButton).toBeVisible();
     await startButton.click();
 
-    // 設問1（anchor_q1）
+    // 設問1（anchor_q1）。出題されるのは init 画面で選択されていた項目である。
     await expect(page.getByText(/設問 1 \/ 2/)).toBeVisible();
-    await expect(page.getByText(/共通アンカー項目: ANCHOR-A-01/)).toBeVisible();
+    await expect(page.getByText(new RegExp(`共通アンカー項目: ${selectedAnchorId}`))).toBeVisible();
 
     // 設問1の選択肢を1つ選ぶ
     const q1FirstOption = page.locator("input[name='q1']").first();
@@ -187,7 +229,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
   test("動的3ペイン対話 → CFF暫定判断 → AutoSCORE採点 → XAIレポート表示の全フローが完走する", async ({ page }) => {
     await page.goto("/");
 
-    // 1. アンカーフローを通過
+    // 1. アンカーフローを通過（項目が読み込まれるまで待ってから開始する）
+    await expect(page.locator("select").first()).toBeEnabled();
     await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
     await page.locator("input[name='q1']").first().check();
     await page.getByRole("button", { name: "設問2へ進む" }).click();
@@ -298,6 +341,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     });
 
     await page.goto("/");
+    await expect(page.locator("select").first()).toBeEnabled();
     await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
     await page.locator("input[name='q1']").first().check();
     await page.getByRole("button", { name: "設問2へ進む" }).click();

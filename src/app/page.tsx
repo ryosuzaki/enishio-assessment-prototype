@@ -16,6 +16,7 @@ import { DialogueSessionStep } from "./components/DialogueSessionStep";
 import { PreliminaryJudgementStep } from "./components/PreliminaryJudgementStep";
 import { EvaluationReportStep } from "./components/EvaluationReportStep";
 import { TelemetryPanel } from "./components/TelemetryPanel";
+import { ErrorBanner } from "./components/ErrorBanner";
 
 export default function AssessmentPrototypePage() {
   // Session & Phase State
@@ -26,7 +27,10 @@ export default function AssessmentPrototypePage() {
 
   // Anchor State (W2)
   const [anchorList, setAnchorList] = useState<{ anchor_id: string; title: string; family: string }[]>([]);
-  const [selectedAnchorId, setSelectedAnchorId] = useState<string>("ANCHOR-A-01");
+  // 読み込めたバンクが運用20項目か同梱サンプル2項目かを画面に明示する。
+  // 供給源が確定するまでは null（未取得）にしておき、断定的な表示をしない。
+  const [bankSource, setBankSource] = useState<"operational" | "demo_sample" | null>(null);
+  const [selectedAnchorId, setSelectedAnchorId] = useState<string>("");
   const [currentAnchor, setCurrentAnchor] = useState<AnchorItem | null>(null);
   const [q1Choice, setQ1Choice] = useState<string>("");
   const [q2Choice, setQ2Choice] = useState<string>("");
@@ -70,17 +74,28 @@ export default function AssessmentPrototypePage() {
   // Telemetry Monitor
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [telemetryLog, setTelemetryLog] = useState<string[]>([]);
+  // 画面内エラー表示。window.alert() は使わない（ErrorBanner の注記を参照）
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Load anchor list on mount
   useEffect(() => {
     fetch("/api/anchor")
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.anchors) {
+        if (data.success && data.anchors?.length) {
           setAnchorList(data.anchors);
+          setBankSource(data.bankSource ?? null);
+          // 既定の出題項目は先頭に合わせる。特定IDを決め打ちすると、
+          // 運用バンクと同梱サンプルでID体系が違うため片方で必ず404になる。
+          setSelectedAnchorId(data.anchors[0].anchor_id);
+        } else {
+          setErrorMessage(
+            data.error ??
+              "アンカー項目バンクを読み込めませんでした。'npm run seed:anchors' が済んでいるか確認してください。"
+          );
         }
       })
-      .catch((e) => console.error("Fetch anchors error:", e));
+      .catch((e) => setErrorMessage("アンカー項目の取得に失敗しました: " + e.message));
   }, []);
 
   const addTelemetry = (msg: string) => {
@@ -90,7 +105,12 @@ export default function AssessmentPrototypePage() {
 
   // Start Session
   const handleStartSession = async () => {
+    if (!selectedAnchorId) {
+      setErrorMessage("出題するアンカー項目が読み込めていません。ページを再読み込みしてください。");
+      return;
+    }
     setIsSubmitting(true);
+    setErrorMessage(null);
     try {
       const res = await fetch("/api/session/start", {
         method: "POST",
@@ -115,10 +135,15 @@ export default function AssessmentPrototypePage() {
           setCurrentStep("anchor_q1");
           setQ1StartTime(Date.now());
           addTelemetry(`Anchor stimulus loaded (${selectedAnchorId}) - pretest mode`);
+        } else {
+          // ここを黙って通すと、セッションだけ作られて画面が無反応になる。
+          setErrorMessage(anchorData.error ?? "アンカー項目の読み込みに失敗しました。");
         }
+      } else {
+        setErrorMessage(data.error ?? "セッションを開始できませんでした。");
       }
     } catch (e: any) {
-      alert("セッション開始エラー: " + e.message);
+      setErrorMessage("セッション開始エラー: " + e.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -145,6 +170,7 @@ export default function AssessmentPrototypePage() {
   const handleAnchorSubmit = async () => {
     if (!currentAnchor) return;
     setIsSubmitting(true);
+    setErrorMessage(null);
     try {
       const res = await fetch("/api/anchor", {
         method: "POST",
@@ -166,10 +192,10 @@ export default function AssessmentPrototypePage() {
         );
         setCurrentStep("anchor_complete");
       } else {
-        alert("アンカー記録エラー: " + data.error);
+        setErrorMessage("アンカー記録エラー: " + data.error);
       }
     } catch (e: any) {
-      alert("送信エラー: " + e.message);
+      setErrorMessage("送信エラー: " + e.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -177,6 +203,7 @@ export default function AssessmentPrototypePage() {
 
   // Transition to Dynamic Dialogue Session (W3)
   const handleStartDialogueSession = async () => {
+    setErrorMessage(null);
     // 仕込み不備と「正常箇所」のラベルをこのセッションに対して確定させる [P-15]
     try {
       const res = await fetch("/api/dialogue/start", {
@@ -190,11 +217,11 @@ export default function AssessmentPrototypePage() {
           `injected_flaw_map recorded (不備 ${data.flawCount} 件 + 正常箇所 ${data.normalSpanCount} 件)`
         );
       } else {
-        alert("課題開始エラー: " + data.error);
+        setErrorMessage("課題開始エラー: " + data.error);
         return;
       }
     } catch (e: any) {
-      alert("課題開始エラー: " + e.message);
+      setErrorMessage("課題開始エラー: " + e.message);
       return;
     }
 
@@ -220,6 +247,7 @@ export default function AssessmentPrototypePage() {
     const userText = userPromptInput;
     setUserPromptInput("");
     setCffActiveWarning(null);
+    setErrorMessage(null);
 
     // Optimistically update chat
     const updatedHistory: ChatMessage[] = [
@@ -246,7 +274,7 @@ export default function AssessmentPrototypePage() {
       });
       const data = await res.json();
       if (!data.success) {
-        alert("対話エラー: " + data.error);
+        setErrorMessage("対話エラー: " + data.error);
         setChatHistory(chatHistory);
         setUserPromptInput(userText);
         return;
@@ -278,7 +306,7 @@ export default function AssessmentPrototypePage() {
         }
       }
     } catch (e: any) {
-      alert("対話送信エラー: " + e.message);
+      setErrorMessage("対話送信エラー: " + e.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -313,8 +341,9 @@ export default function AssessmentPrototypePage() {
 
   // Advance to CFF: Force Decision First & Mandatory Justification Step [MVP 2.5, T-17b]
   const handleProceedToPreliminaryJudgement = () => {
+    setErrorMessage(null);
     if (chatHistory.length < 2) {
-      alert("最低1回以上AI同僚と対話してから完了してください。");
+      setErrorMessage("最低1回以上AI同僚と対話してから完了してください。");
       return;
     }
     setPrelimError(null);
@@ -336,6 +365,7 @@ export default function AssessmentPrototypePage() {
     }
 
     setPrelimError(null);
+    setErrorMessage(null);
     setIsEvaluating(true);
     addTelemetry("Submitting Preliminary Judgement & Mandatory Justification...");
 
@@ -354,7 +384,7 @@ export default function AssessmentPrototypePage() {
       });
       const prelimData = await prelimRes.json();
       if (!prelimData.success) {
-        alert("暫定判断記録エラー: " + prelimData.error);
+        setErrorMessage("暫定判断記録エラー: " + prelimData.error);
         setIsEvaluating(false);
         return;
       }
@@ -403,15 +433,15 @@ export default function AssessmentPrototypePage() {
         );
       } else if (data.scoringUnavailable) {
         // 採点できないときに推測値で埋めない。埋めると ratings に偽の評点が残る。
-        alert(
+        setErrorMessage(
           `採点を実行できませんでした（${data.stage === "extract" ? "第1段階" : "第2段階"}）。\n\n` +
             data.error
         );
       } else {
-        alert("評価エラー: " + data.error);
+        setErrorMessage("評価エラー: " + data.error);
       }
     } catch (e: any) {
-      alert("評価リクエスト失敗: " + e.message);
+      setErrorMessage("評価リクエスト失敗: " + e.message);
     } finally {
       setIsEvaluating(false);
     }
@@ -421,6 +451,7 @@ export default function AssessmentPrototypePage() {
   const handleSubmitDispute = async () => {
     if (!disputeReason.trim() || !disputeDirection || !evaluation) return;
 
+    setErrorMessage(null);
     try {
       const res = await fetch("/api/feedback", {
         method: "POST",
@@ -435,7 +466,7 @@ export default function AssessmentPrototypePage() {
       });
       const data = await res.json();
       if (!data.success) {
-        alert("異議申立エラー: " + data.error);
+        setErrorMessage("異議申立エラー: " + data.error);
         return;
       }
       if (data.success) {
@@ -443,7 +474,7 @@ export default function AssessmentPrototypePage() {
         addTelemetry(`Score dispute recorded in score_feedback (ID: ${data.feedbackId.slice(0, 8)}...)`);
       }
     } catch (e: any) {
-      alert("異議申立エラー: " + e.message);
+      setErrorMessage("異議申立エラー: " + e.message);
     }
   };
 
@@ -452,12 +483,15 @@ export default function AssessmentPrototypePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content Area */}
         <div className="lg:col-span-2 space-y-6">
+          <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
+
           {/* STEP 0: Initialization */}
           {currentStep === "init" && (
             <InitStep
               selectedAnchorId={selectedAnchorId}
               setSelectedAnchorId={setSelectedAnchorId}
               anchorList={anchorList}
+              bankSource={bankSource}
               selectedTaskId={selectedTaskId}
               setSelectedTaskId={setSelectedTaskId}
               selectedTask={selectedTask}

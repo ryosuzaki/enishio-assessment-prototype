@@ -1,56 +1,12 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 import { recordAnchorResponse, resolveSessionContext } from "@/lib/telemetry";
 import { prisma } from "@/lib/db";
-
-interface AnchorOption {
-  key: string;
-  text: string;
-  note?: string;
-}
-
-interface AnchorRecord {
-  anchor_id: string;
-  family: string;
-  anchor_status?: string;
-  title: string;
-  metadata: string;
-  intro: string;
-  proposal: string;
-  hidden_premise?: string;
-  cheat_notes?: string;
-  distractor_notes?: string;
-  confidence_scale?: string;
-  q1: { question: string; options: AnchorOption[] };
-  q2: { question: string; options: AnchorOption[] };
-}
-
-/**
- * アンカー項目バンクを実行時に読む。
- *
- * **`src/data/anchors.json` はこのリポジトリに含まれない**（.gitignore）。
- * 20項目の本文と設計意図は運用中の項目バンクそのものであり、公開すると受検者が
- * 事前に読めてしまう（項目露出。MVP 2.6.2 が監視指標に据えているリスク）。
- * 生成は `npm run parse:anchors`（隣の enishio-education リポジトリの Markdown から）。
- *
- * 静的 import にすると、ファイルが無いだけでビルドが落ちる。実行時読み込みにして
- * 「バンクが未投入である」ことを利用者へ伝えられるようにしている。
- */
-function loadAnchorBank(): AnchorRecord[] {
-  const jsonPath = path.resolve(process.cwd(), "src/data/anchors.json");
-  if (!fs.existsSync(jsonPath)) return [];
-  try {
-    return JSON.parse(fs.readFileSync(jsonPath, "utf-8")) as AnchorRecord[];
-  } catch (e) {
-    console.error("anchors.json の読み込みに失敗しました:", e);
-    return [];
-  }
-}
-
-const BANK_MISSING_MESSAGE =
-  "アンカー項目バンクが投入されていません。'npm run parse:anchors' を実行してください" +
-  "（隣の enishio-education リポジトリのチェックアウトが必要です）。";
+import {
+  loadAnchorBank,
+  BANK_MISSING_MESSAGE,
+  type AnchorOption,
+  type AnchorRecord,
+} from "@/lib/anchor-bank";
 
 /**
  * 受検者へ返してよい形へ落とす。
@@ -77,18 +33,29 @@ function toLearnerFacingAnchor(a: AnchorRecord) {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const anchorId = searchParams.get("id");
-  const anchors = loadAnchorBank();
+  const { anchors, source } = loadAnchorBank();
 
-  if (anchors.length === 0) {
+  if (source === "missing") {
     return NextResponse.json({ success: false, error: BANK_MISSING_MESSAGE }, { status: 503 });
   }
 
   if (anchorId) {
     const found = anchors.find((a) => a.anchor_id === anchorId);
     if (!found) {
-      return NextResponse.json({ success: false, error: "Anchor not found" }, { status: 404 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: `アンカー項目 ${anchorId} がバンクにありません。`,
+          bankSource: source,
+        },
+        { status: 404 }
+      );
     }
-    return NextResponse.json({ success: true, anchor: toLearnerFacingAnchor(found) });
+    return NextResponse.json({
+      success: true,
+      anchor: toLearnerFacingAnchor(found),
+      bankSource: source,
+    });
   }
 
   const summaries = anchors.map((a) => ({
@@ -97,7 +64,14 @@ export async function GET(req: Request) {
     title: a.title,
   }));
 
-  return NextResponse.json({ success: true, count: anchors.length, anchors: summaries });
+  // bankSource は画面に「これは運用バンクか、同梱サンプルか」を明示させるために返す。
+  // サンプル2項目を運用20項目に見せてはならない。
+  return NextResponse.json({
+    success: true,
+    count: anchors.length,
+    anchors: summaries,
+    bankSource: source,
+  });
 }
 
 // POST /api/anchor - record response

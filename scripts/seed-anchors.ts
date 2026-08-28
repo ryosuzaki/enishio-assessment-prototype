@@ -1,43 +1,44 @@
 /**
- * anchors.json を anchor_items テーブルへ投入する。
+ * アンカー項目バンクを anchor_items テーブルへ投入する。
  *
  * anchor_responses は anchor_items への外部キーを持つため、これを流していないと
  * アンカー出題フローは必ず外部キー違反で落ちる。
  *
+ * 供給源は2つあり、`loadAnchorBank()` が運用バンク（`npm run parse:anchors` で生成）を
+ * 優先し、無ければ同梱の公開デモ用サンプルへフォールバックする。**サンプルへ落ちた場合は
+ * その旨を明示して投入する**（黙って2項目を入れて20項目のつもりにさせない）。
+ *
  * 全項目を anchor_status = "pretest" として投入する [D-51]。
  * 昇格判定（pretest → operational）は本縦切りのスコープ外（禁止事項3）。
  */
-import fs from "fs";
-import path from "path";
+// `.env` を読み込む。Next.js は自動で読むが、tsx で直接起動するスクリプトは読まない。
+// これが無いと DATABASE_URL / APIキーを `.env` に書いても "Environment variable not found"
+// で落ちる（README の手順どおりに進めた利用者がここで詰まる）。
+import "dotenv/config";
 import { prisma } from "../src/lib/db";
-
-interface AnchorRecord {
-  anchor_id: string;
-  family: string;
-  title: string;
-  metadata: string;
-  intro: string;
-  proposal: string;
-  hidden_premise: string;
-  confidence_scale: string;
-  cheat_notes: string;
-  distractor_notes: string;
-  q1: { question: string; options: { key: string; text: string; note: string }[] };
-  q2: { question: string; options: { key: string; text: string; note: string }[] };
-}
+import { loadAnchorBank, OPERATIONAL_BANK_PATH, SAMPLE_BANK_PATH } from "../src/lib/anchor-bank";
 
 async function main() {
-  const jsonPath = path.resolve(process.cwd(), "src/data/anchors.json");
-  if (!fs.existsSync(jsonPath)) {
-    console.error(`anchors.json がありません: ${jsonPath}`);
-    console.error("先に 'npm run parse:anchors' を実行してください。");
+  const { anchors, source } = loadAnchorBank();
+
+  if (source === "missing") {
+    console.error(`アンカー項目バンクを読み込めませんでした。`);
+    console.error(`  運用バンク: ${OPERATIONAL_BANK_PATH}（'npm run parse:anchors' で生成）`);
+    console.error(`  同梱サンプル: ${SAMPLE_BANK_PATH}（リポジトリに含まれるはず）`);
     process.exit(1);
   }
 
-  const items: AnchorRecord[] = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
-  console.log(`=== anchor_items の投入（${items.length}項目） ===`);
+  if (source === "demo_sample") {
+    console.log("=== 供給源: 公開デモ用サンプル ===");
+    console.log(`${OPERATIONAL_BANK_PATH} が無いため ${SAMPLE_BANK_PATH} を投入します。`);
+    console.log("**これは運用アンカーバンク（20項目）ではありません。**");
+    console.log("運用バンクを使う場合は 'npm run parse:anchors' を先に実行してください");
+    console.log("（隣の enishio-education リポジトリのチェックアウトが必要です）。\n");
+  }
 
-  for (const item of items) {
+  console.log(`=== anchor_items の投入（${anchors.length}項目 / source=${source}） ===`);
+
+  for (const item of anchors) {
     await prisma.anchorItem.upsert({
       where: { anchor_id: item.anchor_id },
       // anchor_status は更新しない。運用中に operational へ昇格した項目を

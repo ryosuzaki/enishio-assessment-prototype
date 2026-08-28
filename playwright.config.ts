@@ -11,9 +11,18 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
   },
+  // 提案書用スクリーンショットの取得は「テスト」ではなく生成処理である。
+  // 既定の実行（npm run test:e2e → chromium プロジェクト）に混ぜると、CIで走るたびに
+  // docs/screenshots/ を上書きしてしまうため、別プロジェクトへ分けている。
   projects: [
     {
       name: "chromium",
+      testIgnore: "**/capture-screenshots.spec.ts",
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "capture",
+      testMatch: "**/capture-screenshots.spec.ts",
       use: { ...devices["Desktop Chrome"] },
     },
   ],

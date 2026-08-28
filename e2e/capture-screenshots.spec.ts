@@ -151,9 +151,13 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     });
 
     // 02. アンカー出題・設問1 (Anchor Q1)
+    // 出題項目IDは供給源（運用バンク / 同梱サンプル）で変わるため決め打ちしない
+    const anchorSelect = page.locator("select").first();
+    await expect(anchorSelect).toBeEnabled();
+    const selectedAnchorId = await anchorSelect.inputValue();
     await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
     await expect(page.getByText(/設問 1 \/ 2/)).toBeVisible();
-    await expect(page.getByText(/共通アンカー項目: ANCHOR-A-01/)).toBeVisible();
+    await expect(page.getByText(new RegExp(`共通アンカー項目: ${selectedAnchorId}`))).toBeVisible();
     await page.locator("input[name='q1']").first().check();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
