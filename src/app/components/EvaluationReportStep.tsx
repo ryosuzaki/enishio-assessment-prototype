@@ -148,10 +148,19 @@ export function EvaluationReportStep({
             この判定は確定していません
           </div>
           <p className="text-[11px] text-slate-400 leading-relaxed">
-            採点器の確信度が閾値（0.70）を下回ったため（
+            採点器の確信度が閾値（{evaluation.confidenceThreshold.toFixed(2)}）を下回ったため（
             {evaluation.scoringConfidence.toFixed(2)}）、バンドを確定させず
             `rater_type = pending_human` として記録しました。評点は人間の評価者が確認してから確定します。
           </p>
+          {evaluation.isDemoThresholdOverride && (
+            <p
+              className="text-[10px] text-slate-500 leading-relaxed border-t border-slate-700/60 pt-1.5"
+              data-testid="demo-threshold-override-note"
+            >
+              ※ この閾値は `HITL_DEMO_CONFIDENCE_THRESHOLD` によりデモ用に引き上げられています。
+              採点器が実際に返した確信度（{evaluation.scoringConfidence.toFixed(2)}）自体は変更していません。
+            </p>
+          )}
         </div>
       ) : (
         <div className="p-4 rounded-xl bg-amber-950/25 border border-amber-900/40 space-y-1.5">
@@ -307,6 +316,32 @@ export function EvaluationReportStep({
             {evaluation.diagnosticFeedback}
           </p>
         </div>
+
+        {evaluation.probeConsistency && (
+          <div
+            className="p-4 rounded-xl bg-cyan-950/25 border border-cyan-900/40 space-y-2"
+            data-testid="probe-consistency-block"
+          >
+            <h3 className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+              深掘りへの応答の一貫性（Probe Consistency）
+            </h3>
+            {evaluation.probeConsistency.score === null ? (
+              <p className="text-xs text-cyan-200/70 leading-relaxed italic">
+                このセッションでは深掘り（ソクラテス型深掘り・What-if注入）が発生しなかったため、
+                判定対象がありません。
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-cyan-200/90 font-mono">
+                  {evaluation.probeConsistency.score.toFixed(2)}
+                </p>
+                <p className="text-xs text-cyan-200/80 leading-relaxed">
+                  {evaluation.probeConsistency.rationale}
+                </p>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Dialogue Log with Evidence Highlights [根拠ハイライト] */}
@@ -329,19 +364,33 @@ export function EvaluationReportStep({
             const turnComponents = evaluation.evidenceComponents.filter(
               (c) => c.turn_index === msg.turnSeq
             );
+            const speakerLabel =
+              msg.role === "user"
+                ? "You (受講者)"
+                : msg.role === "mediator"
+                  ? "進行役（媒介プローブ）"
+                  : "AI Peer (同僚エージェント)";
             return (
               <div
                 key={i}
-                className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
+                className={`flex flex-col ${
+                  msg.role === "user"
+                    ? "items-end"
+                    : msg.role === "mediator"
+                      ? "items-center"
+                      : "items-start"
+                }`}
               >
                 <div className="text-[10px] text-slate-500 mb-1 font-mono">
-                  {msg.role === "user" ? "You (受講者)" : "AI Peer (同僚エージェント)"} ・ Turn {msg.turnSeq}
+                  {speakerLabel} ・ Turn {msg.turnSeq}
                 </div>
                 <div
                   className={`max-w-[90%] p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
                     msg.role === "user"
                       ? "bg-blue-600/90 text-white rounded-tr-sm"
-                      : "bg-slate-800/90 text-slate-100 rounded-tl-sm border border-slate-700/60"
+                      : msg.role === "mediator"
+                        ? "bg-cyan-950/40 text-cyan-100 border border-cyan-800/50 italic"
+                        : "bg-slate-800/90 text-slate-100 rounded-tl-sm border border-slate-700/60"
                   }`}
                 >
                   {renderChatContentWithHighlights(msg.content, turnComponents)}

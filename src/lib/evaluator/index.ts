@@ -14,7 +14,15 @@ export const EvidenceComponentSchema = z.object({
     "blind_acceptance",         // AI出力への無批判な受容・追従
     "unclear_instruction",      // 曖昧・具体性のない指示
   ]),
-  injected_flaw_id: z.string().nullable().describe("対応する仕込み不備ID（正常箇所または該当なしはnull）"),
+  injected_flaw_id: z
+    .string()
+    .nullable()
+    .describe(
+      "対応する基準マップ上のID。仕込み不備（is_flaw=true）と正常箇所（is_flaw=false）の" +
+        "どちらにも付けること。基準マップのどれにも該当しない一般的な検証行動のみ null。" +
+        "正常箇所への過剰指摘（false_positive_critique）には、その正常箇所のIDを必ず入れる" +
+        "——入れないと適正依存の指標（MVP 2.3）が算出できない。"
+    ),
   rationale_summary: z.string().describe("抽出理由の簡潔な要約"),
 });
 
@@ -27,6 +35,23 @@ export const EvidenceExtractionOutputSchema = z.object({
       "受講者が正常箇所（is_flaw=false）を明示的に正当と判断した場合のみ true。" +
         "正常箇所に一切言及がない場合は判断材料がないため false にすること。"
     ),
+  // ソクラテス型深掘り（MVP 2.1 ステップ7）への応答の一貫性（MVP 4.4）。
+  // 深掘りが1手も入っていないログでは null を返させる。0 は「一貫していなかった」であり、
+  // 「そもそも問うていない」とは別である。
+  probe_consistency: z
+    .object({
+      score: z
+        .number()
+        .min(0)
+        .max(1)
+        .nullable()
+        .describe(
+          "MEDIATOR の問いに対する受講者の応答が、それ以前の自身の発言と整合しているか。" +
+            "MEDIATOR の発話が1件も無い場合は必ず null にすること（0 にしない）。"
+        ),
+      rationale: z.string().describe("そう判断した理由。MEDIATOR の発話が無い場合はその旨を書く"),
+    })
+    .describe("深掘りへの応答の一貫性。判定材料が無ければ score は null"),
 });
 
 export type EvidenceExtractionOutput = z.infer<typeof EvidenceExtractionOutputSchema>;
@@ -66,10 +91,37 @@ export function levelLabelFor(ratingCategory: number): string {
 // モデルID＋プロンプト版の複合文字列（実行指示書 §5）。プロンプトを直したら必ず上げる。
 // v3: extractEvidence/computeBandScore を taskId 引数化し、ルーブリックをタスク非依存の
 // 一般記述へ書き換えたため v2 から更新（T-06a）。
-export const SCORER_MODEL_VERSION = "claude-opus-5/extract-v3/score-v3";
+// v4: 第1段階に probe_consistency を追加し、injected_flaw_id を正常箇所にも付けさせる
+// 仕様へ変更した（MVP 2.3 の適正依存指標の算出に必要）。MEDIATOR ロールの扱いも明記した。
+export const SCORER_MODEL_VERSION = "claude-opus-5/extract-v4/score-v3";
 
 // これを下回った判定は rater_type = "pending_human" として記録し、スコアを確定させない（W4-3）
 export const HITL_CONFIDENCE_THRESHOLD = 0.7;
+
+/**
+ * デモ用の閾値上書き。二次審査等で `pending_human` 経路を意図的に実演するためのもの。
+ *
+ * `scoring_confidence`（モデルの自己申告値）そのものは一切改変しない。変わるのは
+ * 「確定させるかどうか」を決める運用パラメータ側だけである。**推測で保留を装う
+ * のではない**——第2エージェントが実際に返した確信度は、上書きの有無にかかわらず
+ * そのまま `ratings.scoring_confidence` へ記録される。
+ *
+ * `.env` に `HITL_DEMO_CONFIDENCE_THRESHOLD`（0〜1）を設定したときのみ有効になる。
+ * 未設定なら通常どおり `HITL_CONFIDENCE_THRESHOLD`（0.7）を使う。
+ */
+export function resolveConfidenceThreshold(): { threshold: number; isDemoOverride: boolean } {
+  const raw = process.env.HITL_DEMO_CONFIDENCE_THRESHOLD;
+  if (!raw) return { threshold: HITL_CONFIDENCE_THRESHOLD, isDemoOverride: false };
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    console.warn(
+      `HITL_DEMO_CONFIDENCE_THRESHOLD の値が不正です（0〜1の数値ではありません: "${raw}"）。既定値 ${HITL_CONFIDENCE_THRESHOLD} を使います。`
+    );
+    return { threshold: HITL_CONFIDENCE_THRESHOLD, isDemoOverride: false };
+  }
+  return { threshold: parsed, isDemoOverride: true };
+}
 
 const MODEL = "claude-opus-5";
 const MAX_TOKENS = 16000; // 実行指示書 §6.3。低く見積もると途中で切れる
@@ -121,6 +173,8 @@ export async function extractEvidence(
 - 「Redisとは何ですか」のような知識を尋ねる発言は検証行動ではありません。
 - quoted_span は発言全文ではなく、根拠となる該当箇所だけを切り出してください。
 - avoided_false_positives は、受講者が正常箇所を明示的に「これは妥当だ」と判断した場合のみ true です。言及が無い場合は false です。
+- ログには MEDIATOR という役割の発話が混じることがあります。これは受講者の判断を**引き出すための問い**（ソクラテス型深掘り・What-if注入）であり、正解を教えるヒントではありません。**MEDIATOR の発話そのものを受講者の検証行動として抽出してはいけません。**抽出対象はあくまで USER（受講者）の発言です。
+- probe_consistency は、MEDIATOR の問いに対する USER の応答が、それ以前の USER 自身の発言と整合しているかの判定です。**MEDIATOR の発話がログに1件も無い場合は score を null にしてください。**
 
 【課題シナリオと仕込み不備の基準マップ】
 ${JSON.stringify(injectedFlaws, null, 2)}

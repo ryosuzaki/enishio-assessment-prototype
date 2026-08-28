@@ -5,10 +5,16 @@ import {
   levelLabelFor,
   ScoringUnavailableError,
   SCORER_MODEL_VERSION,
-  HITL_CONFIDENCE_THRESHOLD,
+  resolveConfidenceThreshold,
 } from "@/lib/evaluator";
-import { recordRating, resolveSessionContext } from "@/lib/telemetry";
+import {
+  recordRating,
+  resolveSessionContext,
+  recordEvidenceComponents,
+  recordRelianceMetrics,
+} from "@/lib/telemetry";
 import { getDynamicTask } from "@/data/dynamic-task";
+import { getInjectedFlaws } from "@/data/dynamic-task.server";
 
 // POST /api/dialogue/evaluate - execute 2-stage AutoSCORE evaluation and record rating
 export async function POST(req: Request) {
@@ -37,13 +43,16 @@ export async function POST(req: Request) {
 
     // 3. 確信度が閾値を下回る判定はスコアを確定させず、人間の確認待ちとして記録する（W4-3）。
     //    画面は作らない（S0-5 はスコープ外）。記録だけ行う。
-    const isPending = scoring.scoring_confidence < HITL_CONFIDENCE_THRESHOLD;
+    const { threshold: confidenceThreshold, isDemoOverride } = resolveConfidenceThreshold();
+    const isPending = scoring.scoring_confidence < confidenceThreshold;
+
+    const stepId = `step-dynamic-${task.task_id}`;
 
     const ratingRecord = await recordRating({
       sessionId,
       learnerId: session.learner_id,
       sessionSeq: session.session_seq,
-      stepId: `step-dynamic-${task.task_id}`,
+      stepId,
       axisId: "axis_4",
       ratingCategory: isPending ? null : scoring.rating_category,
       raterType: isPending ? "pending_human" : "llm",
@@ -54,6 +63,8 @@ export async function POST(req: Request) {
       anchorId: null,
       anchorStatus: null,
       scoringConfidence: scoring.scoring_confidence,
+      // 深掘りが1手も入っていないセッションでは null が返る。0 で埋めない。
+      probeConsistencyScore: evidence.probe_consistency?.score ?? null,
       stimulusFeatures: {
         domain: task.domain,
         error_types: task.stimulus_features.injected_flaw_types,
@@ -68,6 +79,28 @@ export async function POST(req: Request) {
       },
     });
 
+    // 4. 根拠要素を永続化する（MVP 4.4）。**評点だけ残して根拠を捨てない。**
+    //    これが無いと「根拠と得点の対応がログ上で追跡可能」という2段階分離の主張が成立しない。
+    const evidenceRecords = evidence.components.map((c) => ({
+      turnIndex: c.turn_index,
+      quotedSpan: c.quoted_span,
+      componentType: c.component_type,
+      injectedFlawId: c.injected_flaw_id,
+      rationaleSummary: c.rationale_summary,
+    }));
+    await recordEvidenceComponents(ratingRecord.rating_id, sessionId, evidenceRecords);
+
+    // 5. 適正依存の3指標を記録する（MVP 2.3 / 4.4）。
+    //    正常箇所のラベルが要るため、正答鍵はサーバ側でのみ参照する。
+    const flawMap = getInjectedFlaws(taskId);
+    await recordRelianceMetrics({
+      sessionId,
+      stepId,
+      flawIds: flawMap.filter((f) => f.is_flaw).map((f) => f.flaw_id),
+      validSpanIds: flawMap.filter((f) => !f.is_flaw).map((f) => f.flaw_id),
+      components: evidenceRecords,
+    });
+
     return NextResponse.json({
       success: true,
       ratingId: ratingRecord.rating_id,
@@ -75,9 +108,12 @@ export async function POST(req: Request) {
       ratingCategory: isPending ? null : scoring.rating_category,
       levelLabel: isPending ? null : levelLabelFor(scoring.rating_category),
       scoringConfidence: scoring.scoring_confidence,
+      confidenceThreshold,
+      isDemoThresholdOverride: isDemoOverride,
       evidenceSummary: scoring.evidence_summary,
       diagnosticFeedback: scoring.diagnostic_feedback,
       evidenceComponents: evidence.components,
+      probeConsistency: evidence.probe_consistency ?? null,
       scorerModelVersion: SCORER_MODEL_VERSION,
     });
   } catch (error: any) {

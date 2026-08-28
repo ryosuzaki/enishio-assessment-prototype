@@ -97,12 +97,22 @@ ${task.business_requirements.join("\n")}
 ${task.constraints.join("\n")}
 
 受講者から具体的な指摘を受けてコードを直す場合のみ updated_artifact にコード全文を入れてください。
-自分から不備を列挙して先回りしてはいけません。指摘されていない箇所は直さないでください。`,
+自分から不備を列挙して先回りしてはいけません。指摘されていない箇所は直さないでください。
+
+対話ログに「第三者の進行役」という発言者が出てくることがあります。これは受講者へ内省を
+促す進行役であり、あなたへの発言ではありません。その発言や、それに対する受講者の回答に
+あなたが割り込んで答える必要はありません。`,
       messages: [
         {
           role: "user",
+          // mediator（ソクラテス型深掘り・What-if注入）は AI同僚自身の発話ではない。
+          // 「あなた」に丸めると、AI同僚が自分の発した問いだと誤認して応答が歪む。
           content: priorTurns
-            .map((t) => `[Turn ${t.turn_seq}] ${t.role === "user" ? "受講者" : "あなた"}: ${t.content}`)
+            .map((t) => {
+              const speaker =
+                t.role === "user" ? "受講者" : t.role === "mediator" ? "第三者の進行役" : "あなた";
+              return `[Turn ${t.turn_seq}] ${speaker}: ${t.content}`;
+            })
             .join("\n"),
         },
       ],

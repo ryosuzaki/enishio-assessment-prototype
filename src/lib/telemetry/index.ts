@@ -72,10 +72,20 @@ export async function resolveSessionContext(sessionId: string) {
 /**
  * Record a prompt turn (user or AI response) in the session
  */
+/**
+ * 対話の1ターンを記録する（MVP 4.4 `prompt_turns[]`）。
+ *
+ * `mediator` は AI同僚（`assistant`）とは別の役割である——AI同僚は成果物を書く相手、
+ * メディエーターは受講者の判断を引き出す相手（MVP 2.1 ステップ7・8）。
+ * **同じ role にまとめてはならない。**受講者が検証したのかメディエーターが問うたのかを
+ * 事後に分離できなくなり、第1エージェントが応答の一貫性を判定できなくなる。
+ */
+export type PromptTurnRole = "user" | "assistant" | "system" | "mediator";
+
 export async function recordPromptTurn(
   sessionId: string,
   turnSeq: number,
-  role: "user" | "assistant" | "system",
+  role: PromptTurnRole,
   content: string
 ) {
   return await prisma.promptTurn.create({
@@ -150,6 +160,12 @@ export interface RecordRatingParams {
   anchorStatus?: "pretest" | "operational" | "retired" | null;
   stimulusFeatures: Record<string, any>;
   scoringConfidence?: number | null;
+  /**
+   * ソクラテス型深掘り（MVP 2.1 ステップ7）への応答の一貫性（MVP 4.4）。
+   * 深掘りが1回も走らなかったセッションでは null にする。0 を入れてはならない
+   * ——「一貫していなかった」と「そもそも問うていない」は別である。
+   */
+  probeConsistencyScore?: number | null;
 }
 
 /**
@@ -194,6 +210,7 @@ export async function recordRating(params: RecordRatingParams) {
       anchor_status: params.anchorStatus ?? null,
       stimulus_features: params.stimulusFeatures,
       scoring_confidence: params.scoringConfidence ?? null,
+      probe_consistency_score: params.probeConsistencyScore ?? null,
     },
   });
 }
@@ -352,3 +369,165 @@ export async function recordVerificationFocusSequence(
   return result.count;
 }
 
+
+/**
+ * 第1エージェントが抽出した根拠要素を永続化する（MVP 4.4 `evidence_components[]`）。
+ *
+ * **評点だけを残して根拠を捨ててはならない。**2段階分離の主張——「抽出結果のみを
+ * 採点入力にすることで、根拠と得点の対応が事後に追跡できる」——は、抽出結果が
+ * ログに残って初めて成立する。後から足しても過去セッション分は戻らない。
+ */
+export interface EvidenceComponentRecord {
+  turnIndex: number;
+  quotedSpan: string;
+  componentType: string;
+  injectedFlawId?: string | null;
+  rationaleSummary: string;
+}
+
+export async function recordEvidenceComponents(
+  ratingId: string,
+  sessionId: string,
+  components: EvidenceComponentRecord[]
+) {
+  if (!components || components.length === 0) return 0;
+  const result = await prisma.evidenceComponent.createMany({
+    data: components.map((c) => ({
+      rating_id: ratingId,
+      session_id: sessionId,
+      turn_index: c.turnIndex,
+      quoted_span: c.quotedSpan,
+      component_type: c.componentType,
+      injected_flaw_id: c.injectedFlawId ?? null,
+      rationale_summary: c.rationaleSummary,
+    })),
+  });
+  return result.count;
+}
+
+/**
+ * 適正依存の3指標を算出して記録する（MVP 2.3 / 4.4 `reliance_metrics`）。
+ *
+ * **算出はセッション単位で完結させる。**複数セッションを横断して平均・相関・一致率を
+ * 取ってはならない（`[P-17]` 判定基準②。稼働前に統計量を出す作業になる）。
+ *
+ * 操作的定義（本実装で凍結し、`operationalization` に文字列で残す）:
+ * - 仕込み不備（is_flaw = true）: `flaw_detection` の根拠要素が当該 flaw_id に紐づいて
+ *   いれば「棄却・修正」、紐づいていなければ「採択」（＝指摘せず通した）として数える。
+ * - 正常箇所（is_flaw = false）: `false_positive_critique` として指摘されていれば
+ *   「棄却」、指摘が無ければ「採択」として数える。
+ *
+ * ⚠️ **本実装では Automation Bias Index は Correct Self-Reliance の補数になる。**
+ * スパン単位の明示的な採択／棄却をまだ取っていないためであり、3指標が独立に
+ * 測れているわけではない。この制約を隠さずに記録する。
+ */
+export interface RelianceMetricsInput {
+  sessionId: string;
+  stepId: string;
+  /** このセッションで提示した仕込み不備のID（is_flaw = true） */
+  flawIds: string[];
+  /** このセッションで提示した正常箇所のID（is_flaw = false） */
+  validSpanIds: string[];
+  /** 第1エージェントの抽出結果 */
+  components: EvidenceComponentRecord[];
+}
+
+export const RELIANCE_OPERATIONALIZATION =
+  "flaw: flaw_detection が当該 flaw_id に紐づけば棄却・修正、無ければ採択。" +
+  "valid: false_positive_critique が紐づけば棄却、無ければ採択。" +
+  "スパン単位の明示的採択／棄却は未取得のため automation_bias_index は " +
+  "correct_self_reliance の補数になる（3指標は独立ではない）。";
+
+export async function recordRelianceMetrics(input: RelianceMetricsInput) {
+  const { sessionId, stepId, flawIds, validSpanIds, components } = input;
+
+  const detectedFlawIds = new Set(
+    components
+      .filter((c) => c.componentType === "flaw_detection" && c.injectedFlawId)
+      .map((c) => c.injectedFlawId as string)
+  );
+  const overCalledValidIds = new Set(
+    components
+      .filter((c) => c.componentType === "false_positive_critique" && c.injectedFlawId)
+      .map((c) => c.injectedFlawId as string)
+  );
+
+  const flawCount = flawIds.length;
+  const validCount = validSpanIds.length;
+
+  const detected = flawIds.filter((id) => detectedFlawIds.has(id)).length;
+  const overCalled = validSpanIds.filter((id) => overCalledValidIds.has(id)).length;
+
+  // 分母が0のときは割り算をしない。0 を入れると「該当箇所が無かった」と
+  // 「1件も正しく扱えなかった」が区別できなくなる。
+  const correctSelfReliance = flawCount > 0 ? detected / flawCount : null;
+  const automationBiasIndex = flawCount > 0 ? (flawCount - detected) / flawCount : null;
+  const correctAiReliance = validCount > 0 ? (validCount - overCalled) / validCount : null;
+
+  return await prisma.relianceMetrics.upsert({
+    where: { session_id_step_id: { session_id: sessionId, step_id: stepId } },
+    update: {
+      correct_ai_reliance: correctAiReliance,
+      correct_self_reliance: correctSelfReliance,
+      automation_bias_index: automationBiasIndex,
+      valid_span_count: validCount,
+      flaw_span_count: flawCount,
+      operationalization: RELIANCE_OPERATIONALIZATION,
+    },
+    create: {
+      session_id: sessionId,
+      step_id: stepId,
+      correct_ai_reliance: correctAiReliance,
+      correct_self_reliance: correctSelfReliance,
+      automation_bias_index: automationBiasIndex,
+      valid_span_count: validCount,
+      flaw_span_count: flawCount,
+      operationalization: RELIANCE_OPERATIONALIZATION,
+    },
+  });
+}
+
+/**
+ * 画面外滞在時間を加算する（MVP 4.4 `window_blur_duration_sec`）。
+ *
+ * **判定には一切用いず記録のみ。**Phase 3 の多層防衛の資産である。
+ * 採点・保留判定・レポートのどこからも参照してはならない。
+ */
+export async function accumulateWindowBlurDuration(sessionId: string, deltaSec: number) {
+  const delta = Math.max(0, Math.round(deltaSec));
+  if (delta === 0) return null;
+  return await prisma.session.update({
+    where: { session_id: sessionId },
+    data: { window_blur_duration_sec: { increment: delta } },
+  });
+}
+
+/**
+ * ソクラテス型深掘り・What-if注入の1手を記録する（MVP 2.1 ステップ7・8）。
+ *
+ * `state_estimate` と `selection_rationale` を必ず残す。**なぜその問いを選んだかが
+ * 残らなければ、媒介は「記述可能・再現可能・監査可能な人工物」ではなくなる** `[D-30]`。
+ */
+export interface MediationProbeRecord {
+  sessionId: string;
+  turnSeq: number;
+  probeMove: string;
+  probeText: string;
+  stateEstimate: Record<string, any>;
+  selectionRationale: string;
+  mediatorModelVersion: string;
+}
+
+export async function recordMediationProbe(record: MediationProbeRecord) {
+  return await prisma.mediationProbe.create({
+    data: {
+      session_id: record.sessionId,
+      turn_seq: record.turnSeq,
+      probe_move: record.probeMove,
+      probe_text: record.probeText,
+      state_estimate: record.stateEstimate,
+      selection_rationale: record.selectionRationale,
+      mediator_model_version: record.mediatorModelVersion,
+    },
+  });
+}

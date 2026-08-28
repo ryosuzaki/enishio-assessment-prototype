@@ -20,21 +20,27 @@ model Learner {
 }
 
 model Session {
-  session_id  String    @id @default(uuid())
-  learner_id  String
-  session_seq Int
-  started_at  DateTime  @default(now())
-  ended_at    DateTime?
+  session_id               String    @id @default(uuid())
+  learner_id               String
+  session_seq              Int
+  started_at               DateTime  @default(now())
+  ended_at                 DateTime?
+  // 画面外滞在時間（MVP 4.4）。**判定には一切用いず記録のみ。**Phase 3 の多層防衛の資産である。
+  // 採点・保留判定・レポートのどこからも参照してはならない。
+  window_blur_duration_sec Int       @default(0)
 
-  learner               Learner                      @relation(fields: [learner_id], references: [learner_id], onDelete: Cascade)
-  ratings               Rating[]
-  anchor_responses      AnchorResponse[]
-  prompt_turns          PromptTurn[]
-  artifact_edit_series  ArtifactEditDistanceSeries[]
-  injected_flaw_map     InjectedFlawMap[]
-  score_feedback        ScoreFeedback[]
+  learner                Learner                       @relation(fields: [learner_id], references: [learner_id], onDelete: Cascade)
+  ratings                Rating[]
+  anchor_responses       AnchorResponse[]
+  prompt_turns           PromptTurn[]
+  artifact_edit_series   ArtifactEditDistanceSeries[]
+  injected_flaw_map      InjectedFlawMap[]
+  score_feedback         ScoreFeedback[]
   preliminary_judgements LearnerPreliminaryJudgement[]
-  verification_focuses  VerificationFocusSequence[]
+  verification_focuses   VerificationFocusSequence[]
+  evidence_components    EvidenceComponent[]
+  reliance_metrics       RelianceMetrics[]
+  mediation_probes       MediationProbe[]
 
   @@unique([learner_id, session_seq])
   @@index([learner_id, session_seq])
@@ -42,27 +48,32 @@ model Session {
 }
 
 model Rating {
-  rating_id            String    @id @default(uuid())
-  session_id           String
-  learner_id           String
-  session_seq          Int
-  step_id              String
-  axis_id              String    // e.g. "axis_4"
-  rating_category      Int?      // 0..5。null = 未採点（アンカー無得点 / HITL確認待ち）
-  rater_type           String    // "llm" | "human" | "pending_human"
-  scoring_confidence   Float?    // 第2エージェントの自己申告確信度。閾値未満は pending_human へ回す
-  rater_id             String
-  scorer_model_version String    // "model_id/extract-v1/score-v1"
-  stimulus_ref         String
-  stimulus_type        String    // "generated" | "anchor"
-  anchor_id            String?
-  anchor_status        String?   // "pretest" | "operational" | "retired"
-  stimulus_features    Json      // JSONB
-  created_at           DateTime  @default(now())
+  rating_id               String   @id @default(uuid())
+  session_id              String
+  learner_id              String
+  session_seq             Int
+  step_id                 String
+  axis_id                 String // e.g. "axis_4"
+  rating_category         Int? // 0..5。null = 未採点（アンカー無得点 / HITL確認待ち）
+  rater_type              String // "llm" | "human" | "pending_human"
+  scoring_confidence      Float? // 第2エージェントの自己申告確信度。閾値未満は pending_human へ回す
+  // ソクラテス型深掘り（MVP 2.1 ステップ7）への応答の一貫性（MVP 4.4）。
+  // 第1エージェントが構造化出力として返す0..1の自己申告値であり、統計量ではない。
+  // 深掘りが1回も走らなかったセッションでは null（「一貫していた」ではない）。
+  probe_consistency_score Float?
+  rater_id                String
+  scorer_model_version    String // "model_id/extract-v1/score-v1"
+  stimulus_ref            String
+  stimulus_type           String // "generated" | "anchor"
+  anchor_id               String?
+  anchor_status           String? // "pretest" | "operational" | "retired"
+  stimulus_features       Json // JSONB
+  created_at              DateTime @default(now())
 
-  session        Session         @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
-  learner        Learner         @relation(fields: [learner_id], references: [learner_id], onDelete: Cascade)
-  score_feedback ScoreFeedback[]
+  session             Session             @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
+  learner             Learner             @relation(fields: [learner_id], references: [learner_id], onDelete: Cascade)
+  score_feedback      ScoreFeedback[]
+  evidence_components EvidenceComponent[]
 
   @@index([session_id])
   @@index([learner_id])
@@ -72,9 +83,9 @@ model Rating {
 
 model AnchorItem {
   anchor_id     String   @id
-  family        String   // "A" | "B"
+  family        String // "A" | "B"
   anchor_status String   @default("pretest") // "pretest" | "operational" | "retired"
-  content       Json     // full JSON structure: title, intro, proposal, q1, q2, confidence
+  content       Json // full JSON structure: title, intro, proposal, q1, q2, confidence
   created_at    DateTime @default(now())
 
   responses AnchorResponse[]
@@ -91,7 +102,7 @@ model AnchorResponse {
   anchor_status  String   @default("pretest")
   q1_selection   String
   q2_selection   String
-  confidence     Int      // 1..5
+  confidence     Int // 1..5
   q1_duration_ms Int
   q2_duration_ms Int
   created_at     DateTime @default(now())
@@ -109,7 +120,10 @@ model PromptTurn {
   turn_id    String   @id @default(uuid())
   session_id String
   turn_seq   Int
-  role       String   // "user" | "assistant" | "system"
+  // "user" | "assistant" | "system" | "mediator"
+  // mediator は AI同僚（assistant）と別役割である。深掘りの問い（MVP 2.1 ステップ7・8）を
+  // assistant に混ぜると、受講者が検証したのかメディエーターが問うたのかが分離できなくなる。
+  role       String
   content    String   @db.Text
   timestamp  DateTime @default(now())
 
@@ -137,7 +151,7 @@ model InjectedFlawMap {
   id          String  @id @default(uuid())
   session_id  String
   flaw_id     String
-  flaw_type   String  // "type_A" | "type_B" | "type_C"
+  flaw_type   String // "type_A" | "type_B" | "type_C"
   span_text   String  @db.Text
   is_flaw     Boolean @default(true) // false indicates verified intentional normal span [P-15]
   description String  @db.Text
@@ -152,9 +166,9 @@ model InjectedFlawMap {
 model ScoreFeedback {
   feedback_id            String   @id @default(uuid())
   rating_id              String
-  session_id             String   // MVP 4.5。総合スコアへの申立は rating_id を持たない場合があるため必須
-  actor_role             String   // "learner" | "supervisor" | "hr"
-  disagreement_direction String   // "too_high" | "too_low" | "axis_mismatch" | "evidence_wrong"
+  session_id             String // MVP 4.5。総合スコアへの申立は rating_id を持たない場合があるため必須
+  actor_role             String // "learner" | "supervisor" | "hr"
+  disagreement_direction String // "too_high" | "too_low" | "axis_mismatch" | "evidence_wrong"
   free_text_reason       String   @db.Text // mandatory [P-12]
   cited_evidence_ref     String?
   scorer_model_version   String
@@ -172,9 +186,9 @@ model ScoreFeedback {
 model LearnerPreliminaryJudgement {
   id                   String   @id @default(uuid())
   session_id           String
-  step_id              String   // e.g. "step-dynamic-fintech-01"
-  action               String   // "approve" | "remand" (承認 / 差し戻し)
-  self_estimated_score Int      // 0..5 (自己評価バンド)
+  step_id              String // e.g. "step-dynamic-fintech-01"
+  action               String // "approve" | "remand" (承認 / 差し戻し)
+  self_estimated_score Int // 0..5 (自己評価バンド)
   justification        String   @db.Text // Mandatory Justification: 理由記述（必須・空文字不可）
   created_at           DateTime @default(now())
 
@@ -187,9 +201,9 @@ model LearnerPreliminaryJudgement {
 model VerificationFocusSequence {
   id            String   @id @default(uuid())
   session_id    String
-  focus_seq     Int      // 明示の順序連番（1, 2, 3...）
-  line_start    Int?     // 選択開始行
-  line_end      Int?     // 選択終了行
+  focus_seq     Int // 明示の順序連番（1, 2, 3...）
+  line_start    Int? // 選択開始行
+  line_end      Int? // 選択終了行
   selected_text String   @db.Text // 選択されたコード/テキスト
   note          String?  @db.Text // 受講者任意メモ
   created_at    DateTime @default(now())
@@ -201,3 +215,93 @@ model VerificationFocusSequence {
   @@map("verification_focus_sequences")
 }
 
+// 採点エンジン第1エージェントが抽出した根拠要素（MVP 4.4 `evidence_components[]`）。
+//
+// **これを残さないと、評点だけがログに残って根拠が消える。**2段階分離の要点は
+// 「抽出結果のみを採点入力にすることで、根拠と得点の対応が事後に追跡できる」ことであり、
+// 抽出結果を永続化しなければその主張は成立しない（4章冒頭の原則：後から足しても
+// 過去セッション分は戻らない）。XAIレポートの原材料も兼ねる。
+model EvidenceComponent {
+  component_id      String   @id @default(uuid())
+  rating_id         String
+  session_id        String
+  // 対話ログ上のどのターンから切り出したか（prompt_turns.turn_seq に対応）
+  turn_index        Int
+  quoted_span       String   @db.Text
+  // premise_identification | flaw_detection | false_positive_critique
+  // | blind_acceptance | unclear_instruction
+  component_type    String
+  // 対応する仕込み不備ID。正常箇所または該当なしは null
+  injected_flaw_id  String?
+  rationale_summary String   @db.Text
+  created_at        DateTime @default(now())
+
+  rating  Rating  @relation(fields: [rating_id], references: [rating_id], onDelete: Cascade)
+  session Session @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
+
+  @@index([rating_id])
+  @@index([session_id])
+  @@map("evidence_components")
+}
+
+// 適正依存の3指標（MVP 2.3 / 4.4 `reliance_metrics`）。
+//
+// **過剰依存と不足依存の両方が不適応行動である。**AIの正しい提案を不当に拒絶する受講者も、
+// 鵜呑みにする受講者と同様に較正されていない。算出には `injected_flaw_map` の
+// 「正常箇所のラベル」（is_flaw = false）が要る。
+//
+// **セッション単位の記録である。**複数セッションを横断して平均・相関を取らないこと
+// （`[P-17]` 判定基準②。稼働前に統計量を出す作業になる）。
+model RelianceMetrics {
+  metrics_id            String   @id @default(uuid())
+  session_id            String
+  step_id               String
+  // P(採択 | AIが正しい)。正常箇所を過剰指摘せず承認できた割合
+  correct_ai_reliance   Float?
+  // P(棄却・修正 | AIが誤り)。仕込み不備を検出・指摘できた割合
+  correct_self_reliance Float?
+  // P(採択 | AIが誤り)。過剰依存の度合い
+  automation_bias_index Float?
+  valid_span_count      Int
+  flaw_span_count       Int
+  // **どう数えたかを凍結する。**定義を後から変えると過去の値の意味が失われるため、
+  // 算出時点の操作的定義を文字列で持つ。
+  operationalization    String   @db.Text
+  created_at            DateTime @default(now())
+
+  session Session @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
+
+  @@unique([session_id, step_id])
+  @@map("reliance_metrics")
+}
+
+// ソクラテス型深掘り・What-if注入の1手（MVP 2.1 ステップ7・8）。
+//
+// **媒介の機能は elicitation（誘出）であって intervention-for-growth ではない** `[D-28]`。
+// 選択器には `injected_flaw_map`（正答鍵）を渡さない。渡すと仕込み不備へ向かう
+// 固定ヒント梯子（Interventionist DA / graduated prompt）になり、`[D-28]` が却下した
+// 設計そのものになる。**引き出すのであって、導かない。**
+//
+// `state_estimate` は「正解までの距離」ではなく「ルーブリック上どの根拠がまだ
+// 引き出せていないか」の推定である。次に打つ手はこれに応じて変わる。
+model MediationProbe {
+  probe_id               String   @id @default(uuid())
+  session_id             String
+  // このプローブを挿入した対話ターン（prompt_turns.turn_seq に対応）
+  turn_seq               Int
+  // deepen_rationale | trace_grounding | what_if | self_report_gap | none
+  probe_move             String
+  probe_text             String   @db.Text
+  // 走行中の状態推定。根拠カテゴリごとの取得状況（JSONB）
+  state_estimate         Json
+  // なぜこの手を選んだか。監査のために必ず残す
+  selection_rationale    String   @db.Text
+  // モデルID＋プロンプト版。方針を変えたら必ず上げる
+  mediator_model_version String
+  created_at             DateTime @default(now())
+
+  session Session @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
+
+  @@index([session_id, turn_seq])
+  @@map("mediation_probes")
+}

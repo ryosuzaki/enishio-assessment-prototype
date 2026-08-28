@@ -61,6 +61,38 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
       });
     });
 
+    await page.route("**/api/dialogue/probe", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          probeIssued: true,
+          probeMove: "trace_grounding",
+          probeText: "その指摘は業務要件のどの部分から来ていますか？",
+          stateEstimate: [
+            { target: "premise_articulation", status: "partial", basis: "単一障害点への言及はあるが前提の明示は無い" },
+            { target: "tradeoff_reasoning", status: "not_elicited", basis: "トレードオフの言及はまだ無い" },
+            { target: "requirement_grounding", status: "elicited", basis: "耐障害性要件への言及がある" },
+            { target: "normal_span_discrimination", status: "not_elicited", basis: "正常箇所への言及はまだ無い" },
+            { target: "robustness_under_changed_premise", status: "not_elicited", basis: "What-ifはまだ投げていない" },
+          ],
+          selectionRationale: "premise_articulation と tradeoff_reasoning が未取得のため、根拠の出所を辿る問いを選んだ",
+          mediatorModelVersion: "claude-opus-5/probe-v1",
+          probeTurnSeq: 3,
+          probesSoFar: 1,
+        }),
+      });
+    });
+
+    await page.route("**/api/session/blur", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ success: true, recorded: true }),
+      });
+    });
+
     await page.route("**/api/dialogue/preliminary-judgement", async (route) => {
       await route.fulfill({
         status: 200,
@@ -93,6 +125,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
           ratingCategory: 3,
           levelLabel: "Band 3: 前提摘発・要件検証行動",
           scoringConfidence: 0.88,
+          confidenceThreshold: 0.7,
+          isDemoThresholdOverride: false,
           evidenceSummary:
             "受講者はRedis障害時の単一障害点リスクおよびPCI DSS要件との乖離を的確に指摘し、AI同僚に適切な修正指示を出している。",
           diagnosticFeedback:
@@ -106,7 +140,11 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
               rationale_summary: "Redis障害時の耐障害性要件違反を指摘",
             },
           ],
-          scorerModelVersion: "claude-opus-5/extract-v2/score-v2",
+          probeConsistency: {
+            score: 0.82,
+            rationale: "進行役の問いかけに対し、直前の指摘と整合する理由づけを述べていた",
+          },
+          scorerModelVersion: "claude-opus-5/extract-v4/score-v3",
         }),
       });
     });
@@ -263,6 +301,13 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     // AI同僚の返答が表示されたことを確認
     await expect(page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時")).toBeVisible();
 
+    // 2.5 媒介プローブ（ソクラテス型深掘り・What-if注入、MVP 2.1 ステップ7・8）の確認。
+    // AI同僚の応答後に自動で1手打たれ、状態推定パネルと進行役の発話がログに現れる。
+    await expect(page.getByTestId("mediation-state-panel")).toBeVisible();
+    await expect(page.getByText("その指摘は業務要件のどの部分から来ていますか？")).toBeVisible();
+    await expect(page.getByText("進行役（媒介プローブ）")).toBeVisible();
+    await expect(page.getByText(/この推定を踏まえて選んだ手/)).toBeVisible();
+
     // 3. レビュー完了 ➔ 暫定判断（CFF）へ進む
     await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
 
@@ -288,6 +333,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("判定根拠（Evidence Summary）")).toBeVisible();
     await expect(page.getByText("形成的診断アドバイス（Diagnostic Feedback）")).toBeVisible();
     await expect(page.getByText("抽出された受講者の検証行動スパン")).toBeVisible();
+    await expect(page.getByTestId("probe-consistency-block")).toBeVisible();
+    await expect(page.getByTestId("probe-consistency-block")).toContainText("0.82");
     await expect(page.getByText("評点に対する異議申立・フィードバック")).toBeVisible();
 
     // CFF Discrepancy Highlighting の表示確認（一致ケース）
@@ -324,6 +371,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
           ratingCategory: 2,
           levelLabel: "Band 2: 表層的修正・定型指摘",
           scoringConfidence: 0.88,
+          confidenceThreshold: 0.7,
+          isDemoThresholdOverride: false,
           evidenceSummary: "受講者は基本的な指摘を行ったが、根本的なアーキテクチャ欠陥への追及は部分的であった。",
           diagnosticFeedback: "単一障害点の指摘にとどまらず、フェイルオーバーの具体的な復旧手順まで提案を深めると高評価に繋がります。",
           evidenceComponents: [
@@ -376,5 +425,60 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByTestId("prelim-action-display")).toContainText("差し戻し (Remand)");
     await expect(page.getByTestId("matched-flaws-count")).toContainText("1件 (FLAW-02)");
     await expect(page.getByTestId("prelim-justification-display")).toContainText("高可用性設計とフェイルオーバー要件を提示し、全面的に差し戻したため。");
+  });
+
+  test("pending_human（評点保留）のデモ用閾値上書きが画面に明示される", async ({ page }) => {
+    // 確信度自体は高い（0.85）が、デモ用に閾値を引き上げたため保留になったケース。
+    // scoring_confidence は変更していないことが画面上の注記からも分かることを確認する。
+    await page.route("**/api/dialogue/evaluate", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          ratingId: "mock-rating-pending-001",
+          isPendingHumanReview: true,
+          ratingCategory: null,
+          levelLabel: null,
+          scoringConfidence: 0.85,
+          confidenceThreshold: 0.99,
+          isDemoThresholdOverride: true,
+          evidenceSummary: "",
+          diagnosticFeedback: "",
+          evidenceComponents: [],
+          probeConsistency: null,
+          scorerModelVersion: "claude-opus-5/extract-v4/score-v3",
+        }),
+      });
+    });
+
+    await page.goto("/");
+    await expect(page.locator("select").first()).toBeEnabled();
+    await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
+    await page.locator("input[name='q1']").first().check();
+    await page.getByRole("button", { name: "設問2へ進む" }).click();
+    await page.locator("input[name='q2']").first().check();
+    await page.getByRole("button", { name: "確信度評定へ" }).click();
+    await page.getByRole("button", { name: /4\s*やや自信あり/ }).click();
+    await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
+    await page.getByRole("button", { name: "動的対話セッションへ進む" }).click();
+
+    const promptInput = page.getByPlaceholder(/AI同僚に指示・指摘を入力/);
+    await promptInput.fill("Redisの単一障害点について考慮が必要です");
+    await page.getByRole("button", { name: "送信" }).click();
+    await expect(page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時")).toBeVisible();
+
+    await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
+    await page.locator("input[value='approve']").check();
+    await page.getByRole("button", { name: /Band 3\s*前提摘発/ }).click();
+    const justificationTextarea = page.getByPlaceholder(/承認または差し戻しと判断した具体的な根拠・理由を記述/);
+    await justificationTextarea.fill("デモ用の保留経路確認。");
+    await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
+
+    await expect(page.getByText("評点保留（人間の確認待ち）")).toBeVisible();
+    await expect(page.getByText("採点器の確信度が閾値（0.99）を下回ったため（0.85）")).toBeVisible();
+    await expect(page.getByTestId("demo-threshold-override-note")).toContainText(
+      "採点器が実際に返した確信度（0.85）自体は変更していません"
+    );
   });
 });

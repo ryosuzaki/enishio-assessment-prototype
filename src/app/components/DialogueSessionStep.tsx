@@ -15,7 +15,9 @@ import {
   Send,
 } from "lucide-react";
 import type { DynamicTaskScenario } from "@/data/dynamic-task";
-import type { ChatMessage, FocusItem } from "../types";
+import type { ChatMessage, EvidenceTargetState, FocusItem, ProbeMove } from "../types";
+import { MAX_PROBES_PER_SESSION } from "../types";
+import { MediationStatePanel } from "./MediationStatePanel";
 
 interface DialogueSessionStepProps {
   selectedTask: DynamicTaskScenario;
@@ -30,6 +32,11 @@ interface DialogueSessionStepProps {
   setUserPromptInput: (input: string) => void;
   cffActiveWarning: string | null;
   isSubmitting: boolean;
+  mediationStateEstimate: EvidenceTargetState[] | null;
+  lastProbeMove: ProbeMove | null;
+  lastSelectionRationale: string | null;
+  probesIssued: number;
+  isProbing: boolean;
   onProceedToPreliminaryJudgement: () => void;
   onAddFocusItem: (textSnippet?: string, noteText?: string) => void;
   onRemoveFocusItem: (seq: number) => void;
@@ -49,6 +56,11 @@ export function DialogueSessionStep({
   setUserPromptInput,
   cffActiveWarning,
   isSubmitting,
+  mediationStateEstimate,
+  lastProbeMove,
+  lastSelectionRationale,
+  probesIssued,
+  isProbing,
   onProceedToPreliminaryJudgement,
   onAddFocusItem,
   onRemoveFocusItem,
@@ -186,6 +198,16 @@ export function DialogueSessionStep({
         </div>
       </div>
 
+      {/* Mediation State Panel (MVP 2.1 ステップ7・8) */}
+      <MediationStatePanel
+        stateEstimate={mediationStateEstimate}
+        lastProbeMove={lastProbeMove}
+        selectionRationale={lastSelectionRationale}
+        probesIssued={probesIssued}
+        maxProbes={MAX_PROBES_PER_SESSION}
+        isProbing={isProbing}
+      />
+
       {/* Chat & Prompt Dialogue Pane */}
       <div className="glass-panel p-5 rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -202,17 +224,27 @@ export function DialogueSessionStep({
             <div
               key={i}
               className={`flex flex-col ${
-                msg.role === "user" ? "items-end" : "items-start"
+                msg.role === "user"
+                  ? "items-end"
+                  : msg.role === "mediator"
+                    ? "items-center"
+                    : "items-start"
               }`}
             >
               <div className="text-[10px] text-slate-500 mb-1 font-mono">
-                {msg.role === "user" ? "You (受講者)" : "AI Peer (同僚エージェント)"}
+                {msg.role === "user"
+                  ? "You (受講者)"
+                  : msg.role === "mediator"
+                    ? "進行役（媒介プローブ）"
+                    : "AI Peer (同僚エージェント)"}
               </div>
               <div
                 className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
                   msg.role === "user"
                     ? "bg-blue-600 text-white rounded-tr-sm"
-                    : "bg-slate-800/90 text-slate-100 rounded-tl-sm border border-slate-700/60"
+                    : msg.role === "mediator"
+                      ? "bg-cyan-950/40 text-cyan-100 border border-cyan-800/50 italic"
+                      : "bg-slate-800/90 text-slate-100 rounded-tl-sm border border-slate-700/60"
                 }`}
               >
                 {msg.content}

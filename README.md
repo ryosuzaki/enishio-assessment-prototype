@@ -16,10 +16,13 @@
 ② 動的課題の対話セッション（人手作成3本から選択・3ペイン検証環境）
      ↓  要件仕様・成果物エディタ（編集距離記録）・AI同僚チャット・検証フォーカスパネル
      ↓  AIの提案に誤りが仕込まれている。仕込み位置と「正常箇所」を記録
+     ↓  ②-b メディエーターが走行中の状態推定に応じて深掘り・What-if注入を1手選ぶ
+        （最大4手。正答鍵は渡さない＝誘出であって誘導ではない）
 ③ CFF（認知強制機能）暫定判断
      ↓  Force Decision First（AIレポート閲覧前の承認/差し戻し）＋ Mandatory Justification（理由記述必須）
 ④ 検証行動の抽出（抽出エージェント）
      ↓  対話ログのどの発話が「検証」に当たるかを根拠つきで切り出す（チャット上での根拠ハイライト）
+     ↓  深掘りへの応答の一貫性、適正依存の3指標（過剰依存/不足依存）もここで判定・記録する
 ⑤ 採点（採点エージェント・0〜5バンド）
      ↓  抽出結果のみを入力にする2段階分離
      ↓  確信度が閾値未満なら評点を確定させず人間の確認待ちにする
@@ -42,6 +45,7 @@
 | **採点できないときは採点しない** | APIキーが無い・構造化出力が得られない場合に、キーワード一致等のローカル判定で代替しない。代替すると (a) 単語の出現を検証行動として測ってしまい、(b) LLMが走っていないのに `rater_type = "llm"` のログが残って `scorer_model_version` による再現性の担保が崩れる。**採点しないほうが正確である** |
 | **確信度が低い判定は確定させない** | 採点器が自己申告した確信度が 0.70 を下回る判定は `rater_type = "pending_human"` ・`rating_category = null` として記録する。推定器が迷った事実を潰さずに残す |
 | **単一スタックで通す** | Python 側の処理（IRT較正等）は本縦切りのスコープ外。2週間で端から端まで通すことを優先した |
+| **メディエーターに正答鍵を渡さない** | 深掘り・What-if注入の選択器（`src/lib/mediator`）は `dynamic-task.server.ts` を import しない。渡すと仕込み不備へ向かう固定ヒント梯子になり、答え鍵つきのテストに変質する。媒介の機能は誘出であって誘導ではない |
 
 ## 技術スタック
 
@@ -49,19 +53,22 @@ Next.js 16（App Router）／ TypeScript ／ React 19 ／ Tailwind CSS v4 ／ Po
 
 ## データモデル
 
-`prisma/schema.prisma` に11テーブル。評点の正本は `Rating`。
+`prisma/schema.prisma` に14テーブル。評点の正本は `Rating`。
 
 | テーブル | 役割 |
 | :--- | :--- |
-| `Learner` / `Session` | `session_seq` を明示的に持つ（中断・再開・削除が混じるため日時から復元できない） |
-| `Rating` | 評点の正本。`scorer_model_version` / `stimulus_type` / `anchor_status` / `stimulus_features`(JSONB)。`rating_category` は nullable で、null は「未採点」（人間の確認待ち）を表す |
+| `Learner` / `Session` | `session_seq` を明示的に持つ（中断・再開・削除が混じるため日時から復元できない）。`Session` は `window_blur_duration_sec`（画面外滞在時間・記録専用で判定には使わない）も持つ |
+| `Rating` | 評点の正本。`scorer_model_version` / `stimulus_type` / `anchor_status` / `stimulus_features`(JSONB) / `probe_consistency_score`。`rating_category` は nullable で、null は「未採点」（人間の確認待ち）を表す |
 | `AnchorItem` / `AnchorResponse` | 較正用アンカー項目とその応答。`pretest` / `operational` の2状態。**アンカーは無得点なので `Rating` に行を作らない**——0点を入れるとルーブリック上の「Level 0」と区別できなくなり、将来の較正を汚す。応答時点の `anchor_status` は `AnchorResponse` 側に凍結して持つ |
-| `PromptTurn` | 対話の全ターン全文 |
+| `PromptTurn` | 対話の全ターン全文。`role` は `user` / `assistant` / `mediator`（後述）を区別する |
 | `ArtifactEditDistanceSeries` | 成果物の編集距離の時系列 |
 | `InjectedFlawMap` | 仕込んだ誤りの位置と類型、**および正常箇所のラベル**（これがないと過剰指摘を判定できない） |
 | `LearnerPreliminaryJudgement` | CFF（Force Decision First / Mandatory Justification）による事前暫定判断（承認/差し戻し、自己評価点、必須理由記述） |
 | `VerificationFocusSequence` | 3ペイン検証パネルで受講者が選択したコードスパンと明示順序（`focus_seq`） |
 | `ScoreFeedback` | 異議申立。自由記述の理由を必須にしている |
+| `EvidenceComponent` | 採点エンジン第1エージェントが抽出した根拠要素。評点だけでなく根拠そのものを永続化し、XAIレポートのハイライトの原材料にもなる |
+| `RelianceMetrics` | 適正依存の3指標（Correct AI Reliance / Correct Self-Reliance / Automation Bias Index）。過剰依存と不足依存の両方を同一セッション内で測る |
+| `MediationProbe` | ソクラテス型深掘り・What-if注入の1手ごとの状態推定・選んだ手・選定理由。**正答鍵は含まない**（`src/lib/mediator` が受け取っていないため） |
 
 ## 動かす
 
@@ -132,7 +139,7 @@ npm run check:no-leak         # クライアントバンドルへの正答鍵・
 # 接続先を対象のデータベースURLに設定して実行
 export DATABASE_URL="postgresql://postgres:[PASSWORD]@[HOST]:6543/postgres?pgbouncer=true"
 
-# スキーマの反映（11テーブル作成）
+# スキーマの反映（14テーブル作成）
 npx prisma db push
 
 # アンカー項目のパースとDB初期シード

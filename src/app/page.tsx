@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { DYNAMIC_TASKS, getDynamicTask } from "@/data/dynamic-task";
 import { levenshtein } from "@/lib/edit-distance";
 import type {
@@ -8,13 +8,17 @@ import type {
   ChatMessage,
   FocusItem,
   EvaluationResult,
+  EvidenceTargetState,
+  ProbeMove,
   StepType,
 } from "./types";
+import { MAX_PROBES_PER_SESSION } from "./types";
 import { InitStep } from "./components/InitStep";
 import { AnchorQuestionStep } from "./components/AnchorQuestionStep";
 import { DialogueSessionStep } from "./components/DialogueSessionStep";
 import { PreliminaryJudgementStep } from "./components/PreliminaryJudgementStep";
 import { EvaluationReportStep } from "./components/EvaluationReportStep";
+import { MediationStatePanel } from "./components/MediationStatePanel";
 import { TelemetryPanel } from "./components/TelemetryPanel";
 import { ErrorBanner } from "./components/ErrorBanner";
 
@@ -52,6 +56,13 @@ export default function AssessmentPrototypePage() {
   const [cffActiveWarning, setCffActiveWarning] = useState<string | null>(null);
   // 直近に記録した成果物。次ターンの編集距離をこれとの差分で測る（MVP 4.4）
   const [lastLoggedArtifact, setLastLoggedArtifact] = useState<string>(DYNAMIC_TASKS[0].initial_ai_draft);
+
+  // Mediation State (MVP 2.1 ステップ7・8: ソクラテス型深掘り・What-if注入)
+  const [mediationStateEstimate, setMediationStateEstimate] = useState<EvidenceTargetState[] | null>(null);
+  const [lastProbeMove, setLastProbeMove] = useState<ProbeMove | null>(null);
+  const [lastSelectionRationale, setLastSelectionRationale] = useState<string | null>(null);
+  const [probesIssued, setProbesIssued] = useState<number>(0);
+  const [isProbing, setIsProbing] = useState<boolean>(false);
 
   // Verification Focus Panel State (W3 3rd-Pane) [MVP 4.4, T-17b]
   const [focusItems, setFocusItems] = useState<FocusItem[]>([]);
@@ -96,6 +107,48 @@ export default function AssessmentPrototypePage() {
         }
       })
       .catch((e) => setErrorMessage("アンカー項目の取得に失敗しました: " + e.message));
+  }, []);
+
+  // 画面外滞在時間の記録（MVP 4.4 `window_blur_duration_sec`）。
+  // **判定には一切用いない。**Phase 3の多層防衛の資産として貯めるだけであり、
+  // このプロトタイプの採点・保留判定・レポート表示のどこからも参照しない。
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
+  useEffect(() => {
+    let hiddenSince: number | null = null;
+
+    const flush = () => {
+      if (hiddenSince === null) return;
+      const deltaSec = (Date.now() - hiddenSince) / 1000;
+      hiddenSince = null;
+      const currentSessionId = sessionIdRef.current;
+      if (!currentSessionId || deltaSec < 1) return;
+      fetch("/api/session/blur", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: currentSessionId, deltaSec }),
+      }).catch(() => {
+        // 記録専用の副次的テレメトリである。失敗してもセッションは続行する。
+      });
+    };
+
+    const onHide = () => {
+      if (hiddenSince === null) hiddenSince = Date.now();
+    };
+    const onShow = () => flush();
+
+    const onVisibilityChange = () => (document.hidden ? onHide() : onShow());
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("blur", onHide);
+    window.addEventListener("focus", onShow);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("blur", onHide);
+      window.removeEventListener("focus", onShow);
+      flush();
+    };
   }, []);
 
   const addTelemetry = (msg: string) => {
@@ -236,6 +289,10 @@ export default function AssessmentPrototypePage() {
     ]);
     setTurnCounter(2);
     setLastLoggedArtifact(selectedTask.initial_ai_draft);
+    setMediationStateEstimate(null);
+    setLastProbeMove(null);
+    setLastSelectionRationale(null);
+    setProbesIssued(0);
     addTelemetry(`Dynamic Task initiated (${selectedTask.task_id})`);
   };
 
@@ -281,17 +338,17 @@ export default function AssessmentPrototypePage() {
       }
       setLastLoggedArtifact(artifactCode);
       if (data.success) {
-        const nextTurn = data.assistantTurnSeq + 1;
-        setTurnCounter(nextTurn);
+        let nextTurn = data.assistantTurnSeq + 1;
 
-        setChatHistory([
+        const historyWithAssistant: ChatMessage[] = [
           ...updatedHistory,
           {
             turnSeq: data.assistantTurnSeq,
             role: "assistant",
             content: data.assistantMessage,
           },
-        ]);
+        ];
+        setChatHistory(historyWithAssistant);
 
         if (data.isInterlockTriggered) {
           setCffActiveWarning(data.assistantMessage);
@@ -304,11 +361,63 @@ export default function AssessmentPrototypePage() {
           setArtifactCode(data.updatedArtifact);
           addTelemetry(`Artifact draft updated by AI Peer`);
         }
+
+        setTurnCounter(nextTurn);
+
+        // 意図-行動ギャップのインターロック（正規表現ベース。別機構）が発火したターンには
+        // 深掘りを重ねない。上限に達していれば呼ばない。
+        if (!data.isInterlockTriggered && probesIssued < MAX_PROBES_PER_SESSION) {
+          await runMediationProbe(nextTurn, historyWithAssistant);
+        }
       }
     } catch (e: any) {
       setErrorMessage("対話送信エラー: " + e.message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Mediation Probe (MVP 2.1 ステップ7・8: ソクラテス型深掘り・What-if注入)
+  //
+  // AI同僚の応答とは別の手番。**正答鍵（injected_flaw_map）はこの呼び出しに含めない**
+  // ——渡っているのは selectedTaskId のみで、サーバ側で業務要件・制約と対話ログから
+  // 状態推定を行う（src/lib/mediator の注記を参照）。
+  const runMediationProbe = async (turnSeq: number, historySoFar: ChatMessage[]) => {
+    setIsProbing(true);
+    try {
+      const res = await fetch("/api/dialogue/probe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, taskId: selectedTaskId, turnSeq }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        // 深掘りが打てなくても対話セッション自体は継続させる。ここで止めない。
+        if (!data.mediationUnavailable) {
+          addTelemetry(`Mediation probe error: ${data.error}`);
+        }
+        return;
+      }
+
+      setMediationStateEstimate(data.stateEstimate ?? null);
+      setLastProbeMove(data.probeMove ?? null);
+      setLastSelectionRationale(data.selectionRationale ?? null);
+
+      if (data.probeIssued) {
+        setProbesIssued((n) => n + 1);
+        setTurnCounter(turnSeq + 1);
+        setChatHistory([
+          ...historySoFar,
+          { turnSeq, role: "mediator", content: data.probeText },
+        ]);
+        addTelemetry(`Mediation probe issued (${data.probeMove}, Turn #${turnSeq})`);
+      } else {
+        addTelemetry(`Mediation: no probe needed (${data.reason ?? data.probeMove})`);
+      }
+    } catch (e: any) {
+      addTelemetry(`Mediation probe request failed: ${e.message}`);
+    } finally {
+      setIsProbing(false);
     }
   };
 
@@ -428,7 +537,7 @@ export default function AssessmentPrototypePage() {
         setCurrentStep("evaluation_report");
         addTelemetry(
           data.isPendingHumanReview
-            ? `Evaluation pending human review (confidence ${data.scoringConfidence.toFixed(2)} < 0.70)`
+            ? `Evaluation pending human review (confidence ${data.scoringConfidence.toFixed(2)} < ${data.confidenceThreshold.toFixed(2)}${data.isDemoThresholdOverride ? ", demo override" : ""})`
             : `Evaluation complete: ${data.levelLabel} (Rating ID: ${data.ratingId.slice(0, 8)}...)`
         );
       } else if (data.scoringUnavailable) {
@@ -537,6 +646,11 @@ export default function AssessmentPrototypePage() {
               setUserPromptInput={setUserPromptInput}
               cffActiveWarning={cffActiveWarning}
               isSubmitting={isSubmitting}
+              mediationStateEstimate={mediationStateEstimate}
+              lastProbeMove={lastProbeMove}
+              lastSelectionRationale={lastSelectionRationale}
+              probesIssued={probesIssued}
+              isProbing={isProbing}
               onProceedToPreliminaryJudgement={handleProceedToPreliminaryJudgement}
               onAddFocusItem={handleAddFocusItem}
               onRemoveFocusItem={handleRemoveFocusItem}
