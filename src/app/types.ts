@@ -41,6 +41,7 @@ export interface EvidenceComponent {
   turn_index: number;
   quoted_span: string;
   component_type: string;
+  grounding?: "none" | "asserted" | "tied_to_requirement";
   injected_flaw_id: string | null;
   rationale_summary: string;
 }

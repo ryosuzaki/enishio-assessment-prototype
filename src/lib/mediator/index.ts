@@ -98,10 +98,17 @@ export const ProbeSelectionSchema = z.object({
 
 export type ProbeSelection = z.infer<typeof ProbeSelectionSchema>;
 
-// モデルID＋プロンプト版。方針を変えたら必ず上げる。
-export const MEDIATOR_MODEL_VERSION = "claude-opus-5/probe-v1";
+// メディエーターモデルの選定設定（設定ファイル / 環境変数から動的取得）
+export function getMediatorModel(): string {
+  return process.env.MEDIATOR_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+}
 
-const MODEL = "claude-opus-5";
+export function getMediatorModelVersion(): string {
+  return `${getMediatorModel()}/probe-v1`;
+}
+
+// モデルID＋プロンプト版。方針を変えたら必ず上げる。
+export const MEDIATOR_MODEL_VERSION = getMediatorModelVersion();
 const MAX_TOKENS = 8000;
 
 /** 1セッションあたりの深掘りの上限（MVP 2.1 ステップ7は「3〜4ターン」を必須としている）。 */
@@ -110,7 +117,7 @@ export const MAX_PROBES_PER_SESSION = 4;
 /**
  * 深掘りを実行できないことを表す。**推測でそれらしい問いを作らない。**
  * ローカルの定型文で代替すると「走行中の状態推定に応じて問いが変わる」が偽になり、
- * mediation_probes に固定文言のログが残って媒介方針の再現性の担保が崩れる。
+ * mediation_probes に固定文言のログが残って媒介方針の追跡可能性が崩れる。
  */
 export class MediationUnavailableError extends Error {
   constructor(message: string) {
@@ -184,7 +191,7 @@ ${params.probesSoFar.length > 0 ? params.probesSoFar.join(" → ") : "（まだ1
 現時点の状態推定と、次に打つ手を1つ決めてください。同じ手を続けて打たないでください。`;
 
   const res = await client.messages.parse({
-    model: MODEL,
+    model: getMediatorModel(),
     max_tokens: MAX_TOKENS,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: promptText }],

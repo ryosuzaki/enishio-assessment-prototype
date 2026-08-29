@@ -117,15 +117,17 @@ model AnchorResponse {
 }
 
 model PromptTurn {
-  turn_id    String   @id @default(uuid())
-  session_id String
-  turn_seq   Int
+  turn_id       String   @id @default(uuid())
+  session_id    String
+  turn_seq      Int
   // "user" | "assistant" | "system" | "mediator"
   // mediator は AI同僚（assistant）と別役割である。深掘りの問い（MVP 2.1 ステップ7・8）を
   // assistant に混ぜると、受講者が検証したのかメディエーターが問うたのかが分離できなくなる。
-  role       String
-  content    String   @db.Text
-  timestamp  DateTime @default(now())
+  role          String
+  // AI同僚やメディエーターの発話モデル種別（例: "claude-sonnet-4-5"）。user の場合は null
+  model_version String?
+  content       String   @db.Text
+  timestamp     DateTime @default(now())
 
   session Session @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
 
@@ -229,8 +231,10 @@ model EvidenceComponent {
   turn_index        Int
   quoted_span       String   @db.Text
   // premise_identification | flaw_detection | false_positive_critique
-  // | blind_acceptance | unclear_instruction
+  // | blind_acceptance | unclear_instruction | alternative_design_proposal
   component_type    String
+  // none | asserted | tied_to_requirement [T-29]
+  grounding         String?
   // 対応する仕込み不備ID。正常箇所または該当なしは null
   injected_flaw_id  String?
   rationale_summary String   @db.Text

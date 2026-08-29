@@ -86,7 +86,8 @@ export async function recordPromptTurn(
   sessionId: string,
   turnSeq: number,
   role: PromptTurnRole,
-  content: string
+  content: string,
+  modelVersion?: string | null
 ) {
   return await prisma.promptTurn.create({
     data: {
@@ -94,6 +95,7 @@ export async function recordPromptTurn(
       turn_seq: turnSeq,
       role,
       content,
+      model_version: modelVersion ?? null,
     },
   });
 }
@@ -381,6 +383,7 @@ export interface EvidenceComponentRecord {
   turnIndex: number;
   quotedSpan: string;
   componentType: string;
+  grounding?: string | null;
   injectedFlawId?: string | null;
   rationaleSummary: string;
 }
@@ -398,6 +401,7 @@ export async function recordEvidenceComponents(
       turn_index: c.turnIndex,
       quoted_span: c.quotedSpan,
       component_type: c.componentType,
+      grounding: c.grounding ?? null,
       injected_flaw_id: c.injectedFlawId ?? null,
       rationale_summary: c.rationaleSummary,
     })),

@@ -56,7 +56,7 @@ export async function POST(req: Request) {
       axisId: "axis_4",
       ratingCategory: isPending ? null : scoring.rating_category,
       raterType: isPending ? "pending_human" : "llm",
-      raterId: isPending ? "awaiting-human-review" : "claude-opus-5",
+      raterId: isPending ? "awaiting-human-review" : (process.env.EVALUATOR_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5"),
       scorerModelVersion: SCORER_MODEL_VERSION,
       stimulusRef: task.task_id,
       stimulusType: "generated",
@@ -85,6 +85,7 @@ export async function POST(req: Request) {
       turnIndex: c.turn_index,
       quotedSpan: c.quoted_span,
       componentType: c.component_type,
+      grounding: c.grounding,
       injectedFlawId: c.injected_flaw_id,
       rationaleSummary: c.rationale_summary,
     }));
@@ -119,7 +120,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     if (error instanceof ScoringUnavailableError) {
       // 採点できないときに推測値で埋めない。埋めると「LLMが採点した」という
-      // 偽のログが ratings に残り、scorer_model_version による再現性が崩れる。
+      // 偽のログが ratings に残り、scorer_model_version による追跡可能性が崩れる。
       console.error(`Scoring unavailable at stage '${error.stage}':`, error.message);
       return NextResponse.json(
         { success: false, error: error.message, stage: error.stage, scoringUnavailable: true },

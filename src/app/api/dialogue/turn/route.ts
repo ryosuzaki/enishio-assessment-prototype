@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     // 3. Intent-action gap interlock
     if (userMessage.trim().match(INTENT_GAP_PATTERN)) {
       const intentGapMessage = getIntentGapMessage(taskId);
-      await recordPromptTurn(sessionId, assistantTurnSeq, "assistant", intentGapMessage);
+      await recordPromptTurn(sessionId, assistantTurnSeq, "assistant", intentGapMessage, "system-interlock");
       return NextResponse.json({
         success: true,
         assistantMessage: intentGapMessage,
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
 
     const client = new Anthropic({ apiKey });
     const res = await client.messages.parse({
-      model: "claude-opus-5",
+      model: process.env.DIALOGUE_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5",
       max_tokens: 16000,
       system: `${getAiPeerSystemPrompt(taskId)}
 
@@ -127,7 +127,8 @@ ${task.constraints.join("\n")}
     }
 
     const { reply, updated_artifact } = res.parsed_output;
-    await recordPromptTurn(sessionId, assistantTurnSeq, "assistant", reply);
+    const dialogueModel = process.env.DIALOGUE_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+    await recordPromptTurn(sessionId, assistantTurnSeq, "assistant", reply, dialogueModel);
 
     return NextResponse.json({
       success: true,

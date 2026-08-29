@@ -98,7 +98,7 @@ export async function POST(req: Request) {
 
     // 問いは対話ログにも残す。受講者が何に答えたのかが分からないと、
     // 第1エージェントが応答の一貫性を判定できない。
-    await recordPromptTurn(sessionId, turnSeq, "mediator", selection.probe_text);
+    await recordPromptTurn(sessionId, turnSeq, "mediator", selection.probe_text, MEDIATOR_MODEL_VERSION);
 
     return NextResponse.json({
       success: true,
@@ -114,7 +114,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     if (error instanceof MediationUnavailableError) {
       // 深掘りできないときに定型文で埋めない。埋めると mediation_probes に
-      // 「モデルが選んだ手」ではないログが残り、媒介方針の再現性が崩れる。
+      // 「モデルが選んだ手」ではないログが残り、媒介方針の追跡可能性が崩れる。
       console.error("Mediation unavailable:", error.message);
       return NextResponse.json(
         { success: false, error: error.message, mediationUnavailable: true },

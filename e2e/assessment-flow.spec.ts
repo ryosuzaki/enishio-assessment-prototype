@@ -78,7 +78,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
             { target: "robustness_under_changed_premise", status: "not_elicited", basis: "What-ifはまだ投げていない" },
           ],
           selectionRationale: "premise_articulation と tradeoff_reasoning が未取得のため、根拠の出所を辿る問いを選んだ",
-          mediatorModelVersion: "claude-opus-5/probe-v1",
+          mediatorModelVersion: "claude-sonnet-4-5/probe-v1",
           probeTurnSeq: 3,
           probesSoFar: 1,
         }),
@@ -135,7 +135,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
             {
               turn_index: 2,
               quoted_span: "Redisの単一障害点について考慮が必要です",
-              component_type: "FLAW_IDENTIFICATION",
+              component_type: "flaw_detection",
+              grounding: "tied_to_requirement",
               injected_flaw_id: "FLAW-01",
               rationale_summary: "Redis障害時の耐障害性要件違反を指摘",
             },
@@ -144,7 +145,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
             score: 0.82,
             rationale: "進行役の問いかけに対し、直前の指摘と整合する理由づけを述べていた",
           },
-          scorerModelVersion: "claude-opus-5/extract-v4/score-v3",
+          scorerModelVersion: "claude-sonnet-4-5/extract-v5/score-v3",
         }),
       });
     });
@@ -447,7 +448,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
           diagnosticFeedback: "",
           evidenceComponents: [],
           probeConsistency: null,
-          scorerModelVersion: "claude-opus-5/extract-v4/score-v3",
+          scorerModelVersion: "claude-sonnet-4-5/extract-v5/score-v3",
         }),
       });
     });

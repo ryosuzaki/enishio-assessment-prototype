@@ -8,12 +8,19 @@ export const EvidenceComponentSchema = z.object({
   turn_index: z.number(),
   quoted_span: z.string().describe("受講者の発言または指示の該当箇所（XAIハイライトの原材料）"),
   component_type: z.enum([
-    "premise_identification",    // 暗黙の前提・トレードオフの言語化
-    "flaw_detection",           // 仕込まれた不備の具体的指摘
-    "false_positive_critique",  // 正常箇所への過剰指摘（誤認）
-    "blind_acceptance",         // AI出力への無批判な受容・追従
-    "unclear_instruction",      // 曖昧・具体性のない指示
+    "premise_identification",       // 暗黙の前提・トレードオフの言語化
+    "flaw_detection",              // 仕込まれた不備の具体的指摘
+    "false_positive_critique",     // 正常箇所への過剰指摘（誤認）
+    "blind_acceptance",            // AI出力への無批判な受容・追従
+    "unclear_instruction",         // 曖昧・具体性のない指示
+    "alternative_design_proposal", // 代替アーキテクチャやフォールバック設計の具体的提示（バンド5対応）
   ]),
+  grounding: z
+    .enum(["none", "asserted", "tied_to_requirement"])
+    .describe(
+      "受講者の指摘が業務要件・制約・前提に接続されているかの客観的観測事実" +
+        "（none: 根拠・接続なし, asserted: 単なる違和感・主張の表明にとどまる, tied_to_requirement: 業務要件やシステム制約・前提条件と具体的に接続されている）"
+    ),
   injected_flaw_id: z
     .string()
     .nullable()
@@ -91,9 +98,20 @@ export function levelLabelFor(ratingCategory: number): string {
 // モデルID＋プロンプト版の複合文字列（実行指示書 §5）。プロンプトを直したら必ず上げる。
 // v3: extractEvidence/computeBandScore を taskId 引数化し、ルーブリックをタスク非依存の
 // 一般記述へ書き換えたため v2 から更新（T-06a）。
+// 採点モデルの選定設定（設定ファイル / 環境変数から動的取得）
+// 最先端水準の性能帯の中から費用対効果（コストパフォーマンス）の高いモデルを選定可能
+export function getScorerModel(): string {
+  return process.env.EVALUATOR_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+}
+
+export function getScorerModelVersion(): string {
+  return `${getScorerModel()}/extract-v5/score-v3`;
+}
+
 // v4: 第1段階に probe_consistency を追加し、injected_flaw_id を正常箇所にも付けさせる
 // 仕様へ変更した（MVP 2.3 の適正依存指標の算出に必要）。MEDIATOR ロールの扱いも明記した。
-export const SCORER_MODEL_VERSION = "claude-opus-5/extract-v4/score-v3";
+// v5: component_type に alternative_design_proposal を追加し、grounding（none/asserted/tied_to_requirement）を追加してルーブリック各バンドとの観測対応を整備（T-29）。
+export const SCORER_MODEL_VERSION = getScorerModelVersion();
 
 // これを下回った判定は rater_type = "pending_human" として記録し、スコアを確定させない（W4-3）
 export const HITL_CONFIDENCE_THRESHOLD = 0.7;
@@ -123,7 +141,7 @@ export function resolveConfidenceThreshold(): { threshold: number; isDemoOverrid
   return { threshold: parsed, isDemoOverride: true };
 }
 
-const MODEL = "claude-opus-5";
+// const MODEL は getScorerModel() から動的に取得
 const MAX_TOKENS = 16000; // 実行指示書 §6.3。低く見積もると途中で切れる
 
 /**
@@ -131,7 +149,7 @@ const MAX_TOKENS = 16000; // 実行指示書 §6.3。低く見積もると途中
  *
  * キーワード一致等のローカル発見的手法でスコアを埋めると、(a) 単語の出現を検証行動と
  * 誤って測り、(b) LLMが走っていないのに rater_type="llm" のログが残って
- * scorer_model_version による再現性の担保が崩れる。採点しないほうが正確である。
+ * scorer_model_version による追跡可能性が崩れる。採点しないほうが正確である。
  */
 export class ScoringUnavailableError extends Error {
   readonly stage: "extract" | "score";
@@ -187,7 +205,7 @@ ${finalArtifact}
 `;
 
   const res = await client.messages.parse({
-    model: MODEL,
+    model: getScorerModel(),
     max_tokens: MAX_TOKENS,
     messages: [{ role: "user", content: promptText }],
     output_config: { format: zodOutputFormat(EvidenceExtractionOutputSchema) },
@@ -221,10 +239,10 @@ ${JSON.stringify(evidence, null, 2)}
 【軸4 ルーブリック基準（タスク非依存の一般記述）】
 - Level 0: 判定材料が無い（根拠要素が空、または検証行動が1件も抽出されていない）
 - Level 1: AIの提案を無批判に受け入れている（blind_acceptance がある）
-- Level 2: 不備の存在には気づいているが、理由やトレードオフが言語化できず曖昧
-- Level 3: 業務要件・制約から生じる前提やトレードオフのリスクを具体的に指摘できている
-- Level 4: 不備を正確に指摘しつつ、正常だが疑わしい箇所を過剰指摘せず**明示的に正当と判断している**
-- Level 5: 代替アーキテクチャやフォールバック設計を明確に指示できている
+- Level 2: 不備の存在には気づいているが、理由やトレードオフが言語化できず曖昧（grounding が "asserted" または "none" で止まっている）
+- Level 3: 業務要件・制約から生じる前提やトレードオフのリスクを具体的に指摘できている（grounding が "tied_to_requirement" の flaw_detection や premise_identification がある）
+- Level 4: 不備を正確に指摘しつつ、正常だが疑わしい箇所を過剰指摘せず**明示的に正当と判断している**（avoided_false_positives が true）
+- Level 5: 代替アーキテクチャやフォールバック設計を明確に指示できている（alternative_design_proposal がある）
 
 【この課題固有の着眼点（参考。ルーブリックの判定基準そのものではない）】
 ${rubricHint}
@@ -235,7 +253,7 @@ ${rubricHint}
 `;
 
   const res = await client.messages.parse({
-    model: MODEL,
+    model: getScorerModel(),
     max_tokens: MAX_TOKENS,
     messages: [{ role: "user", content: promptText }],
     output_config: { format: zodOutputFormat(ScoringOutputSchema) },

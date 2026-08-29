@@ -49,7 +49,7 @@ export function TelemetryPanel({
           </div>
           <div className="flex justify-between py-1 border-b border-slate-800/60">
             <span className="text-slate-500">Scorer Version:</span>
-            <span className="text-slate-400 text-[10px]">claude-opus-5/extract-v2/score-v2</span>
+            <span className="text-slate-400 text-[10px]">configurable (claude-sonnet-4-5/extract-v5/score-v3)</span>
           </div>
         </div>
 
@@ -79,7 +79,7 @@ export function TelemetryPanel({
         </div>
         <ul className="space-y-1.5 text-[11px] list-disc list-inside">
           <li>データモデル: `learners`, `sessions`, `ratings`, `learner_preliminary_judgements`, `verification_focus_sequences` 本番準拠</li>
-          <li>AutoSCORE: 自由記述CoTを排した2段階構造化採点（claude-opus-5）</li>
+          <li>AutoSCORE: 自由記述CoTを排した2段階構造化採点（設定可能モデル）</li>
           <li>CFF機能: Force Decision First & Mandatory Justification</li>
           <li>3ペイン: 要件・成果物エディタ・検証パネル（focus_seq 順序追跡）</li>
           <li>XAIレポート: 根拠スパンの可視化と異議申立導線（MVP 4.5）</li>
