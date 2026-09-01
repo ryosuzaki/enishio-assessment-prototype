@@ -46,10 +46,11 @@
 | **確信度が低い判定は確定させない** | 採点器が自己申告した確信度が 0.70 を下回る判定は `rater_type = "pending_human"` ・`rating_category = null` として記録する。推定器が迷った事実を潰さずに残す |
 | **単一スタックで通す** | Python 側の処理（IRT較正等）は本縦切りのスコープ外。2週間で端から端まで通すことを優先した |
 | **メディエーターに正答鍵を渡さない** | 深掘り・What-if注入の選択器（`src/lib/mediator`）は `dynamic-task.server.ts` を import しない。渡すと仕込み不備へ向かう固定ヒント梯子になり、答え鍵つきのテストに変質する。媒介の機能は誘出であって誘導ではない |
+| **対話側に測定モデルを置かない** | 動的に生成される一回性の課題には項目パラメータの同定可能性が無い。対話側は中間表現に基づくルーブリック基準参照評価（0〜5バンド）に留め、アンカー側の尺度と同一尺度化しない |
 
 ## 技術スタック
 
-Next.js 16（App Router）／ TypeScript ／ React 19 ／ Tailwind CSS v4 ／ PostgreSQL ＋ Prisma ／ `@anthropic-ai/sdk`（Claude Opus 5）／ `@google/genai` ／ Playwright ／ Vitest ／ Zod
+Next.js 16（App Router）／ TypeScript ／ React 19 ／ Tailwind CSS v4 ／ PostgreSQL ＋ Prisma ／ `@anthropic-ai/sdk`（モデルは環境変数で切替・既定 `claude-sonnet-4-5`）／ `@google/genai` ／ Playwright ／ Vitest ／ Zod
 
 ## データモデル
 
