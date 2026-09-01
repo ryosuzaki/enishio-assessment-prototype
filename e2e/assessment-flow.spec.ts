@@ -338,6 +338,12 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByTestId("probe-consistency-block")).toContainText("0.82");
     await expect(page.getByText("評点に対する異議申立・フィードバック")).toBeVisible();
 
+    // 共通アンカー並置提示ブロック [D-60, P-16] の表示確認
+    await expect(page.getByTestId("anchor-parallel-report-block")).toBeVisible();
+    await expect(page.getByTestId("anchor-parallel-report-block")).toContainText("共通アンカー課題（別の測定量・並置提示）");
+    await expect(page.getByTestId("anchor-parallel-report-block")).toContainText("固定刺激（無得点記録・尺度較正用）");
+    await expect(page.getByTestId("anchor-parallel-report-block")).toContainText("本プロトタイプでは θ を算出していません");
+
     // CFF Discrepancy Highlighting の表示確認（一致ケース）
     await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
     await expect(page.getByTestId("self-score-display")).toContainText("Band 3");
@@ -418,6 +424,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
 
     // XAIレポート画面での乖離ハイライト確認
+    await expect(page.getByTestId("anchor-parallel-report-block")).toBeVisible();
     await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
     await expect(page.getByTestId("self-score-display")).toContainText("Band 5");
     await expect(page.getByTestId("ai-score-display")).toContainText("Band 2");

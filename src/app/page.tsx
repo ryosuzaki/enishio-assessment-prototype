@@ -35,6 +35,7 @@ export default function AssessmentPrototypePage() {
   // 供給源が確定するまでは null（未取得）にしておき、断定的な表示をしない。
   const [bankSource, setBankSource] = useState<"operational" | "demo_sample" | null>(null);
   const [selectedAnchorId, setSelectedAnchorId] = useState<string>("");
+  const [anchorStatus, setAnchorStatus] = useState<string>("pretest");
   const [currentAnchor, setCurrentAnchor] = useState<AnchorItem | null>(null);
   const [q1Choice, setQ1Choice] = useState<string>("");
   const [q2Choice, setQ2Choice] = useState<string>("");
@@ -240,6 +241,9 @@ export default function AssessmentPrototypePage() {
       });
       const data = await res.json();
       if (data.success) {
+        if (data.anchorStatus) {
+          setAnchorStatus(data.anchorStatus);
+        }
         addTelemetry(
           `Anchor recorded (Response ID: ${data.responseId.slice(0, 8)}..., ${data.anchorStatus} / 無得点)`
         );
@@ -682,6 +686,12 @@ export default function AssessmentPrototypePage() {
               prelimAction={prelimAction}
               prelimScore={prelimScore}
               prelimJustification={prelimJustification}
+              anchorId={selectedAnchorId}
+              anchorStatus={anchorStatus}
+              bankSource={bankSource}
+              q1Choice={q1Choice}
+              q2Choice={q2Choice}
+              confidence={confidence}
               disputeReason={disputeReason}
               setDisputeReason={setDisputeReason}
               disputeDirection={disputeDirection}

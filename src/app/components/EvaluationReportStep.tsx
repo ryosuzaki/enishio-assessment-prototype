@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Scale,
   ArrowRightLeft,
+  Anchor,
 } from "lucide-react";
 import {
   DISAGREEMENT_OPTIONS,
@@ -22,6 +23,12 @@ interface EvaluationReportStepProps {
   prelimAction?: "approve" | "remand" | "";
   prelimScore?: number;
   prelimJustification?: string;
+  anchorId?: string;
+  anchorStatus?: string;
+  bankSource?: "operational" | "demo_sample" | null;
+  q1Choice?: string;
+  q2Choice?: string;
+  confidence?: number;
   disputeReason: string;
   setDisputeReason: (reason: string) => void;
   disputeDirection: string;
@@ -94,6 +101,12 @@ export function EvaluationReportStep({
   prelimAction,
   prelimScore,
   prelimJustification,
+  anchorId,
+  anchorStatus,
+  bankSource,
+  q1Choice,
+  q2Choice,
+  confidence,
   disputeReason,
   setDisputeReason,
   disputeDirection,
@@ -169,7 +182,7 @@ export function EvaluationReportStep({
             これは開発中の推定器による「暫定値」です
           </div>
           <p className="text-[11px] text-amber-200/80 leading-relaxed">
-            妥当性は未検証であり、能力の確定的な評価ではありません。固定した行動アンカーに対する位置づけであって、
+            妥当性は未検証であり、能力の確定的な評価ではありません。ルーブリックの行動記述に対する位置づけであって、
             他者との比較・序列ではありません。判定に納得できない場合は下の異議申立からお知らせください
             （申立の有無は評点に影響しません）。
             <span className="ml-1 font-mono text-amber-200/60">
@@ -178,6 +191,73 @@ export function EvaluationReportStep({
           </p>
         </div>
       )}
+
+      {/* 共通アンカー課題（別の測定量・並置提示） [D-60, P-16] */}
+      <div
+        className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-4"
+        data-testid="anchor-parallel-report-block"
+      >
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Anchor className="w-4 h-4 text-blue-400" />
+            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+              共通アンカー課題（別の測定量・並置提示）
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/40">
+              固定刺激（無得点記録・尺度較正用）
+            </span>
+            {anchorStatus && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                status: {anchorStatus}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
+            <span className="text-[10px] text-slate-500 block">出題項目 ID / 供給源</span>
+            <div className="font-mono text-slate-200 font-semibold flex items-center gap-1.5 flex-wrap">
+              <span>{anchorId || "—"}</span>
+              <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                {bankSource === "operational"
+                  ? "運用バンク"
+                  : bankSource === "demo_sample"
+                  ? "公開デモ用サンプル"
+                  : "項目バンク"}
+              </span>
+            </div>
+          </div>
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
+            <span className="text-[10px] text-slate-500 block">受検者回答（選択肢）</span>
+            <div className="font-mono text-slate-200 font-semibold">
+              設問1: <span className="text-blue-400">{q1Choice || "—"}</span> ／ 設問2: <span className="text-indigo-400">{q2Choice || "—"}</span>
+            </div>
+          </div>
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
+            <span className="text-[10px] text-slate-500 block">自己評定確信度</span>
+            <div className="font-mono text-slate-200 font-semibold">
+              {confidence ? `${confidence} / 5` : "—"}
+              <span className="text-[10px] font-normal text-slate-400 ml-1.5">
+                ({confidence === 1 ? "全く自信なし" : confidence === 2 ? "やや不安" : confidence === 3 ? "普通" : confidence === 4 ? "やや自信あり" : confidence === 5 ? "非常に確信" : ""})
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-900/30 text-[11px] text-slate-400 space-y-1 leading-relaxed">
+          <div className="flex items-center gap-1.5 text-blue-300 font-semibold text-xs">
+            <AlertCircle className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+            <span>尺度連結および並置提示に関する設計上の原則（[P-16] [D-60]）</span>
+          </div>
+          <p>
+            共通アンカー課題は<strong>固定刺激</strong>であり、<strong>対話セッションの評点とは別の測定量</strong>です。両者を同一尺度へ等化・合算していません。
+            &theta; 尺度の較正には項目バンク全体で <span className="font-mono text-slate-300">N &ge; 150〜200</span> の応答が必要であり、<strong>本プロトタイプでは &theta; を算出していません</strong>。
+          </p>
+        </div>
+      </div>
 
       {/* CFF Discrepancy Highlighting [MVP 2.5, T-17 §9, T-24] */}
       <div
