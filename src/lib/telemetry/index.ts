@@ -159,7 +159,14 @@ export interface RecordRatingParams {
   stimulusRef: string;
   stimulusType: "generated" | "anchor";
   anchorId?: string | null;
-  anchorStatus?: "pretest" | "operational" | "retired" | null;
+  anchorStatus?: "pretest" | "operational" | "verification" | "retired" | null;
+  /** [D-67] 決定2：用途の列挙。省略時は "formative"（Phase 1） */
+  stakesContext?:
+    | "formative"
+    | "education"
+    | "promotion"
+    | "selection"
+    | "verification";
   stimulusFeatures: Record<string, any>;
   scoringConfidence?: number | null;
   /**
@@ -210,6 +217,8 @@ export async function recordRating(params: RecordRatingParams) {
       stimulus_type: params.stimulusType,
       anchor_id: params.anchorId ?? null,
       anchor_status: params.anchorStatus ?? null,
+      // [D-67] 決定2 / MVP 4.1.1：全応答に付す。本プロトタイプは Phase 1 相当のため既定は "formative"。
+      stakes_context: params.stakesContext ?? "formative",
       stimulus_features: params.stimulusFeatures,
       scoring_confidence: params.scoringConfidence ?? null,
       probe_consistency_score: params.probeConsistencyScore ?? null,
@@ -221,6 +230,13 @@ export interface RecordAnchorResponseParams {
   sessionId: string;
   anchorId: string;
   anchorStatus: string;
+  /** [D-67] 決定2：用途の列挙。省略時は "formative"（Phase 1） */
+  stakesContext?:
+    | "formative"
+    | "education"
+    | "promotion"
+    | "selection"
+    | "verification";
   q1Selection: string;
   q2Selection: string;
   confidence: number;
@@ -237,6 +253,8 @@ export async function recordAnchorResponse(params: RecordAnchorResponseParams) {
       session_id: params.sessionId,
       anchor_id: params.anchorId,
       anchor_status: params.anchorStatus,
+      // [D-67] 決定2
+      stakes_context: params.stakesContext ?? "formative",
       q1_selection: params.q1Selection,
       q2_selection: params.q2Selection,
       confidence: params.confidence,

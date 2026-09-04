@@ -66,7 +66,12 @@ model Rating {
   stimulus_ref            String
   stimulus_type           String // "generated" | "anchor"
   anchor_id               String?
-  anchor_status           String? // "pretest" | "operational" | "retired"
+  anchor_status           String? // "pretest" | "operational" | "verification" | "retired" [D-67]
+  // [D-67] 決定2 / MVP 4.1.1：全応答に付す。用途の列挙であり2値ではない。
+  // "formative"（Phase 1 育成・評価非連動）/ "education"（Phase 2）/ "promotion"（Phase 3(C) 昇格・配置）
+  // / "selection"（Phase 3(A) 採用選考）/ "verification"（可搬型の照合）
+  // 用途からステークス水準へは後から写像できるが逆はできない。記録がなければ事後分離ができない [D-28]。
+  stakes_context          String   @default("formative")
   stimulus_features       Json // JSONB
   created_at              DateTime @default(now())
 
@@ -84,7 +89,7 @@ model Rating {
 model AnchorItem {
   anchor_id     String   @id
   family        String // "A" | "B"
-  anchor_status String   @default("pretest") // "pretest" | "operational" | "retired"
+  anchor_status String   @default("pretest") // "pretest" | "operational" | "verification" | "retired" [D-67]
   content       Json // full JSON structure: title, intro, proposal, q1, q2, confidence
   created_at    DateTime @default(now())
 
@@ -99,7 +104,10 @@ model AnchorResponse {
   anchor_id      String
   // 応答時点の anchor_status を凍結して持つ。anchor_items 側は昇格で書き換わるため、
   // ここに残さないと「この応答が pretest 期のものか」を後から復元できない（MVP 4.1.1）。
+  // [D-67] "pretest" | "operational" | "verification" | "retired"
   anchor_status  String   @default("pretest")
+  // [D-67] 決定2：応答時の用途。Rating.stakes_context と同じ列挙。
+  stakes_context String   @default("formative")
   q1_selection   String
   q2_selection   String
   confidence     Int // 1..5
