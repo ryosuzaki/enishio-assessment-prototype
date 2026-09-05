@@ -489,4 +489,74 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
       "採点器が実際に返した確信度（0.85）自体は変更していません"
     );
   });
+
+  test("① 組織分析ダッシュボードの表示とチーム別ヒートマップ・アラート・演習遷移が動作する", async ({ page }) => {
+    await page.goto("/");
+
+    // 組織分析ダッシュボードタブへの切替
+    const dashboardTabBtn = page.getByRole("button", { name: /① 組織分析ダッシュボード/ });
+    await expect(dashboardTabBtn).toBeVisible();
+    await dashboardTabBtn.click();
+
+    // 画面タイトルとKPIカードの確認
+    await expect(page.locator("h1")).toContainText("組織動的コンピテンシー・手戻りリスク分析");
+    await expect(page.getByText("受検完了エンジニア")).toBeVisible();
+    await expect(page.getByText("Band 3.4", { exact: true })).toBeVisible();
+    await expect(page.getByText("AI盲従リスク検知（要注視）")).toBeVisible();
+
+    // ヒートマップとアラートパネルの確認
+    await expect(page.getByText("組織動的コンピテンシー 4領域ヒートマップ")).toBeVisible();
+    await expect(page.getByText("決済基盤チーム", { exact: true })).toBeVisible();
+    await expect(page.getByText("AI盲従・過剰指摘リスクアラート")).toBeVisible();
+    await expect(page.getByText("高リスク: AI盲従・無検証承認")).toBeVisible();
+
+    // 手戻り工数削減シミュレーション
+    await expect(page.getByText("手戻り工数削減推移シミュレーション")).toBeVisible();
+
+    // CTAボタンによる実務演習セッションへの遷移
+    const startCta = page.getByRole("button", { name: "演習セッションを開始" });
+    await expect(startCta).toBeVisible();
+    await startCta.click();
+
+    // セッションタブに戻り、初期画面が表示されていることを確認
+    await expect(page.locator("h1")).toContainText("評価的判断力 動的アセスメント＆テレメトリ基盤");
+    await expect(page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" })).toBeVisible();
+  });
+
+  test("② 受講者スキルカルテの表示と4領域レーダー・バイアス診断・推奨演習遷移が動作する", async ({ page }) => {
+    await page.goto("/");
+
+    // 受講者スキルカルテタブへの切替
+    const profileTabBtn = page.getByRole("button", { name: /② 受講者スキルカルテ/ });
+    await expect(profileTabBtn).toBeVisible();
+    await profileTabBtn.click();
+
+    // 受講者名とプロフィールヘッダー確認
+    await expect(page.locator("h1")).toContainText("佐藤 拓也 さんのスキルカルテ＆検証行動分析");
+    await expect(page.getByText("決済基盤チーム / シニアエンジニア")).toBeVisible();
+    await expect(page.getByText("4領域 動的コンピテンシー")).toBeVisible();
+
+    // 4領域の到達度判定
+    await expect(page.getByText("① 評価的判断力（Epistemic Judgement）")).toBeVisible();
+    await expect(page.getByText("② 高次認知・自己客観化（Metacognitive Judgement）")).toBeVisible();
+
+    // 検証行動バイアス診断（適正依存3指標）
+    await expect(page.getByText("検証行動バイアス診断（適正依存3指標）")).toBeVisible();
+    await expect(page.getByText("判定: 自律批判型（Autonomous Critical）")).toBeVisible();
+    await expect(page.getByText("正当AI依存率 (CAR)")).toBeVisible();
+
+    // 過去セッション履歴テーブル
+    await expect(page.getByText("過去セッション演習履歴")).toBeVisible();
+    await expect(page.getByText("決済トランザクションの冪等性・障害時キャッシュ")).toBeVisible();
+
+    // 推奨演習CTAボタンによる演習セッションへの遷移
+    const recommendCta = page.getByRole("button", { name: "この推奨演習を開始する" });
+    await expect(recommendCta).toBeVisible();
+    await recommendCta.click();
+
+    // セッション画面に戻り、初期画面が表示されていることを確認
+    await expect(page.locator("h1")).toContainText("評価的判断力 動的アセスメント＆テレメトリ基盤");
+    await expect(page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" })).toBeVisible();
+  });
 });
+

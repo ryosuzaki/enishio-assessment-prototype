@@ -251,5 +251,25 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       path: path.join(screenshotsDir, "06-xai-report.png"),
       fullPage: true,
     });
+
+    // 07. 組織分析ダッシュボード（Viability・モックUI）
+    const dashboardTabBtn = page.getByRole("button", { name: /① 組織分析ダッシュボード/ });
+    await dashboardTabBtn.click();
+    await expect(page.locator("h1")).toContainText("組織動的コンピテンシー・手戻りリスク分析");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: path.join(screenshotsDir, "07-organization-dashboard.png"),
+      fullPage: true,
+    });
+
+    // 08. 受講者スキルカルテ（Viability・モックUI）
+    const profileTabBtn = page.getByRole("button", { name: /② 受講者スキルカルテ/ });
+    await profileTabBtn.click();
+    await expect(page.locator("h1")).toContainText("佐藤 拓也 さんのスキルカルテ＆検証行動分析");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: path.join(screenshotsDir, "08-learner-profile.png"),
+      fullPage: true,
+    });
   });
 });

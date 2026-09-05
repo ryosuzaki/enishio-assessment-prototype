@@ -11,8 +11,10 @@ import type {
   EvidenceTargetState,
   ProbeMove,
   StepType,
+  AppTab,
 } from "./types";
 import { MAX_PROBES_PER_SESSION } from "./types";
+import { Play, Building2, UserCheck } from "lucide-react";
 import { InitStep } from "./components/InitStep";
 import { AnchorQuestionStep } from "./components/AnchorQuestionStep";
 import { DialogueSessionStep } from "./components/DialogueSessionStep";
@@ -21,8 +23,13 @@ import { EvaluationReportStep } from "./components/EvaluationReportStep";
 import { MediationStatePanel } from "./components/MediationStatePanel";
 import { TelemetryPanel } from "./components/TelemetryPanel";
 import { ErrorBanner } from "./components/ErrorBanner";
+import { OrganizationDashboard } from "./components/OrganizationDashboard";
+import { LearnerProfile } from "./components/LearnerProfile";
 
 export default function AssessmentPrototypePage() {
+  // Navigation & Tab State ([D-79]: 2-layer Viability & Feasibility)
+  const [activeTab, setActiveTab] = useState<AppTab>("session");
+
   // Session & Phase State
   const [sessionId, setSessionId] = useState<string>("");
   const [sessionSeq, setSessionSeq] = useState<number>(1);
@@ -108,6 +115,21 @@ export default function AssessmentPrototypePage() {
         }
       })
       .catch((e) => setErrorMessage("アンカー項目の取得に失敗しました: " + e.message));
+  }, []);
+
+  // URLクエリによる初期タブの反映（?tab=dashboard / ?tab=learner / ?tab=session）
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab === "dashboard" || tab === "org") {
+        setActiveTab("org_dashboard");
+      } else if (tab === "profile" || tab === "learner") {
+        setActiveTab("learner_profile");
+      } else if (tab === "session") {
+        setActiveTab("session");
+      }
+    }
   }, []);
 
   // 画面外滞在時間の記録（MVP 4.4 `window_blur_duration_sec`）。
@@ -592,11 +614,78 @@ export default function AssessmentPrototypePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content Area */}
-        <div className="lg:col-span-2 space-y-6">
-          <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* 2-Layer Navigation Tab Bar ([D-79]: Viability & Feasibility) */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
+        <div className="flex flex-wrap items-center gap-2 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
+          <button
+            type="button"
+            onClick={() => setActiveTab("session")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+              activeTab === "session"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+            }`}
+          >
+            <Play className="w-3.5 h-3.5" />
+            <span>実務演習セッション（Feasibility・中核評価エンジン稼働）</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("org_dashboard")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+              activeTab === "org_dashboard"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>① 組織分析ダッシュボード（Viability・モックUI）</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("learner_profile")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+              activeTab === "learner_profile"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+            }`}
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>② 受講者スキルカルテ（Viability・モックUI）</span>
+          </button>
+        </div>
+
+        <div className="text-xs text-slate-500 hidden xl:flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+          <span>審査用2層構造プロトタイプ [D-79]</span>
+        </div>
+      </div>
+
+      {/* Tab 1: Organization Analytics Dashboard */}
+      {activeTab === "org_dashboard" && (
+        <OrganizationDashboard onStartSession={() => setActiveTab("session")} />
+      )}
+
+      {/* Tab 2: Learner Profile & Skill Card */}
+      {activeTab === "learner_profile" && (
+        <LearnerProfile
+          onStartSession={(taskId) => {
+            if (taskId) {
+              const matched = DYNAMIC_TASKS.find((t) => t.task_id === taskId);
+              if (matched) setSelectedTaskId(matched.task_id);
+            }
+            setActiveTab("session");
+          }}
+        />
+      )}
+
+      {/* Tab 3: Core Evaluation Session (Vertical Cut) */}
+      {activeTab === "session" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content Area */}
+          <div className="lg:col-span-2 space-y-6">
+            <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
 
           {/* STEP 0: Initialization */}
           {currentStep === "init" && (
@@ -713,6 +802,7 @@ export default function AssessmentPrototypePage() {
           />
         </div>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 }

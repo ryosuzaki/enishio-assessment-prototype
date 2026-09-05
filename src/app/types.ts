@@ -128,3 +128,6 @@ export type StepType =
   | "dialogue_session"
   | "preliminary_judgement"
   | "evaluation_report";
+
+export type AppTab = "session" | "org_dashboard" | "learner_profile";
+
