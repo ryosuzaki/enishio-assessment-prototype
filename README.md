@@ -52,7 +52,8 @@
      ↓  ②-b メディエーターが走行中の状態推定に応じて深掘り・What-if注入を1手選ぶ
         （最大4手。正答鍵は渡さない＝誘出であって誘導ではない）
 ③ CFF（認知強制機能）暫定判断
-     ↓  Force Decision First（AIレポート閲覧前の承認/差し戻し）＋ Mandatory Justification（理由記述必須）
+     ↓  Force Decision First（AIレポート閲覧前の承認/差し戻しコミット）＋ Mandatory Justification（理由の保持）
+     ↓  （※現行コードは学術文献Buçinca et al. 2021のFeasibility実証画面。本番SaaS仕様 `[D-80]` では参加コスト極小化のため「対話内ミラーリング要約＋GitHub PR形式ワンクリック確定」へ統合。白紙再作文は恒久禁止）
 ④ 検証行動の抽出（抽出エージェント）
      ↓  対話ログのどの発話が「検証」に当たるかを根拠つきで切り出す（チャット上での根拠ハイライト）
      ↓  深掘りへの応答の一貫性、適正依存の3指標（過剰依存/不足依存）もここで判定・記録する
@@ -80,6 +81,7 @@
 | **単一スタックで通す** | Python 側の処理（IRT較正等）は本縦切りのスコープ外。2週間で端から端まで通すことを優先した |
 | **メディエーターに正答鍵を渡さない** | 深掘り・What-if注入の選択器（`src/lib/mediator`）は `dynamic-task.server.ts` を import しない。渡すと仕込み不備へ向かう固定ヒント梯子になり、答え鍵つきのテストに変質する。媒介の機能は誘出であって誘導ではない |
 | **対話側に測定モデルを置かない** | 動的に生成される一回性の課題には項目パラメータの同定可能性が無い。対話側は中間表現に基づくルーブリック基準参照評価（0〜5バンド）に留め、アンカー側の尺度と同一尺度化しない |
+| **CFFにおける白紙再作文の恒久禁止と対話内ミラーリング統合** | 15分間の対話を終えた受講者に別画面で白紙から理由を再作文させることは認知負荷の二重請求であり参加コストを暴騰させるため永久禁止とする（`[D-80]`）。本番SaaSでは進行役による対話ログからの論点ミラーリング要約とワンクリックコミット（PRレビュー形式）に統合する |
 
 ## 技術スタック
 
@@ -97,7 +99,7 @@ Next.js 16（App Router）／ TypeScript ／ React 19 ／ Tailwind CSS v4 ／ Po
 | `PromptTurn` | 対話の全ターン全文。`role` は `user` / `assistant` / `mediator`（後述）を区別する |
 | `ArtifactEditDistanceSeries` | 成果物の編集距離の時系列 |
 | `InjectedFlawMap` | 仕込んだ誤りの位置と類型、**および正常箇所のラベル**（これがないと過剰指摘を判定できない） |
-| `LearnerPreliminaryJudgement` | CFF（Force Decision First / Mandatory Justification）による事前暫定判断（承認/差し戻し、自己評価点、必須理由記述） |
+| `LearnerPreliminaryJudgement` | CFF（Force Decision First / Mandatory Justification）による事前暫定判断（承認/差し戻し、自己評価点、理由記述。※本番仕様 `[D-80]` では対話内ミラーリング要約のコミットメントとして記録） |
 | `VerificationFocusSequence` | 3ペイン検証パネルで受講者が選択したコードスパンと明示順序（`focus_seq`） |
 | `ScoreFeedback` | 異議申立。自由記述の理由を必須にしている |
 | `EvidenceComponent` | 採点エンジン第1エージェントが抽出した根拠要素。評点だけでなく根拠そのものを永続化し、XAIレポートのハイライトの原材料にもなる |
