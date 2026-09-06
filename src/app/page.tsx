@@ -18,7 +18,10 @@ import { Play, Building2, UserCheck } from "lucide-react";
 import { InitStep } from "./components/InitStep";
 import { AnchorQuestionStep } from "./components/AnchorQuestionStep";
 import { DialogueSessionStep } from "./components/DialogueSessionStep";
-import { PreliminaryJudgementStep } from "./components/PreliminaryJudgementStep";
+import {
+  PreliminaryJudgementStep,
+  getDefaultMirroringSummary,
+} from "./components/PreliminaryJudgementStep";
 import { EvaluationReportStep } from "./components/EvaluationReportStep";
 import { MediationStatePanel } from "./components/MediationStatePanel";
 import { TelemetryPanel } from "./components/TelemetryPanel";
@@ -494,15 +497,16 @@ export default function AssessmentPrototypePage() {
       setPrelimError("成果物の判定（承認または差し戻し）を選択してください。");
       return;
     }
-    if (!prelimJustification.trim()) {
-      setPrelimError("判断理由の記述は必須です（Mandatory Justification・空文字不可）。");
-      return;
-    }
+
+    // [D-80]: 白紙再作文の強制撤廃。受講者が微調整を入力しなかった場合は進行役のミラーリング要約を採用する
+    const effectiveJustification =
+      prelimJustification.trim() ||
+      getDefaultMirroringSummary(selectedTaskId, chatHistory);
 
     setPrelimError(null);
     setErrorMessage(null);
     setIsEvaluating(true);
-    addTelemetry("Submitting Preliminary Judgement & Mandatory Justification...");
+    addTelemetry("Submitting Preliminary Judgement & Justification (PR-review style)...");
 
     try {
       // 1. Record preliminary judgement (CFF)
@@ -514,7 +518,7 @@ export default function AssessmentPrototypePage() {
           stepId: `step-dynamic-${selectedTaskId}`,
           action: prelimAction,
           selfEstimatedScore: prelimScore,
-          justification: prelimJustification.trim(),
+          justification: effectiveJustification,
         }),
       });
       const prelimData = await prelimRes.json();
@@ -751,9 +755,11 @@ export default function AssessmentPrototypePage() {
             />
           )}
 
-          {/* STEP 5.5: CFF Force Decision First & Mandatory Justification [MVP 2.5, T-17b] */}
+          {/* STEP 5.5: CFF Force Decision First & Facilitator Mirroring Summary [MVP 2.5, T-17b, D-80] */}
           {currentStep === "preliminary_judgement" && (
             <PreliminaryJudgementStep
+              taskId={selectedTaskId}
+              chatHistory={chatHistory}
               prelimAction={prelimAction}
               setPrelimAction={setPrelimAction}
               prelimScore={prelimScore}
