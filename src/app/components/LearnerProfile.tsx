@@ -719,7 +719,7 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
           </h2>
         </div>
         <p className="text-xs text-slate-400">
-          演習結果から導き出された、あなたが明日からのGitHub PRレビューやCopilot協働で意識すべき3大チェックポイント
+          演習結果から導き出された、あなたが明日からの実務（要件定義・設計・レビュー・AI協働）で意識すべき3大チェックポイント
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
