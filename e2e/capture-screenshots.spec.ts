@@ -265,7 +265,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     // 08. 受講者スキルカルテ（Viability・モックUI）
     const profileTabBtn = page.getByRole("button", { name: /② 受講者スキルカルテ/ });
     await profileTabBtn.click();
-    await expect(page.locator("h1")).toContainText("佐藤 拓也 さんのスキルカルテ＆検証行動分析");
+    await expect(page.locator("h1")).toContainText("佐藤 拓也 さんのスキルカルテ");
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: path.join(screenshotsDir, "08-learner-profile.png"),

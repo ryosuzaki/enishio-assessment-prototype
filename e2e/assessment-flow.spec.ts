@@ -524,7 +524,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" })).toBeVisible();
   });
 
-  test("② 受講者スキルカルテの表示と4領域レーダー・バイアス診断・推奨演習遷移が動作する", async ({ page }) => {
+  test("② 受講者スキルカルテの表示と4領域・12観点・協働アプローチ特性・演習遷移が動作する", async ({ page }) => {
     await page.goto("/");
 
     // 受講者スキルカルテタブへの切替
@@ -533,27 +533,30 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await profileTabBtn.click();
 
     // 受講者名とプロフィールヘッダー確認
-    await expect(page.locator("h1")).toContainText("佐藤 拓也 さんのスキルカルテ＆検証行動分析");
+    await expect(page.locator("h1")).toContainText("佐藤 拓也 さんのスキルカルテ");
     await expect(page.getByText("決済基盤チーム / シニアエンジニア")).toBeVisible();
-    await expect(page.getByText("4領域 動的コンピテンシー")).toBeVisible();
+    await expect(page.getByText("動的コンピテンシー到達度（4領域・12サブ観点）")).toBeVisible();
 
     // 4領域の到達度判定
-    await expect(page.getByText("① 評価的判断力（Epistemic Judgement）")).toBeVisible();
-    await expect(page.getByText("② 高次認知・自己客観化（Metacognitive Judgement）")).toBeVisible();
+    await expect(page.getByText(/① 評価的判断力/).first()).toBeVisible();
+    await expect(page.getByText(/② 高次認知/).first()).toBeVisible();
 
-    // 検証行動バイアス診断（適正依存3指標）
-    await expect(page.getByText("検証行動バイアス診断（適正依存3指標）")).toBeVisible();
-    await expect(page.getByText("判定: 自律批判型（Autonomous Critical）")).toBeVisible();
-    await expect(page.getByText("正当AI依存率 (CAR)")).toBeVisible();
+    // AI協働アプローチ特性 ＆ 適正依存バランス
+    await expect(page.getByText("AI協働アプローチ特性 ＆ 適正依存バランス")).toBeVisible();
+    await expect(page.getByText("特性: 堅牢性重視スタイル（High Resilience）")).toBeVisible();
+    await expect(page.getByText("協働活用効率 (CAR)")).toBeVisible();
+
+    // 実務直結チェックリスト
+    await expect(page.getByText("実務直結チェックリスト（Tomorrow's Takeaways）")).toBeVisible();
 
     // 過去セッション履歴テーブル
     await expect(page.getByText("過去セッション演習履歴")).toBeVisible();
     await expect(page.getByText("決済トランザクションの冪等性・障害時キャッシュ")).toBeVisible();
 
-    // 推奨演習CTAボタンによる演習セッションへの遷移
-    const recommendCta = page.getByRole("button", { name: "この推奨演習を開始する" });
-    await expect(recommendCta).toBeVisible();
-    await recommendCta.click();
+    // 実務演習開始ボタンによる演習セッションへの遷移
+    const startExerciseBtn = page.getByRole("button", { name: "実務演習を開始" });
+    await expect(startExerciseBtn).toBeVisible();
+    await startExerciseBtn.click();
 
     // セッション画面に戻り、初期画面が表示されていることを確認
     await expect(page.locator("h1")).toContainText("評価的判断力 動的アセスメント＆テレメトリ基盤");

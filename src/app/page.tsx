@@ -644,7 +644,7 @@ export default function AssessmentPrototypePage() {
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>① 組織分析ダッシュボード（Viability・モックUI）</span>
+            <span>① 組織・受講管理ダッシュボード（Viability・モックUI）</span>
           </button>
           <button
             type="button"
