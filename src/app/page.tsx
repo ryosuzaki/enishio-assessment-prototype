@@ -668,7 +668,10 @@ export default function AssessmentPrototypePage() {
 
       {/* Tab 1: Organization Analytics Dashboard */}
       {activeTab === "org_dashboard" && (
-        <OrganizationDashboard onStartSession={() => setActiveTab("session")} />
+        <OrganizationDashboard
+          onStartSession={() => setActiveTab("session")}
+          onViewLearnerProfile={() => setActiveTab("learner_profile")}
+        />
       )}
 
       {/* Tab 2: Learner Profile & Skill Card */}

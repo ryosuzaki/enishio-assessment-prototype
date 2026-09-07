@@ -490,28 +490,29 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     );
   });
 
-  test("① 組織分析ダッシュボードの表示とチーム別ヒートマップ・アラート・演習遷移が動作する", async ({ page }) => {
+  test("① 組織・受講管理ダッシュボードの表示と受講者一覧・教育成果・演習遷移が動作する", async ({ page }) => {
     await page.goto("/");
 
-    // 組織分析ダッシュボードタブへの切替
-    const dashboardTabBtn = page.getByRole("button", { name: /① 組織分析ダッシュボード/ });
+    // 組織・受講管理ダッシュボードタブへの切替
+    const dashboardTabBtn = page.getByRole("button", { name: /① 組織.*ダッシュボード/ });
     await expect(dashboardTabBtn).toBeVisible();
     await dashboardTabBtn.click();
 
     // 画面タイトルとKPIカードの確認
-    await expect(page.locator("h1")).toContainText("組織動的コンピテンシー・手戻りリスク分析");
+    await expect(page.locator("h1")).toContainText("組織・受講管理ダッシュボード");
     await expect(page.getByText("受検完了エンジニア")).toBeVisible();
     await expect(page.getByText("Band 3.4", { exact: true })).toBeVisible();
-    await expect(page.getByText("AI盲従リスク検知（要注視）")).toBeVisible();
+    await expect(page.getByText("盲従バイアス克服率")).toBeVisible();
 
-    // ヒートマップとアラートパネルの確認
-    await expect(page.getByText("組織動的コンピテンシー 4領域ヒートマップ")).toBeVisible();
-    await expect(page.getByText("決済基盤チーム", { exact: true })).toBeVisible();
-    await expect(page.getByText("AI盲従・過剰指摘リスクアラート")).toBeVisible();
-    await expect(page.getByText("高リスク: AI盲従・無検証承認")).toBeVisible();
+    // 受講者一覧テーブルと教育成果パネルの確認
+    await expect(page.getByText("受講者一覧・スキル到達度カルテ")).toBeVisible();
+    await expect(page.getByText("佐藤 拓也", { exact: true })).toBeVisible();
+    await expect(page.getByText("バイアス克服・教育成果（Before / After）")).toBeVisible();
+    await expect(page.getByText("マネージャー向け推奨育成アクション")).toBeVisible();
 
-    // 手戻り工数削減シミュレーション
-    await expect(page.getByText("手戻り工数削減推移シミュレーション")).toBeVisible();
+    // 部門別定着サマリーと助成金CSV出力セクション
+    await expect(page.getByText("部門別 運用・定着サマリー（サブ集計）")).toBeVisible();
+    await expect(page.getByText("受講履歴・学習時間データ（助成金・社内報告用CSV）")).toBeVisible();
 
     // CTAボタンによる実務演習セッションへの遷移
     const startCta = page.getByRole("button", { name: "演習セッションを開始" });

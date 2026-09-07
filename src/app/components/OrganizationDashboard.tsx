@@ -5,97 +5,268 @@ import {
   Building2,
   Users,
   TrendingUp,
-  AlertTriangle,
   ShieldCheck,
   ArrowUpRight,
   ArrowRight,
   BarChart3,
   CheckCircle2,
-  Activity,
-  Zap,
-  Layers,
   Sparkles,
   Filter,
   Info,
   ChevronRight,
   TrendingDown,
+  Search,
+  Download,
+  FileText,
+  Clock,
+  Send,
+  AlertCircle,
+  Award,
+  ExternalLink,
 } from "lucide-react";
 
 interface OrganizationDashboardProps {
   onStartSession: () => void;
+  onViewLearnerProfile?: (learnerId?: string) => void;
 }
 
-interface TeamCompetency {
+export interface LearnerItem {
+  id: string;
+  name: string;
+  role: string;
+  team: string;
+  progress: {
+    completed: number;
+    total: number;
+  };
+  lastActive: string;
+  overallBand: number;
+  initialBand: number;
+  scores: {
+    epistemic: number; // ① 評価的判断力
+    metacognition: number; // ② 高次認知
+    dialogue: number; // ③ 対話共創
+    adaptation: number; // ④ 適応力
+  };
+  biasStatus: "overcome" | "improving" | "needs_focus";
+  biasLabel: string;
+  biasNote: string;
+  status: "active" | "completed" | "stalled";
+}
+
+interface TeamSummary {
   name: string;
   memberCount: number;
-  overallBand: number;
-  scores: {
-    epistemic: number; // 評価的判断力
-    metacognition: number; // 高次認知
-    dialogue: number; // 対話共創
-    adaptation: number; // 適応力
-  };
-  riskType: "healthy" | "over_reliance" | "over_rejection";
-  riskNote: string;
+  completionRate: number;
+  activeRate: number;
+  avgHours: number;
+  note: string;
 }
 
-const TEAMS_DATA: TeamCompetency[] = [
+const LEARNERS_DATA: LearnerItem[] = [
+  {
+    id: "learner-01",
+    name: "佐藤 拓也",
+    role: "シニアエンジニア",
+    team: "決済基盤チーム",
+    progress: { completed: 12, total: 12 },
+    lastActive: "2026-09-05",
+    overallBand: 3.8,
+    initialBand: 2.3,
+    scores: { epistemic: 4.1, metacognition: 3.8, dialogue: 3.5, adaptation: 3.9 },
+    biasStatus: "overcome",
+    biasLabel: "盲従克服済み（自律批判型）",
+    biasNote: "PCI DSS制約やSPOF脆弱性を的確に指摘。AI提案コードの編集・検証が組織内トップクラス。",
+    status: "completed",
+  },
+  {
+    id: "learner-02",
+    name: "高橋 優斗",
+    role: "バックエンドエンジニア",
+    team: "コアAPIプラットフォーム",
+    progress: { completed: 11, total: 12 },
+    lastActive: "2026-09-04",
+    overallBand: 3.6,
+    initialBand: 2.4,
+    scores: { epistemic: 3.7, metacognition: 3.6, dialogue: 3.8, adaptation: 3.3 },
+    biasStatus: "overcome",
+    biasLabel: "盲従克服済み（対話収束型）",
+    biasNote: "キャッシュTTLやレートリミットの整合性検証が安定。What-if前提変化への適応速度が顕著に向上。",
+    status: "active",
+  },
+  {
+    id: "learner-03",
+    name: "中村 遥",
+    role: "インフラエンジニア",
+    team: "SRE / インフラチーム",
+    progress: { completed: 12, total: 12 },
+    lastActive: "2026-09-06",
+    overallBand: 4.3,
+    initialBand: 3.1,
+    scores: { epistemic: 4.5, metacognition: 4.2, dialogue: 4.1, adaptation: 4.4 },
+    biasStatus: "overcome",
+    biasLabel: "全領域マスター（模範型）",
+    biasNote: "前提検証・対話共創・適応力のすべてがBand 4水準。社内コードレビュアー推薦対象。",
+    status: "completed",
+  },
+  {
+    id: "learner-04",
+    name: "渡辺 健司",
+    role: "データエンジニア",
+    team: "データ分析基盤チーム",
+    progress: { completed: 9, total: 12 },
+    lastActive: "2026-08-30",
+    overallBand: 3.3,
+    initialBand: 2.2,
+    scores: { epistemic: 3.5, metacognition: 3.2, dialogue: 3.1, adaptation: 3.4 },
+    biasStatus: "improving",
+    biasLabel: "過剰指摘の適正化進行中",
+    biasNote: "正常コードに対する不信（False Positive指摘）が初期28%から10%へ減少。合意形成力が向上。",
+    status: "active",
+  },
+  {
+    id: "learner-05",
+    name: "伊藤 菜々子",
+    role: "フロントエンドエンジニア",
+    team: "モバイル・フロントエンドチーム",
+    progress: { completed: 8, total: 12 },
+    lastActive: "2026-09-02",
+    overallBand: 2.9,
+    initialBand: 1.8,
+    scores: { epistemic: 2.7, metacognition: 2.8, dialogue: 3.3, adaptation: 2.8 },
+    biasStatus: "improving",
+    biasLabel: "盲従克服中（検証行動移行期）",
+    biasNote: "初期の無検証承認から批判的精査へ移行中。非同期例外・フォールバック検証演習を推奨。",
+    status: "active",
+  },
+  {
+    id: "learner-06",
+    name: "小林 大樹",
+    role: "ジュニアエンジニア",
+    team: "モバイル・フロントエンドチーム",
+    progress: { completed: 3, total: 12 },
+    lastActive: "2026-08-04",
+    overallBand: 2.1,
+    initialBand: 1.9,
+    scores: { epistemic: 2.0, metacognition: 2.1, dialogue: 2.4, adaptation: 1.9 },
+    biasStatus: "needs_focus",
+    biasLabel: "要受講フォロー（初期AI過信）",
+    biasNote: "受講が30日以上停滞。AI出力コードを無検証で承認する傾向あり。上長1on1での動機付け推奨。",
+    status: "stalled",
+  },
+];
+
+const TEAMS_SUMMARY: TeamSummary[] = [
   {
     name: "決済基盤チーム",
     memberCount: 24,
-    overallBand: 3.8,
-    scores: { epistemic: 4.1, metacognition: 3.8, dialogue: 3.5, adaptation: 3.9 },
-    riskType: "healthy",
-    riskNote: "PCI DSS制約や単一障害点（SPOF）への検証が組織的に定着。高次認知も安定。",
+    completionRate: 95.8,
+    activeRate: 91.6,
+    avgHours: 11.8,
+    note: "PCI DSS制約やSPOF検証が組織的に定着。受講習慣が最も高い。",
   },
   {
     name: "コアAPIプラットフォーム",
     memberCount: 38,
-    overallBand: 3.5,
-    scores: { epistemic: 3.6, metacognition: 3.4, dialogue: 3.6, adaptation: 3.3 },
-    riskType: "healthy",
-    riskNote: "キャッシュTTLやレートリミットの整合性検証が標準化。堅調に推移。",
-  },
-  {
-    name: "モバイル・フロントエンドチーム",
-    memberCount: 32,
-    overallBand: 2.7,
-    scores: { epistemic: 2.5, metacognition: 2.6, dialogue: 3.1, adaptation: 2.8 },
-    riskType: "over_reliance",
-    riskNote: "AI提案コードの編集距離が極小（5未満）。非同期例外やフォールバックの見落としリスクあり。",
-  },
-  {
-    name: "データ分析基盤チーム",
-    memberCount: 26,
-    overallBand: 3.4,
-    scores: { epistemic: 3.7, metacognition: 3.2, dialogue: 3.0, adaptation: 3.5 },
-    riskType: "over_rejection",
-    riskNote: "正常コードに対する不信（False Positive指摘）が28%発生。手戻り工数増加の要因に。",
+    completionRate: 92.1,
+    activeRate: 89.5,
+    avgHours: 11.2,
+    note: "アーキテクチャ設計・非同期耐性の検証演習が順調に進捗。",
   },
   {
     name: "SRE / インフラチーム",
     memberCount: 22,
-    overallBand: 4.2,
-    scores: { epistemic: 4.4, metacognition: 4.1, dialogue: 3.9, adaptation: 4.3 },
-    riskType: "healthy",
-    riskNote: "What-if前提変更に対する耐性が最上位水準。社内ベストプラクティスリーダー。",
+    completionRate: 100.0,
+    activeRate: 95.5,
+    avgHours: 12.4,
+    note: "全員が既定12セッション修了。What-if耐性で社内最高スコア。",
+  },
+  {
+    name: "データ分析基盤チーム",
+    memberCount: 26,
+    completionRate: 84.6,
+    activeRate: 80.8,
+    avgHours: 10.1,
+    note: "正常コードへの過剰指摘バイアスが大幅に是正中。",
+  },
+  {
+    name: "モバイル・フロントエンドチーム",
+    memberCount: 32,
+    completionRate: 75.0,
+    activeRate: 71.8,
+    avgHours: 8.9,
+    note: "一部メンバーに受講停滞あり。非同期例外演習の重点フォロー推奨。",
   },
 ];
 
-export function OrganizationDashboard({ onStartSession }: OrganizationDashboardProps) {
+export function OrganizationDashboard({
+  onStartSession,
+  onViewLearnerProfile,
+}: OrganizationDashboardProps) {
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
-  const [activeViewTeam, setActiveViewTeam] = useState<TeamCompetency>(TEAMS_DATA[0]);
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [activeLearner, setActiveLearner] = useState<LearnerItem>(LEARNERS_DATA[0]);
+  const [remindSuccess, setRemindSuccess] = useState<boolean>(false);
+  const [recommendSuccess, setRecommendSuccess] = useState<boolean>(false);
+  const [csvExportSuccess, setCsvExportSuccess] = useState<boolean>(false);
 
-  const filteredTeams =
-    selectedTeam === "all"
-      ? TEAMS_DATA
-      : TEAMS_DATA.filter((t) => t.name === selectedTeam);
+  const filteredLearners = LEARNERS_DATA.filter((learner) => {
+    const matchesTeam = selectedTeam === "all" || learner.team === selectedTeam;
+    const matchesStatus = selectedStatus === "all" || learner.status === selectedStatus;
+    const matchesSearch =
+      searchQuery.trim() === "" ||
+      learner.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      learner.team.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      learner.role.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesTeam && matchesStatus && matchesSearch;
+  });
 
   const getBandBadgeClass = (score: number) => {
     if (score >= 4.0) return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
     if (score >= 3.0) return "bg-blue-500/15 text-blue-400 border-blue-500/30";
     if (score >= 2.5) return "bg-amber-500/15 text-amber-400 border-amber-500/30";
     return "bg-rose-500/15 text-rose-400 border-rose-500/30";
+  };
+
+  const getStatusBadge = (status: LearnerItem["status"]) => {
+    if (status === "completed") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+          <CheckCircle2 className="w-3 h-3" />
+          <span>修了済み</span>
+        </span>
+      );
+    }
+    if (status === "active") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
+          <Clock className="w-3 h-3" />
+          <span>受講中</span>
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium">
+        <AlertCircle className="w-3 h-3" />
+        <span>要フォロー</span>
+      </span>
+    );
+  };
+
+  const handleSendReminder = () => {
+    setRemindSuccess(true);
+    setTimeout(() => setRemindSuccess(false), 3500);
+  };
+
+  const handleSendRecommendation = () => {
+    setRecommendSuccess(true);
+    setTimeout(() => setRecommendSuccess(false), 3500);
+  };
+
+  const handleExportCsv = () => {
+    setCsvExportSuccess(true);
+    setTimeout(() => setCsvExportSuccess(false), 3500);
   };
 
   return (
@@ -105,25 +276,28 @@ export function OrganizationDashboard({ onStartSession }: OrganizationDashboardP
         <div>
           <div className="flex items-center gap-2.5 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2">
             <Building2 className="w-4 h-4" />
-            <span>企業向け分析・管理ポータル（B2B SaaS 構想モックUI）</span>
+            <span>企業向け育成・管理ポータル（B2B SaaS 構想モックUI）</span>
             <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px]">
               Viability
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-            組織動的コンピテンシー・手戻りリスク分析
+            組織・受講管理ダッシュボード
           </h1>
           <p className="text-slate-400 text-sm mt-1 max-w-3xl leading-relaxed">
-            AI協働開発における各開発チームの「評価的判断力・検証行動」を可視化し、
-            AI盲従による不備流出リスクと、手戻り工数削減によるROIを定量的に把握します。
+            受講者個人の学習進捗と動的コンピテンシー（4領域）の成長推移を一元管理し、
+            演習によるバイアス克服成果の実証と、現場マネージャーの育成フォロー（1on1・推奨課題配信）を支援します。
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <span>対象期間: 直近90日間</span>
-          </div>
+          <button
+            onClick={handleExportCsv}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
+          >
+            <Download className="w-3.5 h-3.5 text-blue-400" />
+            <span>助成金用受講ログCSV</span>
+          </button>
           <button
             onClick={onStartSession}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 transition-all"
@@ -134,9 +308,33 @@ export function OrganizationDashboard({ onStartSession }: OrganizationDashboardP
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
+      {/* Global Notifications / Toasts */}
+      {csvExportSuccess && (
+        <div className="p-3.5 rounded-xl bg-blue-950/80 border border-blue-700/60 text-blue-200 text-xs flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
+            <span>
+              【助成金申請用ログ出力完了】厚生労働省 人材開発支援助成金（リスキリング支援コース）提出用受講時間・出席ログ（142名分・12時間構成CSV）をダウンロードしました。
+            </span>
+          </div>
+        </div>
+      )}
+      {remindSuccess && (
+        <div className="p-3.5 rounded-xl bg-amber-950/80 border border-amber-700/60 text-amber-200 text-xs flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>受講停滞メンバー（30日以上未受講）へ、Slackおよびメールで演習リマインドを配信しました。</span>
+        </div>
+      )}
+      {recommendSuccess && (
+        <div className="p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-700/60 text-emerald-200 text-xs flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>非同期エラー検証の強化対象メンバーへ、推奨課題「T-06b（キャッシュ不整合の検知）」を一括配信しました。</span>
+        </div>
+      )}
+
+      {/* KPI Cards Grid (4 Cards - Verifiable Real Metrics) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1 */}
+        {/* Card 1: Completion */}
         <div className="glass-panel p-5 rounded-xl border border-slate-800 bg-slate-900/60 relative overflow-hidden">
           <div className="absolute top-0 left-0 h-1 w-full bg-blue-500" />
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
@@ -152,15 +350,15 @@ export function OrganizationDashboard({ onStartSession }: OrganizationDashboardP
             </span>
           </div>
           <p className="mt-2 text-xs text-slate-400 leading-snug">
-            受検完了率が前期比 +12% 向上。月次定期演習の受検習慣が定着。
+            受講完了率が前期比 +12% 向上。月次演習の定着が進んでいます。
           </p>
         </div>
 
-        {/* Card 2 */}
+        {/* Card 2: Average Band Growth */}
         <div className="glass-panel p-5 rounded-xl border border-slate-800 bg-slate-900/60 relative overflow-hidden">
           <div className="absolute top-0 left-0 h-1 w-full bg-emerald-500" />
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>組織平均 検証力スコア</span>
+            <span>組織平均 到達Band</span>
             <BarChart3 className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
@@ -168,165 +366,211 @@ export function OrganizationDashboard({ onStartSession }: OrganizationDashboardP
             <span className="text-xs text-slate-400">/ 5.0</span>
             <span className="ml-auto inline-flex items-center text-xs text-emerald-400 font-semibold">
               <ArrowUpRight className="w-3.5 h-3.5" />
-              +0.6 pt
+              +1.1 pt
             </span>
           </div>
           <p className="mt-2 text-xs text-slate-400 leading-snug">
-            「Band 3: 前提摘発・要件検証行動」水準に組織中央値が到達。
+            受講開始時の平均 Band 2.3 から「Band 3: 前提・トレードオフ検証」へ向上。
           </p>
         </div>
 
-        {/* Card 3 */}
+        {/* Card 3: Bias Overcome Rate */}
         <div className="glass-panel p-5 rounded-xl border border-slate-800 bg-slate-900/60 relative overflow-hidden">
           <div className="absolute top-0 left-0 h-1 w-full bg-indigo-500" />
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>月間手戻り工数削減効果</span>
-            <TrendingUp className="w-4 h-4 text-indigo-400" />
+            <span>盲従バイアス克服率</span>
+            <ShieldCheck className="w-4 h-4 text-indigo-400" />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-indigo-400 tracking-tight">-240</span>
-            <span className="text-xs text-slate-400">時間 / 月</span>
-            <span className="ml-auto text-xs text-indigo-300 font-semibold">
-              約 360万円/月 試算
+            <span className="text-3xl font-bold text-indigo-400 tracking-tight">74.2%</span>
+            <span className="text-xs text-slate-400">克服</span>
+            <span className="ml-auto inline-flex items-center text-xs text-emerald-400 font-semibold">
+              <TrendingDown className="w-3.5 h-3.5" />
+              -28.4 pt
             </span>
           </div>
           <p className="mt-2 text-xs text-slate-400 leading-snug">
-            PRレビューでの初期的不備差し戻し率が 34% 減少したことによる推計値。
+            初回演習時の無検証承認率 38.2% が直近 9.8% まで劇的に解消。
           </p>
         </div>
 
-        {/* Card 4 */}
+        {/* Card 4: Study Hours for Subsidy */}
         <div className="glass-panel p-5 rounded-xl border border-slate-800 bg-slate-900/60 relative overflow-hidden">
           <div className="absolute top-0 left-0 h-1 w-full bg-amber-500" />
           <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>AI盲従リスク検知（要注視）</span>
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <span>累計受講・演習時間</span>
+            <Clock className="w-4 h-4 text-amber-400" />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-amber-400 tracking-tight">14.1%</span>
-            <span className="text-xs text-slate-400">(20名)</span>
-            <span className="ml-auto inline-flex items-center text-xs text-emerald-400 font-semibold">
-              <TrendingDown className="w-3.5 h-3.5" />
-              -5.9% 改善
+            <span className="text-3xl font-bold text-amber-400 tracking-tight">1,704</span>
+            <span className="text-xs text-slate-400">時間</span>
+            <span className="ml-auto text-xs text-amber-300 font-semibold">
+              平均 10.6h / 名
             </span>
           </div>
           <p className="mt-2 text-xs text-slate-400 leading-snug">
-            CFF事前判断における無検証即時承認率。重点フォロー対象部署を特定。
+            人材開発支援助成金の10〜12時間訓練要件を 86.4% の受講者が達成。
           </p>
         </div>
       </div>
 
-      {/* Main Grid: Heatmap & Alert System */}
+      {/* Main Section: Learner List Table (2/3 Width) & Growth/Action Panels (1/3 Width) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Heatmap Section (2 Cols) */}
-        <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-6">
+        {/* Main Table: Learner Roster & Skill Profile (2 Cols) */}
+        <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-blue-400" />
+                <Users className="w-4 h-4 text-blue-400" />
                 <h2 className="text-lg font-bold text-white tracking-tight">
-                  組織動的コンピテンシー 4領域ヒートマップ
+                  受講者一覧・スキル到達度カルテ
                 </h2>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                チーム別の各コンピテンシー到達度（0〜5 Band）。行をクリックすると詳細カルテを確認できます。
+                各エンジニアの受講進捗、動的コンピテンシー4領域Band、成長度を確認できます。行をクリックするとカルテ要約を表示します。
               </p>
             </div>
 
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500/80 mr-0.5" />
-              <span>4.0+ (自律探究)</span>
-              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-blue-500/80 ml-2 mr-0.5" />
-              <span>3.0+ (前提摘発)</span>
-              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-500/80 ml-2 mr-0.5" />
-              <span>&lt;3.0 (要育成)</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-400 font-medium">表示:</span>
+              <span className="text-xs font-bold font-mono text-white bg-slate-800 px-2.5 py-1 rounded-md border border-slate-700">
+                {filteredLearners.length}名
+              </span>
             </div>
           </div>
 
+          {/* Filter Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="氏名・所属・役職で検索..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <select
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+              >
+                <option value="all">すべての部署</option>
+                <option value="決済基盤チーム">決済基盤チーム</option>
+                <option value="コアAPIプラットフォーム">コアAPIプラットフォーム</option>
+                <option value="SRE / インフラチーム">SRE / インフラチーム</option>
+                <option value="データ分析基盤チーム">データ分析基盤チーム</option>
+                <option value="モバイル・フロントエンドチーム">モバイル・フロントエンドチーム</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+              >
+                <option value="all">すべての受講状況</option>
+                <option value="completed">修了済み（12回）</option>
+                <option value="active">受講中（順調）</option>
+                <option value="stalled">要フォロー（停滞）</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-800 text-xs font-semibold uppercase text-slate-400 tracking-wider">
-                  <th className="py-3 px-3">対象チーム</th>
-                  <th className="py-3 px-3 text-center">人数</th>
-                  <th className="py-3 px-3 text-center">総合Band</th>
-                  <th className="py-3 px-3 text-center">① 評価的判断力</th>
-                  <th className="py-3 px-3 text-center">② 高次認知</th>
-                  <th className="py-3 px-3 text-center">③ 対話共創</th>
-                  <th className="py-3 px-3 text-center">④ 適応力</th>
+                  <th className="py-3 px-3">氏名・所属</th>
+                  <th className="py-3 px-2 text-center">進捗</th>
+                  <th className="py-3 px-2 text-center">現在Band</th>
+                  <th className="py-3 px-2 text-center">① 評価</th>
+                  <th className="py-3 px-2 text-center">② 高次</th>
+                  <th className="py-3 px-2 text-center">③ 共創</th>
+                  <th className="py-3 px-2 text-center">④ 適応</th>
+                  <th className="py-3 px-2 text-center">成長</th>
+                  <th className="py-3 px-3 text-center">状況</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {filteredTeams.map((team) => (
+                {filteredLearners.map((learner) => (
                   <tr
-                    key={team.name}
-                    onClick={() => setActiveViewTeam(team)}
+                    key={learner.id}
+                    onClick={() => setActiveLearner(learner)}
                     className={`cursor-pointer transition-colors hover:bg-slate-800/40 ${
-                      activeViewTeam.name === team.name ? "bg-blue-900/20" : ""
+                      activeLearner.id === learner.id ? "bg-blue-950/30" : ""
                     }`}
                   >
-                    <td className="py-3.5 px-3">
-                      <div className="font-semibold text-slate-200 flex items-center gap-2">
-                        {team.name}
-                        {team.riskType === "over_reliance" && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            盲従注視
-                          </span>
-                        )}
-                        {team.riskType === "over_rejection" && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                            過剰指摘
-                          </span>
-                        )}
+                    <td className="py-3 px-3">
+                      <div>
+                        <div className="font-semibold text-slate-200 flex items-center gap-2">
+                          <span>{learner.name}</span>
+                          {learner.overallBand >= 4.0 && (
+                            <Award className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
+                          <span>{learner.team}</span>
+                          <span>•</span>
+                          <span>{learner.role}</span>
+                        </div>
                       </div>
                     </td>
-                    <td className="py-3.5 px-3 text-center text-slate-400 font-mono text-xs">
-                      {team.memberCount}名
+                    <td className="py-3 px-2 text-center">
+                      <div className="flex flex-col items-center">
+                        <span className="font-mono text-xs text-slate-300">
+                          {learner.progress.completed} / {learner.progress.total}
+                        </span>
+                        <div className="w-14 h-1.5 bg-slate-800 rounded-full mt-1 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              learner.progress.completed === learner.progress.total
+                                ? "bg-emerald-500"
+                                : learner.status === "stalled"
+                                ? "bg-rose-500"
+                                : "bg-blue-500"
+                            }`}
+                            style={{
+                              width: `${(learner.progress.completed / learner.progress.total) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
                     </td>
-                    <td className="py-3.5 px-3 text-center">
+                    <td className="py-3 px-2 text-center">
                       <span
-                        className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold font-mono border ${getBandBadgeClass(
-                          team.overallBand
+                        className={`inline-block px-2 py-0.5 rounded text-xs font-bold font-mono border ${getBandBadgeClass(
+                          learner.overallBand
                         )}`}
                       >
-                        {team.overallBand.toFixed(1)}
+                        {learner.overallBand.toFixed(1)}
                       </span>
                     </td>
-                    <td className="py-3.5 px-3 text-center">
-                      <span
-                        className={`inline-block w-14 py-1 rounded text-xs font-mono font-medium border ${getBandBadgeClass(
-                          team.scores.epistemic
-                        )}`}
-                      >
-                        {team.scores.epistemic.toFixed(1)}
+                    <td className="py-3 px-2 text-center font-mono text-xs text-slate-300">
+                      {learner.scores.epistemic.toFixed(1)}
+                    </td>
+                    <td className="py-3 px-2 text-center font-mono text-xs text-slate-300">
+                      {learner.scores.metacognition.toFixed(1)}
+                    </td>
+                    <td className="py-3 px-2 text-center font-mono text-xs text-slate-300">
+                      {learner.scores.dialogue.toFixed(1)}
+                    </td>
+                    <td className="py-3 px-2 text-center font-mono text-xs text-slate-300">
+                      {learner.scores.adaptation.toFixed(1)}
+                    </td>
+                    <td className="py-3 px-2 text-center">
+                      <span className="text-xs font-mono font-semibold text-emerald-400">
+                        +{(learner.overallBand - learner.initialBand).toFixed(1)}
                       </span>
                     </td>
-                    <td className="py-3.5 px-3 text-center">
-                      <span
-                        className={`inline-block w-14 py-1 rounded text-xs font-mono font-medium border ${getBandBadgeClass(
-                          team.scores.metacognition
-                        )}`}
-                      >
-                        {team.scores.metacognition.toFixed(1)}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-3 text-center">
-                      <span
-                        className={`inline-block w-14 py-1 rounded text-xs font-mono font-medium border ${getBandBadgeClass(
-                          team.scores.dialogue
-                        )}`}
-                      >
-                        {team.scores.dialogue.toFixed(1)}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-3 text-center">
-                      <span
-                        className={`inline-block w-14 py-1 rounded text-xs font-mono font-medium border ${getBandBadgeClass(
-                          team.scores.adaptation
-                        )}`}
-                      >
-                        {team.scores.adaptation.toFixed(1)}
-                      </span>
+                    <td className="py-3 px-3 text-center">
+                      {getStatusBadge(learner.status)}
                     </td>
                   </tr>
                 ))}
@@ -334,245 +578,284 @@ export function OrganizationDashboard({ onStartSession }: OrganizationDashboardP
             </table>
           </div>
 
-          {/* Selected Team Detail Callout */}
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-start gap-3">
-            <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+          {/* Selected Learner Quick Summary Card */}
+          <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-white">
-                  選択中: {activeViewTeam.name}
+                <span className="text-sm font-bold text-white">
+                  選択中: {activeLearner.name} さん
                 </span>
                 <span className="text-xs text-slate-400">
-                  （平均 Band {activeViewTeam.overallBand.toFixed(1)} / 所属 {activeViewTeam.memberCount}名）
+                  （{activeLearner.team} / {activeLearner.role}）
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 font-medium">
+                  {activeLearner.biasLabel}
                 </span>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                {activeViewTeam.riskNote}
+              <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+                {activeLearner.biasNote}
               </p>
             </div>
+
+            <button
+              onClick={() => {
+                if (onViewLearnerProfile) {
+                  onViewLearnerProfile(activeLearner.id);
+                } else {
+                  onStartSession();
+                }
+              }}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow transition-all"
+            >
+              <span>受講者カルテ詳細を開く</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
-        {/* Risk Alerts & Diagnostics Panel (1 Col) */}
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-5 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-amber-400" />
-              <h2 className="text-lg font-bold text-white tracking-tight">
-                AI盲従・過剰指摘リスクアラート
-              </h2>
+        {/* Right Side: Efficacy Before/After & Manager Action Recommendations */}
+        <div className="space-y-6 flex flex-col justify-between">
+          {/* Card A: Bias Overcome & Efficacy (Before vs After) */}
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  バイアス克服・教育成果（Before / After）
+                </h3>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                実測データ
+              </span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              セッション中の成果物編集距離、CFF事前承認時間、検証フォーカス選択率の異常値をリアルタイム検知。
+              受講者全員の初期演習（初回〜2回目）と直近演習の比較。AI出力を批判的に検証する行動が確実に定着しています。
             </p>
 
-            {/* Alert Item 1: Over-Reliance */}
-            <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-800/50 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  高リスク: AI盲従・無検証承認
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-900/50 text-amber-300">
-                  発生率 38%
-                </span>
+            <div className="space-y-3.5 pt-1">
+              {/* Metric 1: AI Over-reliance */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-300 font-medium">AI盲従（無検証即時承認率）</span>
+                  <span className="font-mono text-emerald-400 font-bold">
+                    38.2% → 9.8% (-28.4 pt)
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
+                  <div className="h-full bg-rose-500/80 w-[38%]" title="初回 38.2%" />
+                  <div className="h-full bg-slate-800 flex-1" />
+                </div>
+                <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
+                  <div className="h-full bg-emerald-500 w-[9.8%]" title="直近 9.8%" />
+                  <div className="h-full bg-slate-800 flex-1" />
+                </div>
               </div>
-              <p className="text-xs font-semibold text-slate-200">
-                モバイル・フロントエンドチーム
-              </p>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                AI生成コード提示時、成果物編集距離が5未満のまま承認するセッションが集中。単一障害点や例外系の見落としリスク大。
-              </p>
-              <div className="pt-1">
-                <span className="text-[10px] text-amber-300 font-medium bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                  推奨施策: 動的課題 T-06b（キャッシュ整合性）を重点配信
-                </span>
+
+              {/* Metric 2: Excessive Nitpicking */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-300 font-medium">正常コード過剰指摘率（手戻り要因）</span>
+                  <span className="font-mono text-emerald-400 font-bold">
+                    27.5% → 11.2% (-16.3 pt)
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
+                  <div className="h-full bg-amber-500/80 w-[27.5%]" />
+                  <div className="h-full bg-slate-800 flex-1" />
+                </div>
+                <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
+                  <div className="h-full bg-emerald-500 w-[11.2%]" />
+                  <div className="h-full bg-slate-800 flex-1" />
+                </div>
+              </div>
+
+              {/* Metric 3: Proper Verification Rate */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-300 font-medium">適切差し戻し・是正率（Band 3以上）</span>
+                  <span className="font-mono text-blue-400 font-bold">
+                    34.3% → 79.0% (+44.7 pt)
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
+                  <div className="h-full bg-blue-500 w-[79%]" />
+                  <div className="h-full bg-slate-800 flex-1" />
+                </div>
               </div>
             </div>
 
-            {/* Alert Item 2: Over-Rejection */}
-            <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-800/50 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5" />
-                  中リスク: 正常コードへの過剰指摘
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-900/50 text-rose-300">
-                  発生率 28%
-                </span>
-              </div>
-              <p className="text-xs font-semibold text-slate-200">
-                データ分析基盤チーム
-              </p>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                AIが提示した正常な冪等性担保ロジックに対し、誤った指摘（False Positive）を出し対話が長期化する傾向。
-              </p>
-              <div className="pt-1">
-                <span className="text-[10px] text-rose-300 font-medium bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                  推奨施策: 正常コード弁別アンカー（Family B）の復習を推奨
-                </span>
-              </div>
+            <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 text-[11px] text-emerald-300 leading-relaxed">
+              ✓ 成果物を鵜呑みにせず、隠れた前提や例外系を対話で修正できるエンジニアが全体の約8割に達しました。
             </div>
           </div>
 
-          <div className="pt-3 border-t border-slate-800/80 text-center">
-            <span className="text-[11px] text-slate-400 block mb-2">
-              ※本検知ロジックはテレメトリ基盤（InjectedFlawMap / RelianceMetrics）と直結
-            </span>
+          {/* Card B: Manager Coaching Prescriptions */}
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <h3 className="text-base font-bold text-white tracking-tight">
+                マネージャー向け推奨育成アクション
+              </h3>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              受講データに基づき、マネージャー（EM）が現場ですぐに打てる育成フォローを提案します。
+            </p>
+
+            <div className="space-y-3">
+              {/* Action 1: Reminder */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-rose-400" />
+                    <span>30日以上未受講（4名）</span>
+                  </span>
+                  <button
+                    onClick={handleSendReminder}
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+                  >
+                    リマインド送信
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  小林大樹さん、高橋さん他2名が未受講。月次目標達成に向けてリマインドを推奨。
+                </p>
+              </div>
+
+              {/* Action 2: Task Recommendation */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                    <Send className="w-3.5 h-3.5 text-blue-400" />
+                    <span>非同期例外の重点演習</span>
+                  </span>
+                  <button
+                    onClick={handleSendRecommendation}
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+                  >
+                    一括推奨配信
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  フロントエンドチーム向けに、演習課題「T-06b（キャッシュ不整合の是正）」の受講を推奨。
+                </p>
+              </div>
+
+              {/* Action 3: 1on1 Advice */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+                <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                  <Award className="w-3.5 h-3.5 text-amber-400" />
+                  <span>1on1指導ヒント</span>
+                </span>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  佐藤拓也さんはWhat-if前提変化への適応がBand 4に到達。チーム内のPR設計レビュアー推薦が有効です。
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Handback Reduction Simulation & Benchmark (2 Grid) */}
+      {/* Bottom Section: Department Sub-summary (Left) & Export/Audit Proof (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Simulation Chart */}
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-5">
+        {/* Left: Department Operations Sub-summary */}
+        <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-indigo-400" />
-              <h2 className="text-lg font-bold text-white tracking-tight">
-                手戻り工数削減推移シミュレーション
-              </h2>
+              <Building2 className="w-4 h-4 text-blue-400" />
+              <h3 className="text-base font-bold text-white tracking-tight">
+                部門別 運用・定着サマリー（サブ集計）
+              </h3>
             </div>
-            <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded border border-indigo-500/20">
-              ROI: 約 320% 達成
-            </span>
+            <span className="text-[10px] text-slate-400 font-mono">全5部門集計</span>
           </div>
           <p className="text-xs text-slate-400 leading-relaxed">
-            演習受講セッション数増加に伴う、実務レビュー差し戻し率および障害発生率の推移試算。
+            各部門の受講完了率とアクティブ率を可視化し、研修の形骸化や受講格差を防止します。
           </p>
 
-          {/* SVG Visual Graph */}
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
-            <div className="h-44 w-full flex flex-col justify-between">
-              {/* Simple illustrative SVG trend graph */}
-              <svg viewBox="0 0 400 120" className="w-full h-28 overflow-visible">
-                <defs>
-                  <linearGradient id="blueGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#6366f1" stopOpacity="0.4" />
-                    <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                {/* Grid Lines */}
-                <line x1="20" y1="20" x2="380" y2="20" stroke="#1e293b" strokeDasharray="3,3" />
-                <line x1="20" y1="60" x2="380" y2="60" stroke="#1e293b" strokeDasharray="3,3" />
-                <line x1="20" y1="100" x2="380" y2="100" stroke="#1e293b" />
-
-                {/* Area */}
-                <path
-                  d="M 40 25 Q 120 40, 200 65 T 360 95 L 360 100 L 40 100 Z"
-                  fill="url(#blueGrad)"
-                />
-
-                {/* Trend Line (Handback Hours: 100h -> 20h) */}
-                <path
-                  d="M 40 25 Q 120 40, 200 65 T 360 95"
-                  fill="none"
-                  stroke="#818cf8"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-
-                {/* Points */}
-                <circle cx="40" cy="25" r="4" fill="#818cf8" />
-                <circle cx="120" cy="40" r="4" fill="#818cf8" />
-                <circle cx="200" cy="65" r="4" fill="#818cf8" />
-                <circle cx="280" cy="80" r="4" fill="#818cf8" />
-                <circle cx="360" cy="95" r="5" fill="#38bdf8" />
-              </svg>
-
-              <div className="flex justify-between text-[11px] text-slate-400 font-mono pt-2 border-t border-slate-800">
-                <span>導入前（基準）</span>
-                <span>1ヶ月後</span>
-                <span>2ヶ月後</span>
-                <span>現在（3ヶ月）</span>
-                <span className="text-blue-400 font-semibold">6ヶ月予測</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800">
-              <span className="text-slate-400 block text-[11px]">手戻り工数（月間）</span>
-              <span className="text-base font-bold text-white mt-0.5 block">
-                380h → <span className="text-emerald-400">140h (-63%)</span>
-              </span>
-            </div>
-            <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800">
-              <span className="text-slate-400 block text-[11px]">本番不備流出率</span>
-              <span className="text-base font-bold text-white mt-0.5 block">
-                4.2% → <span className="text-emerald-400">1.1% (-74%)</span>
-              </span>
-            </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase">
+                  <th className="py-2.5 px-2">対象部門</th>
+                  <th className="py-2.5 px-2 text-center">人数</th>
+                  <th className="py-2.5 px-2 text-center">完了率</th>
+                  <th className="py-2.5 px-2 text-center">アクティブ率</th>
+                  <th className="py-2.5 px-2 text-center">平均時間</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                {TEAMS_SUMMARY.map((team) => (
+                  <tr key={team.name} className="hover:bg-slate-800/30">
+                    <td className="py-2.5 px-2 font-medium text-slate-200">
+                      {team.name}
+                    </td>
+                    <td className="py-2.5 px-2 text-center font-mono text-slate-400">
+                      {team.memberCount}名
+                    </td>
+                    <td className="py-2.5 px-2 text-center font-mono">
+                      <span className={team.completionRate >= 90 ? "text-emerald-400 font-bold" : "text-slate-300"}>
+                        {team.completionRate.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-2 text-center font-mono">
+                      <span className={team.activeRate >= 85 ? "text-blue-400" : "text-amber-400"}>
+                        {team.activeRate.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-2 text-center font-mono text-slate-400">
+                      {team.avgHours.toFixed(1)}h
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Benchmark Comparison */}
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-5">
-          <div className="flex items-center justify-between">
+        {/* Right: Subsidy & Internal Compliance Export */}
+        <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4 flex flex-col justify-between">
+          <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-lg font-bold text-white tracking-tight">
-                業界・共通アンカー基準ベンチマーク比較
-              </h2>
+              <FileText className="w-4 h-4 text-indigo-400" />
+              <h3 className="text-base font-bold text-white tracking-tight">
+                受講履歴・学習時間データ（助成金・社内報告用CSV）
+              </h3>
             </div>
-            <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
-              上位 22% 水準
-            </span>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              厚生労働省「人材開発支援助成金（事業展開等リスキリング支援コース）」の申請要件である「10時間以上の訓練」「出席率80%以上」を証明する改ざん不能な受講ログデータです。
+            </p>
           </div>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            項目応答理論（IRT）で尺度較正された共通アンカー規準に基づく、他社・業界平均との相対的ポジショニング。
-          </p>
 
-          <div className="space-y-4 pt-2">
-            {/* Metric 1 */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-200 font-medium">貴社全体水準</span>
-                <span className="font-mono text-blue-400 font-bold">Band 3.4 (SS 58.4)</span>
-              </div>
-              <div className="h-3 w-full bg-slate-950 rounded-full overflow-hidden p-0.5 border border-slate-800">
-                <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-500 rounded-full w-[68%]" />
-              </div>
+          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-300">対象プログラム</span>
+              <span className="text-white font-semibold">生成AI協働・動的検証演習（12時間構成）</span>
             </div>
-
-            {/* Metric 2 */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-400 font-medium">FinTech・金融SaaS業界平均</span>
-                <span className="font-mono text-slate-400">Band 3.2 (SS 54.0)</span>
-              </div>
-              <div className="h-3 w-full bg-slate-950 rounded-full overflow-hidden p-0.5 border border-slate-800">
-                <div className="h-full bg-slate-700 rounded-full w-[60%]" />
-              </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-300">受講者数・ログ件数</span>
+              <span className="font-mono text-white">142名 / 累計 1,704セッション</span>
             </div>
-
-            {/* Metric 3 */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-400 font-medium">Web / 一般SaaS業界平均</span>
-                <span className="font-mono text-slate-400">Band 2.8 (SS 48.2)</span>
-              </div>
-              <div className="h-3 w-full bg-slate-950 rounded-full overflow-hidden p-0.5 border border-slate-800">
-                <div className="h-full bg-slate-800 rounded-full w-[52%]" />
-              </div>
-            </div>
-
-            {/* Metric 4 */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-400 font-medium">業界トップ10%先進組織</span>
-                <span className="font-mono text-emerald-400">Band 4.1 (SS 66.5)</span>
-              </div>
-              <div className="h-3 w-full bg-slate-950 rounded-full overflow-hidden p-0.5 border border-slate-800">
-                <div className="h-full bg-emerald-700/60 rounded-full w-[82%]" />
-              </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-300">助成金要件クリア率（出席率80%以上）</span>
+              <span className="font-mono text-emerald-400 font-bold">86.4%（123名達成）</span>
             </div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-400 leading-relaxed">
-            <span className="text-white font-semibold block mb-0.5">💡 示唆とネクストアクション</span>
-            貴社は全体としてWeb業界平均を大きく上回っていますが、部署間の検証力分散（SREの4.2に対しフロントエンドの2.7）が課題です。横展開ナレッジシェア演習が有効です。
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              onClick={handleExportCsv}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow transition-all"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>助成金提出用受講ログCSV</span>
+            </button>
+            <button
+              onClick={handleExportCsv}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>経営報告用サマリーPDF</span>
+            </button>
           </div>
         </div>
       </div>

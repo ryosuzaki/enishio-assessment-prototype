@@ -252,10 +252,10 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       fullPage: true,
     });
 
-    // 07. 組織分析ダッシュボード（Viability・モックUI）
-    const dashboardTabBtn = page.getByRole("button", { name: /① 組織分析ダッシュボード/ });
+    // 07. 組織・受講管理ダッシュボード（Viability・モックUI）
+    const dashboardTabBtn = page.getByRole("button", { name: /① 組織.*ダッシュボード/ });
     await dashboardTabBtn.click();
-    await expect(page.locator("h1")).toContainText("組織動的コンピテンシー・手戻りリスク分析");
+    await expect(page.locator("h1")).toContainText("組織・受講管理ダッシュボード");
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: path.join(screenshotsDir, "07-organization-dashboard.png"),
