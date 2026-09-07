@@ -80,9 +80,8 @@ export default function AssessmentPrototypePage() {
   const [focusInputText, setFocusInputText] = useState<string>("");
   const [focusInputNote, setFocusInputNote] = useState<string>("");
 
-  // CFF: Force Decision First & Mandatory Justification State [MVP 2.5, T-17b]
+  // CFF: Force Decision First & Mandatory Justification State [MVP 2.5, T-17b, D-80]
   const [prelimAction, setPrelimAction] = useState<"approve" | "remand" | "">("");
-  const [prelimScore, setPrelimScore] = useState<number>(3);
   const [prelimJustification, setPrelimJustification] = useState<string>("");
   const [prelimError, setPrelimError] = useState<string | null>(null);
 
@@ -517,7 +516,6 @@ export default function AssessmentPrototypePage() {
           sessionId,
           stepId: `step-dynamic-${selectedTaskId}`,
           action: prelimAction,
-          selfEstimatedScore: prelimScore,
           justification: effectiveJustification,
         }),
       });
@@ -528,7 +526,7 @@ export default function AssessmentPrototypePage() {
         return;
       }
       addTelemetry(
-        `Preliminary judgement recorded: ${prelimAction} (Self Band: ${prelimScore})`
+        `Preliminary judgement recorded: ${prelimAction}`
       );
 
       // 2. Record verification focus sequence if any items selected
@@ -765,8 +763,6 @@ export default function AssessmentPrototypePage() {
               chatHistory={chatHistory}
               prelimAction={prelimAction}
               setPrelimAction={setPrelimAction}
-              prelimScore={prelimScore}
-              setPrelimScore={setPrelimScore}
               prelimJustification={prelimJustification}
               setPrelimJustification={setPrelimJustification}
               prelimError={prelimError}
@@ -782,7 +778,6 @@ export default function AssessmentPrototypePage() {
               evaluation={evaluation}
               chatHistory={chatHistory}
               prelimAction={prelimAction}
-              prelimScore={prelimScore}
               prelimJustification={prelimJustification}
               anchorId={selectedAnchorId}
               anchorStatus={anchorStatus}

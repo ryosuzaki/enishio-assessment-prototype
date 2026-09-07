@@ -64,7 +64,6 @@ function baseJudgementParams(
     sessionId: "session-1",
     stepId: "step-1",
     action: "approve",
-    selfEstimatedScore: 3,
     justification: "要件と照合して問題ないと判断した",
     ...overrides,
   };
@@ -190,19 +189,7 @@ describe("recordPreliminaryJudgement", () => {
     expect(prisma.learnerPreliminaryJudgement.create).not.toHaveBeenCalled();
   });
 
-  it("throws when selfEstimatedScore is below 0", async () => {
-    await expect(
-      recordPreliminaryJudgement(baseJudgementParams({ selfEstimatedScore: -1 }))
-    ).rejects.toThrow(/self_estimated_score must be between 0 and 5/);
-    expect(prisma.learnerPreliminaryJudgement.create).not.toHaveBeenCalled();
-  });
 
-  it("throws when selfEstimatedScore is above 5", async () => {
-    await expect(
-      recordPreliminaryJudgement(baseJudgementParams({ selfEstimatedScore: 6 }))
-    ).rejects.toThrow(/self_estimated_score must be between 0 and 5/);
-    expect(prisma.learnerPreliminaryJudgement.create).not.toHaveBeenCalled();
-  });
 
   it("throws when action is neither 'approve' nor 'remand'", async () => {
     await expect(

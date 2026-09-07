@@ -318,8 +318,6 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
 
     // 差し戻しを選択
     await page.locator("input[value='remand']").check();
-    // 自己評点 Band 3 を選択
-    await page.getByRole("button", { name: /Band 3\s*前提摘発/ }).click();
     // 判断理由を入力
     const justificationTextarea = page.getByPlaceholder(/承認または差し戻しと判断した具体的な根拠・理由を記述/);
     await justificationTextarea.fill("Redis障害時のフォールバックおよびPCI DSS要件の観点で修正が必要であるため差し戻し。");
@@ -344,12 +342,11 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByTestId("anchor-parallel-report-block")).toContainText("固定刺激（無得点記録・尺度較正用）");
     await expect(page.getByTestId("anchor-parallel-report-block")).toContainText("本プロトタイプでは θ を算出していません");
 
-    // CFF Discrepancy Highlighting の表示確認（一致ケース）
+    // CFF Discrepancy Highlighting の表示確認
     await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
-    await expect(page.getByTestId("self-score-display")).toContainText("Band 3");
-    await expect(page.getByTestId("ai-score-display")).toContainText("Band 3");
-    await expect(page.getByTestId("score-diff-match")).toBeVisible();
     await expect(page.getByTestId("prelim-action-display")).toContainText("差し戻し (Remand)");
+    await expect(page.getByTestId("matched-flaws-count")).toContainText("1件 (FLAW-01)");
+    await expect(page.getByTestId("action-collate-message")).toContainText("受講者の「差し戻し」判断と、AI採点器が抽出した仕込み不備");
 
     // 異議申立の入力と送信テスト
     await page.locator("input[value='too_low']").check();
@@ -365,8 +362,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.locator("h1")).toContainText("評価的判断力 動的アセスメント＆テレメトリ基盤");
   });
 
-  test("CFF Discrepancy Highlighting（自己評価とAI評価の乖離明示および不備抽出対比）が動作する", async ({ page }) => {
-    // 評価APIのレスポンスを評点Band 2（差異発生）に差し替えるモック
+  test("CFF Discrepancy Highlighting（事前採否判断と抽出された不備指摘の対比）が動作する", async ({ page }) => {
+    // 評価APIのレスポンスを評点Band 2に差し替えるモック
     await page.route("**/api/dialogue/evaluate", async (route) => {
       await route.fulfill({
         status: 200,
@@ -417,8 +414,6 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     // CFF画面へ
     await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
     await page.locator("input[value='remand']").check();
-    // 自己評価 Band 5 を選択（AI採点 Band 2 との間に3バンドの乖離）
-    await page.getByRole("button", { name: /Band 5\s*指導的/ }).click();
     const justificationTextarea = page.getByPlaceholder(/承認または差し戻しと判断した具体的な根拠・理由を記述/);
     await justificationTextarea.fill("高可用性設計とフェイルオーバー要件を提示し、全面的に差し戻したため。");
     await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
@@ -426,12 +421,9 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     // XAIレポート画面での乖離ハイライト確認
     await expect(page.getByTestId("anchor-parallel-report-block")).toBeVisible();
     await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
-    await expect(page.getByTestId("self-score-display")).toContainText("Band 5");
-    await expect(page.getByTestId("ai-score-display")).toContainText("Band 2");
-    await expect(page.getByTestId("score-diff-discrepancy")).toBeVisible();
-    await expect(page.getByTestId("score-diff-discrepancy")).toContainText("3 バンドの食い違い");
     await expect(page.getByTestId("prelim-action-display")).toContainText("差し戻し (Remand)");
     await expect(page.getByTestId("matched-flaws-count")).toContainText("1件 (FLAW-02)");
+    await expect(page.getByTestId("action-collate-message")).toContainText("受講者の「差し戻し」判断と、AI採点器が抽出した仕込み不備");
     await expect(page.getByTestId("prelim-justification-display")).toContainText("高可用性設計とフェイルオーバー要件を提示し、全面的に差し戻したため。");
   });
 
@@ -478,7 +470,6 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
 
     await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
     await page.locator("input[value='approve']").check();
-    await page.getByRole("button", { name: /Band 3\s*前提摘発/ }).click();
     const justificationTextarea = page.getByPlaceholder(/承認または差し戻しと判断した具体的な根拠・理由を記述/);
     await justificationTextarea.fill("デモ用の保留経路確認。");
     await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();

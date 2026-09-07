@@ -322,12 +322,11 @@ export interface RecordPreliminaryJudgementParams {
   sessionId: string;
   stepId: string;
   action: "approve" | "remand";
-  selfEstimatedScore: number; // 0..5
   justification: string;
 }
 
 /**
- * Record CFF preliminary judgement and mandatory justification [MVP 2.5, 4.4, T-17b]
+ * Record CFF preliminary judgement and mandatory justification [MVP 2.5, 4.4, T-17b, D-80]
  * Must be executed before showing AI evaluation report (Force Decision First).
  * Justification is mandatory for both approval and remand (Mandatory Justification).
  */
@@ -335,11 +334,6 @@ export async function recordPreliminaryJudgement(params: RecordPreliminaryJudgem
   if (!params.justification || params.justification.trim().length === 0) {
     throw new Error(
       "Validation error: justification is mandatory for preliminary judgement [MVP 2.5, T-17b]"
-    );
-  }
-  if (params.selfEstimatedScore < 0 || params.selfEstimatedScore > 5) {
-    throw new Error(
-      `Validation error: self_estimated_score must be between 0 and 5, received: ${params.selfEstimatedScore}`
     );
   }
   if (params.action !== "approve" && params.action !== "remand") {
@@ -353,7 +347,6 @@ export async function recordPreliminaryJudgement(params: RecordPreliminaryJudgem
       session_id: params.sessionId,
       step_id: params.stepId,
       action: params.action,
-      self_estimated_score: params.selfEstimatedScore,
       justification: params.justification.trim(),
     },
   });

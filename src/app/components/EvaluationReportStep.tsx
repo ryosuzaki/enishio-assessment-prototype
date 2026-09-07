@@ -21,7 +21,6 @@ interface EvaluationReportStepProps {
   evaluation: EvaluationResult;
   chatHistory: ChatMessage[];
   prelimAction?: "approve" | "remand" | "";
-  prelimScore?: number;
   prelimJustification?: string;
   anchorId?: string;
   anchorStatus?: string;
@@ -99,7 +98,6 @@ export function EvaluationReportStep({
   evaluation,
   chatHistory,
   prelimAction,
-  prelimScore,
   prelimJustification,
   anchorId,
   anchorStatus,
@@ -259,16 +257,13 @@ export function EvaluationReportStep({
         </div>
       </div>
 
-      {/* CFF Discrepancy Highlighting [MVP 2.5, T-17 §9, T-24] */}
-      <div
-        className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-4"
-        data-testid="discrepancy-highlighting-block"
-      >
+      {/* CFF Discrepancy Highlighting [MVP 2.5, Buçinca et al. 2021, D-80] */}
+      <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-900/40 space-y-3" data-testid="discrepancy-highlighting-block">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <Scale className="w-4 h-4 text-purple-400" />
             <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              認知強制機能（CFF）：暫定自己判断とAI評価の乖離明示
+              認知強制機能（CFF）：事前採否判断とAI検証結果の対照
             </h3>
           </div>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/40">
@@ -276,81 +271,32 @@ export function EvaluationReportStep({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-          {/* 自己評点 vs AI評点 */}
-          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
-            <div className="text-[11px] font-bold text-slate-300">
-              ① 評点バンドの突き合わせ（自己評価 vs AI判定）
-            </div>
-            <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-950 border border-slate-800/80">
-              <div className="text-center flex-1">
-                <span className="text-[10px] text-slate-500 block">受講者自己評価</span>
-                <span className="text-sm font-bold text-blue-400 font-mono" data-testid="self-score-display">
-                  {prelimScore !== undefined ? `Band ${prelimScore}` : "未入力"}
-                </span>
-              </div>
-              <ArrowRightLeft className="w-4 h-4 text-slate-600 flex-shrink-0" />
-              <div className="text-center flex-1">
-                <span className="text-[10px] text-slate-500 block">AI自動採点</span>
-                <span className="text-sm font-bold text-emerald-400 font-mono" data-testid="ai-score-display">
-                  {evaluation.isPendingHumanReview || evaluation.ratingCategory === null
-                    ? "保留（未確定）"
-                    : `Band ${evaluation.ratingCategory}`}
-                </span>
-              </div>
-            </div>
-
-            {/* 状態別メッセージ */}
-            {evaluation.isPendingHumanReview || evaluation.ratingCategory === null ? (
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-400 px-1 pt-1" data-testid="score-diff-pending">
-                <AlertCircle className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                <span>AI採点器の確信度が閾値未満のため評点が保留されており、乖離幅は算出されません。</span>
-              </div>
-            ) : prelimScore !== undefined && evaluation.ratingCategory === prelimScore ? (
-              <div className="flex items-center gap-1.5 text-[11px] text-teal-300 px-1 pt-1" data-testid="score-diff-match">
-                <CheckCircle2 className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
-                <span>評点一致：自己評価とAI自動採点のバンドが一致しています（差異 0 バンド）。</span>
-              </div>
-            ) : (
-              <div className="flex items-start gap-1.5 text-[11px] text-amber-300 px-1 pt-1" data-testid="score-diff-discrepancy">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                <span>
-                  評点乖離：自己評価とAI採点に{" "}
-                  {prelimScore !== undefined && evaluation.ratingCategory !== null
-                    ? Math.abs(prelimScore - evaluation.ratingCategory)
-                    : "—"}{" "}
-                  バンドの食い違いがあります（自己評価: Band {prelimScore} / AI採点: Band {evaluation.ratingCategory}）。
-                </span>
-              </div>
-            )}
+        {/* 採否判断 vs 抽出された検証行動 */}
+        <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+          <div className="text-[11px] font-bold text-slate-300">
+            採否判断と抽出された検証行動の対照
           </div>
-
-          {/* 採否判断 vs 抽出された検証行動 */}
-          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
-            <div className="text-[11px] font-bold text-slate-300">
-              ② 採否判断と検証行動の対照
-            </div>
-            <div className="space-y-1.5 text-xs">
-              <div className="flex justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-800/80">
-                <span className="text-[11px] text-slate-400">受講者の事前採否判断:</span>
-                <span
-                  className={`font-bold font-mono text-[11px] px-2 py-0.5 rounded ${
-                    prelimAction === "approve"
-                      ? "bg-emerald-950 text-emerald-300 border border-emerald-800/50"
-                      : prelimAction === "remand"
-                      ? "bg-rose-950 text-rose-300 border border-rose-800/50"
-                      : "text-slate-400"
-                  }`}
-                  data-testid="prelim-action-display"
-                >
-                  {prelimAction === "approve"
-                    ? "承認 (Approve)"
+          <div className="space-y-1.5 text-xs">
+            <div className="flex justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-800/80">
+              <span className="text-[11px] text-slate-400">受講者の事前採否判断（Force Decision First）:</span>
+              <span
+                className={`font-bold font-mono text-[11px] px-2 py-0.5 rounded ${
+                  prelimAction === "approve"
+                    ? "bg-emerald-950 text-emerald-300 border border-emerald-800/50"
                     : prelimAction === "remand"
-                    ? "差し戻し (Remand)"
-                    : "未選択"}
-                </span>
-              </div>
-              <div className="flex justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-800/80">
+                    ? "bg-rose-950 text-rose-300 border border-rose-800/50"
+                    : "text-slate-400"
+                }`}
+                data-testid="prelim-action-display"
+              >
+                {prelimAction === "approve"
+                  ? "承認 (Approve)"
+                  : prelimAction === "remand"
+                  ? "差し戻し (Remand)"
+                  : "未選択"}
+              </span>
+            </div>
+            <div className="flex justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-800/80">
                 <span className="text-[11px] text-slate-400">抽出された不備指摘:</span>
                 <span className="font-mono text-[11px] text-slate-200" data-testid="matched-flaws-count">
                   {matchedFlaws.length > 0 ? `${matchedFlaws.length}件 (${matchedFlaws.join(", ")})` : "0件"}
@@ -367,7 +313,6 @@ export function EvaluationReportStep({
                 : "受講者の「承認」判断と、不備指摘の非抽出状態が一致しています。"}
             </p>
           </div>
-        </div>
 
         {prelimJustification && (
           <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-300 space-y-1" data-testid="prelim-justification-display">

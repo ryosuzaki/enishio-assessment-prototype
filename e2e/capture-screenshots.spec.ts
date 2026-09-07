@@ -217,7 +217,6 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
     await expect(page.getByText("CFF: Force Decision First & Mandatory Justification")).toBeVisible();
     await page.locator("input[value='remand']").check();
-    await page.getByRole("button", { name: /Band 3\s*前提摘発/ }).click();
     const justificationTextarea = page.getByPlaceholder(
       /承認または差し戻しと判断した具体的な根拠・理由を記述/
     );

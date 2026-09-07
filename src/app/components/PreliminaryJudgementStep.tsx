@@ -20,8 +20,6 @@ interface PreliminaryJudgementStepProps {
   chatHistory?: ChatMessage[];
   prelimAction: "approve" | "remand" | "";
   setPrelimAction: (action: "approve" | "remand" | "") => void;
-  prelimScore: number;
-  setPrelimScore: (score: number) => void;
   prelimJustification: string;
   setPrelimJustification: (justification: string) => void;
   prelimError: string | null;
@@ -35,8 +33,6 @@ export function PreliminaryJudgementStep({
   chatHistory = [],
   prelimAction,
   setPrelimAction,
-  prelimScore,
-  setPrelimScore,
   prelimJustification,
   setPrelimJustification,
   prelimError,
@@ -253,44 +249,10 @@ export function PreliminaryJudgementStep({
         </div>
       </div>
 
-      {/* 2. Self-Estimated Band */}
-      <div className="space-y-3">
-        <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
-          ② 軸4（評価的判断力）の観点で、自分は何点相当だと思いますか？
-        </label>
-        <div className="grid grid-cols-6 gap-2">
-          {[0, 1, 2, 3, 4, 5].map((band) => (
-            <button
-              key={band}
-              onClick={() => setPrelimScore(band)}
-              type="button"
-              className={`p-3 rounded-xl border text-center transition-all ${
-                prelimScore === band
-                  ? "bg-blue-600 border-blue-500 text-white font-bold shadow-md shadow-blue-500/20"
-                  : "bg-slate-950/40 border-slate-800 text-slate-300 hover:border-slate-700"
-              }`}
-            >
-              <div className="text-base font-bold">Band {band}</div>
-              <div className="text-[10px] text-slate-400 mt-0.5">
-                {band === 0 && "未達"}
-                {band === 1 && "盲目追従"}
-                {band === 2 && "違和感"}
-                {band === 3 && "前提摘発"}
-                {band === 4 && "卓越弁別"}
-                {band === 5 && "指導的"}
-              </div>
-            </button>
-          ))}
-        </div>
-        <p className="text-[11px] text-slate-500">
-          ※ この自己評点はAI採点には入力されず、過信・過小評価バイアスの観測ログとして記録されます。
-        </p>
-      </div>
-
-      {/* 3. Optional Adjustment & Notes (White-space essay is permanently forbidden [D-80]) */}
+      {/* 2. Optional Adjustment & Notes (White-space essay is permanently forbidden [D-80]) */}
       <div className="space-y-2">
         <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block flex items-center justify-between">
-          <span>③ 進行役の要約に対する補足・微調整（任意・省略可）</span>
+          <span>② 進行役の要約に対する補足・微調整（任意・省略可）</span>
           <span className="text-slate-400 text-[10px] font-mono">※ 省略時は上記要約がそのまま記録されます</span>
         </label>
         <textarea
