@@ -150,26 +150,36 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       fullPage: true,
     });
 
-    // 02. アンカー出題・設問1 (Anchor Q1)
+    // 02. アンカー出題・段階1（採用可否）[D-83]
     // 出題項目IDは供給源（運用バンク / 同梱サンプル）で変わるため決め打ちしない
     const anchorSelect = page.locator("select").first();
     await expect(anchorSelect).toBeEnabled();
     const selectedAnchorId = await anchorSelect.inputValue();
     await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
-    await expect(page.getByText(/設問 1 \/ 2/)).toBeVisible();
+    await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
     await expect(page.getByText(new RegExp(`共通アンカー項目: ${selectedAnchorId}`))).toBeVisible();
-    await page.locator("input[name='q1']").first().check();
+    await page.locator("input[name='stage1']").nth(1).check();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: path.join(screenshotsDir, "02-anchor-question.png"),
       fullPage: true,
     });
 
-    // 設問2通過 ➔ 確信度評定 (Anchor Confidence)
-    await page.getByRole("button", { name: "設問2へ進む" }).click();
-    await expect(page.getByText(/設問 2 \/ 2/)).toBeVisible();
-    await page.locator("input[name='q2']").first().check();
+    // 段階2（懸念領域）→ 段階3（前提変化への判断更新）➔ 確信度評定
+    await page.getByRole("button", { name: "この判断で確定する" }).click();
+    const capStage2 = page.locator("input[name='stage2']").first();
+    if (await capStage2.isVisible().catch(() => false)) {
+      await capStage2.check();
+      await page.getByRole("button", { name: "次へ" }).click();
+    }
+    await expect(page.getByText(/段階 3（前提変化への判断更新）/)).toBeVisible();
+    await page.locator("input[name='stage3']").first().check();
     await page.getByRole("button", { name: "確信度評定へ" }).click();
+    const capStage3b = page.locator("input[name='stage3b']").first();
+    if (await capStage3b.isVisible().catch(() => false)) {
+      await capStage3b.check();
+      await page.getByRole("button", { name: "確信度評定へ" }).click();
+    }
     await expect(page.getByText("確信度の自己評定（5段階）")).toBeVisible();
     await page.getByRole("button", { name: /4\s*やや自信あり/ }).click();
     await page.evaluate(() => window.scrollTo(0, 0));

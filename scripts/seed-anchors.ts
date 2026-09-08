@@ -16,24 +16,34 @@
 // で落ちる（README の手順どおりに進めた利用者がここで詰まる）。
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
-import { loadAnchorBank, OPERATIONAL_BANK_PATH, SAMPLE_BANK_PATH } from "../src/lib/anchor-bank";
+import {
+  loadAnchorBank,
+  isRetiredSource,
+  RETIRED_BANK_WARNING,
+  OPERATIONAL_BANK_PATH_V2,
+  SAMPLE_BANK_PATH_V2,
+} from "../src/lib/anchor-bank";
 
 async function main() {
   const { anchors, source } = loadAnchorBank();
 
   if (source === "missing") {
     console.error(`アンカー項目バンクを読み込めませんでした。`);
-    console.error(`  運用バンク: ${OPERATIONAL_BANK_PATH}（'npm run parse:anchors' で生成）`);
-    console.error(`  同梱サンプル: ${SAMPLE_BANK_PATH}（リポジトリに含まれるはず）`);
+    console.error(`  運用バンク: ${OPERATIONAL_BANK_PATH_V2}`);
+    console.error(`  同梱サンプル: ${SAMPLE_BANK_PATH_V2}（リポジトリに含まれるはず）`);
     process.exit(1);
   }
 
-  if (source === "demo_sample") {
-    console.log("=== 供給源: 公開デモ用サンプル ===");
-    console.log(`${OPERATIONAL_BANK_PATH} が無いため ${SAMPLE_BANK_PATH} を投入します。`);
-    console.log("**これは運用アンカーバンク（20項目）ではありません。**");
-    console.log("運用バンクを使う場合は 'npm run parse:anchors' を先に実行してください");
-    console.log("（隣の enishio-education リポジトリのチェックアウトが必要です）。\n");
+  if (source === "demo_sample_v2") {
+    console.log("=== 供給源: 公開デモ用サンプル（v2-sct・3項目） ===");
+    console.log(`${OPERATIONAL_BANK_PATH_V2} が無いため ${SAMPLE_BANK_PATH_V2} を投入します。`);
+    console.log("**これは運用アンカーバンクではありません。**\n");
+  }
+
+  if (isRetiredSource(source)) {
+    console.log("=== ⚠️ 退役形式のバンクです ===");
+    console.log(RETIRED_BANK_WARNING);
+    console.log("投入は行いますが、この応答を較正・等化に用いてはなりません。\n");
   }
 
   console.log(`=== anchor_items の投入（${anchors.length}項目 / source=${source}） ===`);

@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import {
   DISAGREEMENT_OPTIONS,
+  isRetiredBankSource,
+  type AnchorBankSourceView,
   type EvaluationResult,
   type EvidenceComponent,
   type ChatMessage,
@@ -24,9 +26,10 @@ interface EvaluationReportStepProps {
   prelimJustification?: string;
   anchorId?: string;
   anchorStatus?: string;
-  bankSource?: "operational" | "demo_sample" | null;
-  q1Choice?: string;
-  q2Choice?: string;
+  bankSource?: AnchorBankSourceView | null;
+  stage1Choice?: string;
+  stage2Choice?: string;
+  stage3Choice?: number | null;
   confidence?: number;
   disputeReason: string;
   setDisputeReason: (reason: string) => void;
@@ -102,8 +105,9 @@ export function EvaluationReportStep({
   anchorId,
   anchorStatus,
   bankSource,
-  q1Choice,
-  q2Choice,
+  stage1Choice,
+  stage2Choice,
+  stage3Choice,
   confidence,
   disputeReason,
   setDisputeReason,
@@ -220,18 +224,28 @@ export function EvaluationReportStep({
             <div className="font-mono text-slate-200 font-semibold flex items-center gap-1.5 flex-wrap">
               <span>{anchorId || "—"}</span>
               <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                {bankSource === "operational"
-                  ? "運用バンク"
-                  : bankSource === "demo_sample"
-                  ? "公開デモ用サンプル"
+                {bankSource === "operational_v2"
+                  ? "運用バンク (v2-sct)"
+                  : bankSource === "demo_sample_v2"
+                  ? "公開デモ用サンプル (v2-sct)"
+                  : isRetiredBankSource(bankSource ?? null)
+                  ? "⚠️ 退役形式 (v1-static)"
                   : "項目バンク"}
               </span>
             </div>
           </div>
           <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
-            <span className="text-[10px] text-slate-500 block">受検者回答（選択肢）</span>
-            <div className="font-mono text-slate-200 font-semibold">
-              設問1: <span className="text-blue-400">{q1Choice || "—"}</span> ／ 設問2: <span className="text-indigo-400">{q2Choice || "—"}</span>
+            <span className="text-[10px] text-slate-500 block">受検者回答（段階1〜3）</span>
+            <div className="font-mono text-slate-200 font-semibold text-[11px]">
+              1: <span className="text-blue-400">{stage1Choice || "—"}</span> ／ 2:{" "}
+              <span className="text-indigo-400">{stage2Choice || "—"}</span> ／ 3:{" "}
+              <span className="text-amber-400">
+                {stage3Choice === null || stage3Choice === undefined
+                  ? "—"
+                  : stage3Choice > 0
+                  ? `+${stage3Choice}`
+                  : String(stage3Choice)}
+              </span>
             </div>
           </div>
           <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">

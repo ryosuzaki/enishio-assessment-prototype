@@ -1,19 +1,61 @@
 // Application Types for Assessment Prototype
 
+/**
+ * どのバンクを読み込んだかの表示用。**サンプルを運用バンクに見せない／退役形式を
+ * 現行形式に見せない**ため、画面へそのまま出す（実装指示書 §W6）。
+ */
+export type AnchorBankSourceView =
+  | "operational_v2"
+  | "demo_sample_v2"
+  | "operational_v1_retired"
+  | "demo_sample_v1_retired";
+
+export function isRetiredBankSource(s: AnchorBankSourceView | null): boolean {
+  return s === "operational_v1_retired" || s === "demo_sample_v1_retired";
+}
+
+export interface AnchorOptionView {
+  key: string;
+  text: string;
+}
+
+/**
+ * 4段構成の疑似対話形式アンカー [D-83]。
+ *
+ * 段階1は「採用可否」だけを問い、**選択肢に答え（隠れた前提の中身）を含めない**。
+ * 選択肢を提示した時点で「言われずに気づく」という測定対象が消えるため、そこを
+ * 先に確定させてから細部へ降りる。段階3で前提変化（新情報）を注入し、判断が
+ * どちらへ動くかをリッカートで取る——ここは正答鍵ではなく専門家パネルの応答分布で
+ * 採点するため、単一の正解が存在しない。
+ *
+ * サーバは `correct_key` / `item_kind` / パネル分布を落として返す（採点鍵のため）。
+ */
 export interface AnchorItem {
   anchor_id: string;
+  format_version: "v2-sct";
   family: string;
   title: string;
   intro: string;
   proposal: string;
-  q1: {
+  confidence_scale?: string;
+  stage1: { question: string; options: AnchorOptionView[] };
+  /** 類型C（不備なし）では段階2を出題しないため null */
+  stage2: { question: string; options: AnchorOptionView[] } | null;
+  /** 段階2の提示順（サーバでシャッフルされる）。応答と一緒に記録する */
+  stage2_order: string | null;
+  stage3: {
+    new_information: string;
     question: string;
-    options: { key: string; text: string }[];
+    scale: { value: number; label: string }[];
+    /** "mock" の間はパネルがダミーであり、採点値を出してはならない [D-82] */
+    panel_status: "mock" | "provisional" | "final";
+    panel_n: number;
   };
-  q2: {
-    question: string;
-    options: { key: string; text: string }[];
-  };
+  /**
+   * 段階3'（項目によっては null）: 新情報を含まない反論を受けての再回答。
+   * 段階3との差分が迎合（過剰依存）の指標になる。パネル不要 [D-83]。
+   */
+  stage3b: { pushback: string; question: string } | null;
 }
 
 export interface ChatMessage {
@@ -121,8 +163,11 @@ export const PROBE_MOVE_LABELS: Record<ProbeMove, string> = {
 
 export type StepType =
   | "init"
-  | "anchor_q1"
-  | "anchor_q2"
+  // アンカー4段 [D-83]: 採用可否 → 懸念領域 → 前提変化への判断更新 → 確信度
+  | "anchor_stage1"
+  | "anchor_stage2"
+  | "anchor_stage3"
+  | "anchor_stage3b"
   | "anchor_conf"
   | "anchor_complete"
   | "dialogue_session"

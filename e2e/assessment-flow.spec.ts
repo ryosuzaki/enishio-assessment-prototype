@@ -205,10 +205,10 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
         body: JSON.stringify({
           success: true,
           count: 2,
-          bankSource: "demo_sample",
+          bankSource: "demo_sample_v2",
           anchors: [
-            { anchor_id: "ANCHOR-DEMO-A-01", family: "A", title: "【公開デモ用】検索結果キャッシュの導入" },
-            { anchor_id: "ANCHOR-DEMO-B-01", family: "B", title: "【公開デモ用】障害振り返り文書の自動生成" },
+            { anchor_id: "ANCHOR-V2-A-01", family: "A", title: "【公開デモ用】検索結果キャッシュの導入", format_version: "v2-sct" },
+            { anchor_id: "ANCHOR-V2-B-01", family: "B", title: "【公開デモ用】ストーリーポイントによる相対見積もりの導入", format_version: "v2-sct" },
           ],
         }),
       });
@@ -218,10 +218,14 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
 
     await expect(page.getByTestId("anchor-bank-source-badge")).toHaveText("公開デモ用サンプル");
     await expect(page.getByText("出題する共通アンカー項目（全2項目から選択）")).toBeVisible();
-    await expect(page.getByText(/運用中の共通アンカー項目バンク（20項目）は、受検者への事前露出を避けるため公開していません/)).toBeVisible();
+    await expect(
+      page.getByText(/運用中の共通アンカー項目バンクは、受検者への事前露出を避けるため公開していません/)
+    ).toBeVisible();
+    // 3項目のうち1項目は類型C（不備なし）であることを画面が明示する [D-83]
+    await expect(page.getByText(/類型C（仕込んだ不備が無い項目）/)).toBeVisible();
   });
 
-  test("アンカー出題 → 設問回答 → 確信度評定 → 送信完了の一連のフローが動作する", async ({ page }) => {
+  test("アンカー出題 → 4段回答 → 確信度評定 → 送信完了の一連のフローが動作する", async ({ page }) => {
     await page.goto("/");
 
     // 出題される項目IDは供給源によって変わるため、選択中の値を読んでから進む。
@@ -236,20 +240,34 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(startButton).toBeVisible();
     await startButton.click();
 
-    // 設問1（anchor_q1）。出題されるのは init 画面で選択されていた項目である。
-    await expect(page.getByText(/設問 1 \/ 2/)).toBeVisible();
+    // 出題されるのは init 画面で選択されていた項目である。
     await expect(page.getByText(new RegExp(`共通アンカー項目: ${selectedAnchorId}`))).toBeVisible();
 
-    // 設問1の選択肢を1つ選ぶ
-    const q1FirstOption = page.locator("input[name='q1']").first();
-    await q1FirstOption.check();
-    await page.getByRole("button", { name: "設問2へ進む" }).click();
+    // 段階1（採用可否）。選択肢に答えを含めない [D-83]
+    await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
+    await page.locator("input[name='stage1']").nth(1).check();
+    await page.getByRole("button", { name: "この判断で確定する" }).click();
 
-    // 設問2（anchor_q2）
-    await expect(page.getByText(/設問 2 \/ 2/)).toBeVisible();
-    const q2FirstOption = page.locator("input[name='q2']").first();
-    await q2FirstOption.check();
+    // 段階2（懸念領域）。類型C の項目では出題されない
+    const stage2Radio = page.locator("input[name='stage2']").first();
+    if (await stage2Radio.isVisible().catch(() => false)) {
+      await stage2Radio.check();
+      await page.getByRole("button", { name: "次へ" }).click();
+    }
+
+    // 段階3（前提変化への判断更新）
+    await expect(page.getByText(/段階 3（前提変化への判断更新）/)).toBeVisible();
+    await expect(page.getByText("新しい情報が入りました")).toBeVisible();
+    await page.locator("input[name='stage3']").first().check();
     await page.getByRole("button", { name: "確信度評定へ" }).click();
+
+    // 段階3'（新情報を含まない反論）。付いている項目でだけ現れる [D-83]
+    const stage3bRadio = page.locator("input[name='stage3b']").first();
+    if (await stage3bRadio.isVisible().catch(() => false)) {
+      await expect(page.getByText("AI同僚からの反論")).toBeVisible();
+      await stage3bRadio.check();
+      await page.getByRole("button", { name: "確信度評定へ" }).click();
+    }
 
     // 確信度自己評定（anchor_conf）
     await expect(page.getByText("確信度の自己評定（5段階）")).toBeVisible();
@@ -263,6 +281,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     // アンカー完了画面（anchor_complete）
     await expect(page.getByText("共通アンカー項目の記録が完了しました")).toBeVisible();
     await expect(page.getByText("anchor_status = pretest")).toBeVisible();
+    // 正誤もパネル分布も受検者へ返さない [D-83]
+    await expect(page.getByText("この区間は採点されません。結果も返りません。")).toBeVisible();
   });
 
   test("動的3ペイン対話 → CFF暫定判断 → AutoSCORE採点 → XAIレポート表示の全フローが完走する", async ({ page }) => {
@@ -271,10 +291,31 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     // 1. アンカーフローを通過（項目が読み込まれるまで待ってから開始する）
     await expect(page.locator("select").first()).toBeEnabled();
     await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
-    await page.locator("input[name='q1']").first().check();
-    await page.getByRole("button", { name: "設問2へ進む" }).click();
-    await page.locator("input[name='q2']").first().check();
+    // 段階1（採用可否）。選択肢に答えを含めない [D-83]
+    await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
+    await page.locator("input[name='stage1']").nth(1).check();
+    await page.getByRole("button", { name: "この判断で確定する" }).click();
+
+    // 段階2（懸念領域）。類型C の項目では出題されない
+    const stage2Radio = page.locator("input[name='stage2']").first();
+    if (await stage2Radio.isVisible().catch(() => false)) {
+      await stage2Radio.check();
+      await page.getByRole("button", { name: "次へ" }).click();
+    }
+
+    // 段階3（前提変化への判断更新）
+    await expect(page.getByText(/段階 3（前提変化への判断更新）/)).toBeVisible();
+    await expect(page.getByText("新しい情報が入りました")).toBeVisible();
+    await page.locator("input[name='stage3']").first().check();
     await page.getByRole("button", { name: "確信度評定へ" }).click();
+
+    // 段階3'（新情報を含まない反論）。付いている項目でだけ現れる [D-83]
+    const stage3bRadio = page.locator("input[name='stage3b']").first();
+    if (await stage3bRadio.isVisible().catch(() => false)) {
+      await expect(page.getByText("AI同僚からの反論")).toBeVisible();
+      await stage3bRadio.check();
+      await page.getByRole("button", { name: "確信度評定へ" }).click();
+    }
     await page.getByRole("button", { name: /4\s*やや自信あり/ }).click();
     await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
 
@@ -396,10 +437,31 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.goto("/");
     await expect(page.locator("select").first()).toBeEnabled();
     await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
-    await page.locator("input[name='q1']").first().check();
-    await page.getByRole("button", { name: "設問2へ進む" }).click();
-    await page.locator("input[name='q2']").first().check();
+    // 段階1（採用可否）。選択肢に答えを含めない [D-83]
+    await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
+    await page.locator("input[name='stage1']").nth(1).check();
+    await page.getByRole("button", { name: "この判断で確定する" }).click();
+
+    // 段階2（懸念領域）。類型C の項目では出題されない
+    const stage2Radio = page.locator("input[name='stage2']").first();
+    if (await stage2Radio.isVisible().catch(() => false)) {
+      await stage2Radio.check();
+      await page.getByRole("button", { name: "次へ" }).click();
+    }
+
+    // 段階3（前提変化への判断更新）
+    await expect(page.getByText(/段階 3（前提変化への判断更新）/)).toBeVisible();
+    await expect(page.getByText("新しい情報が入りました")).toBeVisible();
+    await page.locator("input[name='stage3']").first().check();
     await page.getByRole("button", { name: "確信度評定へ" }).click();
+
+    // 段階3'（新情報を含まない反論）。付いている項目でだけ現れる [D-83]
+    const stage3bRadio = page.locator("input[name='stage3b']").first();
+    if (await stage3bRadio.isVisible().catch(() => false)) {
+      await expect(page.getByText("AI同僚からの反論")).toBeVisible();
+      await stage3bRadio.check();
+      await page.getByRole("button", { name: "確信度評定へ" }).click();
+    }
     await page.getByRole("button", { name: /5\s*非常に確信/ }).click();
     await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
     await expect(page.getByText("共通アンカー項目の記録が完了しました")).toBeVisible();
@@ -455,10 +517,31 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.goto("/");
     await expect(page.locator("select").first()).toBeEnabled();
     await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
-    await page.locator("input[name='q1']").first().check();
-    await page.getByRole("button", { name: "設問2へ進む" }).click();
-    await page.locator("input[name='q2']").first().check();
+    // 段階1（採用可否）。選択肢に答えを含めない [D-83]
+    await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
+    await page.locator("input[name='stage1']").nth(1).check();
+    await page.getByRole("button", { name: "この判断で確定する" }).click();
+
+    // 段階2（懸念領域）。類型C の項目では出題されない
+    const stage2Radio = page.locator("input[name='stage2']").first();
+    if (await stage2Radio.isVisible().catch(() => false)) {
+      await stage2Radio.check();
+      await page.getByRole("button", { name: "次へ" }).click();
+    }
+
+    // 段階3（前提変化への判断更新）
+    await expect(page.getByText(/段階 3（前提変化への判断更新）/)).toBeVisible();
+    await expect(page.getByText("新しい情報が入りました")).toBeVisible();
+    await page.locator("input[name='stage3']").first().check();
     await page.getByRole("button", { name: "確信度評定へ" }).click();
+
+    // 段階3'（新情報を含まない反論）。付いている項目でだけ現れる [D-83]
+    const stage3bRadio = page.locator("input[name='stage3b']").first();
+    if (await stage3bRadio.isVisible().catch(() => false)) {
+      await expect(page.getByText("AI同僚からの反論")).toBeVisible();
+      await stage3bRadio.check();
+      await page.getByRole("button", { name: "確信度評定へ" }).click();
+    }
     await page.getByRole("button", { name: /4\s*やや自信あり/ }).click();
     await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
     await page.getByRole("button", { name: "動的対話セッションへ進む" }).click();

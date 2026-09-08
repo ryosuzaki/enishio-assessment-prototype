@@ -37,5 +37,7 @@ yarn-error.log*
 next-env.d.ts
 
 # アンカー項目バンク（運用中の項目そのもの。公開リポジトリへ入れない）
-# 生成: npm run parse:anchors  ← ../enishio-education/docs/共通アンカー項目バンク初版_T-05.md
+# アンカー項目バンク（運用）。項目露出を避けるためリポジトリに含めない。
+# v1 (anchors.json) は [D-83] で退役。較正・等化に用いない。
 /src/data/anchors.json
+/src/data/anchors.v2.json

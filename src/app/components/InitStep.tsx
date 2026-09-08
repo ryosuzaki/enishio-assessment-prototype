@@ -3,13 +3,14 @@
 import React from "react";
 import { Sparkles, RefreshCw, ArrowRight } from "lucide-react";
 import { DYNAMIC_TASKS, type DynamicTaskScenario } from "@/data/dynamic-task";
+import { isRetiredBankSource, type AnchorBankSourceView } from "../types";
 
 interface InitStepProps {
   selectedAnchorId: string;
   setSelectedAnchorId: (id: string) => void;
   anchorList: { anchor_id: string; title: string; family: string }[];
   /** 読み込めたバンクの供給源。null は未取得 */
-  bankSource: "operational" | "demo_sample" | null;
+  bankSource: AnchorBankSourceView | null;
   selectedTaskId: string;
   setSelectedTaskId: (id: string) => void;
   selectedTask: DynamicTaskScenario;
@@ -47,7 +48,7 @@ export function InitStep({
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
             出題する共通アンカー項目（全{anchorList.length}項目から選択）
           </label>
-          {bankSource === "demo_sample" && (
+          {bankSource === "demo_sample_v2" && (
             <span
               data-testid="anchor-bank-source-badge"
               className="shrink-0 text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/50 text-amber-300 border border-amber-800/50"
@@ -68,13 +69,23 @@ export function InitStep({
             </option>
           ))}
         </select>
-        {bankSource === "demo_sample" ? (
-          /* サンプル2項目を運用20項目に見せない。何が動いていないかを正直に書く */
+        {isRetiredBankSource(bankSource) ? (
+          /* 退役形式を現行形式に見せない [D-83] */
+          <p className="text-xs text-red-300/80 leading-relaxed">
+            ⚠️ <strong>退役形式（v1-static）のバンクを読み込んでいます</strong>[D-83]。
+            選択肢が答えを含むため「言われずに気づく」という測定対象が失われており、
+            <strong>較正・等化に用いてはなりません。</strong>
+            現行形式（v2-sct）は <code>src/data/anchors.v2.sample.json</code> にあります。
+          </p>
+        ) : bankSource === "demo_sample_v2" ? (
+          /* サンプルを運用バンクに見せない。何が動いていないかを正直に書く */
           <p className="text-xs text-amber-200/70 leading-relaxed">
-            ※ここに出ているのは<strong>リポジトリ同梱の公開デモ用サンプル項目</strong>です。
-            運用中の共通アンカー項目バンク（20項目）は、受検者への事前露出を避けるため公開していません
+            ※ここに出ているのは<strong>リポジトリ同梱の公開デモ用サンプル項目（v2-sct・3項目）</strong>です。
+            運用中の共通アンカー項目バンクは、受検者への事前露出を避けるため公開していません
             （項目露出は MVP 2.6.2 の監視指標）。項目の中身は違いますが、出題から
             `anchor_responses` への無得点記録までの経路は運用時と同一です。
+            3項目のうち1項目は<strong>類型C（仕込んだ不備が無い項目）</strong>で、
+            「とりあえず条件付きを選ぶ」戦略が失敗するようにしてあります。
           </p>
         ) : (
           <p className="text-xs text-slate-500">

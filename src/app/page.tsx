@@ -14,6 +14,7 @@ import type {
   AppTab,
 } from "./types";
 import { MAX_PROBES_PER_SESSION } from "./types";
+import type { AnchorBankSourceView } from "./types";
 import { Play, Building2, UserCheck } from "lucide-react";
 import { InitStep } from "./components/InitStep";
 import { AnchorQuestionStep } from "./components/AnchorQuestionStep";
@@ -43,17 +44,22 @@ export default function AssessmentPrototypePage() {
   const [anchorList, setAnchorList] = useState<{ anchor_id: string; title: string; family: string }[]>([]);
   // 読み込めたバンクが運用20項目か同梱サンプル2項目かを画面に明示する。
   // 供給源が確定するまでは null（未取得）にしておき、断定的な表示をしない。
-  const [bankSource, setBankSource] = useState<"operational" | "demo_sample" | null>(null);
+  const [bankSource, setBankSource] = useState<AnchorBankSourceView | null>(null);
   const [selectedAnchorId, setSelectedAnchorId] = useState<string>("");
   const [anchorStatus, setAnchorStatus] = useState<string>("pretest");
   const [currentAnchor, setCurrentAnchor] = useState<AnchorItem | null>(null);
-  const [q1Choice, setQ1Choice] = useState<string>("");
-  const [q2Choice, setQ2Choice] = useState<string>("");
+  // 4段構成 [D-83]: 段階1 採用可否 → 段階2 懸念領域 → 段階3 前提変化への判断更新 → 確信度
+  const [stage1Choice, setStage1Choice] = useState<string>("");
+  const [stage2Choice, setStage2Choice] = useState<string>("");
+  const [stage3Choice, setStage3Choice] = useState<number | null>(null);
+  // 段階3': 新情報を含まない反論への再回答。項目によっては存在しない [D-83]
+  const [stage3bChoice, setStage3bChoice] = useState<number | null>(null);
   const [confidence, setConfidence] = useState<number>(3);
-  const [q1StartTime, setQ1StartTime] = useState<number>(0);
-  const [q2StartTime, setQ2StartTime] = useState<number>(0);
-  const [q1DurationMs, setQ1DurationMs] = useState<number>(0);
-  const [q2DurationMs, setQ2DurationMs] = useState<number>(0);
+  const [stageStartTime, setStageStartTime] = useState<number>(0);
+  const [stage1DurationMs, setStage1DurationMs] = useState<number>(0);
+  const [stage2DurationMs, setStage2DurationMs] = useState<number>(0);
+  const [stage3DurationMs, setStage3DurationMs] = useState<number>(0);
+  const [stage3bDurationMs, setStage3bDurationMs] = useState<number>(0);
 
   // Dynamic Task Selection (T-06a) — 取り組む動的課題をレジストリから選択する
   const [selectedTaskId, setSelectedTaskId] = useState<string>(DYNAMIC_TASKS[0].task_id);
@@ -210,9 +216,14 @@ export default function AssessmentPrototypePage() {
         const anchorData = await anchorRes.json();
         if (anchorData.success) {
           setCurrentAnchor(anchorData.anchor);
-          setCurrentStep("anchor_q1");
-          setQ1StartTime(Date.now());
-          addTelemetry(`Anchor stimulus loaded (${selectedAnchorId}) - pretest mode`);
+          setCurrentStep("anchor_stage1");
+          setStageStartTime(Date.now());
+          addTelemetry(
+            `Anchor stimulus loaded (${selectedAnchorId}, ${anchorData.anchor.format_version}) - pretest mode`
+          );
+          if (anchorData.retiredWarning) {
+            addTelemetry(`WARN ${anchorData.retiredWarning}`);
+          }
         } else {
           // ここを黙って通すと、セッションだけ作られて画面が無反応になる。
           setErrorMessage(anchorData.error ?? "アンカー項目の読み込みに失敗しました。");
@@ -227,22 +238,65 @@ export default function AssessmentPrototypePage() {
     }
   };
 
-  // Anchor Flow Step Handlers
-  const handleQ1Next = () => {
-    if (!q1Choice) return;
-    const duration = Date.now() - q1StartTime;
-    setQ1DurationMs(duration);
-    setCurrentStep("anchor_q2");
-    setQ2StartTime(Date.now());
-    addTelemetry(`Q1 Answer recorded (${q1Choice}) in ${(duration / 1000).toFixed(1)}s`);
+  // Anchor Flow Step Handlers [D-83]
+  //
+  // 段階1で確定した判断には戻れない。選択肢を見てから遡って書き換えられると、
+  // 「言われずに気づいたか」という段階1の測定が意味を失う。
+  const handleStage1Next = () => {
+    if (!stage1Choice || !currentAnchor) return;
+    const duration = Date.now() - stageStartTime;
+    setStage1DurationMs(duration);
+    // 類型C（不備なし）の項目は段階2を持たないため飛ばす。
+    const next = currentAnchor.stage2 ? "anchor_stage2" : "anchor_stage3";
+    setCurrentStep(next);
+    setStageStartTime(Date.now());
+    addTelemetry(
+      `段階1（採用可否）を確定: ${stage1Choice} / ${(duration / 1000).toFixed(1)}s` +
+        (currentAnchor.stage2 ? "" : " — 段階2なし（類型C）")
+    );
   };
 
-  const handleQ2Next = () => {
-    if (!q2Choice) return;
-    const duration = Date.now() - q2StartTime;
-    setQ2DurationMs(duration);
+  const handleStage2Next = () => {
+    if (!stage2Choice) return;
+    const duration = Date.now() - stageStartTime;
+    setStage2DurationMs(duration);
+    setCurrentStep("anchor_stage3");
+    setStageStartTime(Date.now());
+    addTelemetry(
+      `段階2（懸念領域）: ${stage2Choice} / 提示順 ${currentAnchor?.stage2_order ?? "—"} / ` +
+        `${(duration / 1000).toFixed(1)}s`
+    );
+  };
+
+  const handleStage3Next = () => {
+    if (stage3Choice === null || !currentAnchor) return;
+    const duration = Date.now() - stageStartTime;
+    setStage3DurationMs(duration);
+    // 段階3' はすべての項目には付かない。付く項目を読まれると測れなくなるためである [D-83]。
+    const next = currentAnchor.stage3b ? "anchor_stage3b" : "anchor_conf";
+    setCurrentStep(next);
+    setStageStartTime(Date.now());
+    addTelemetry(
+      `段階3（前提変化への判断更新）: ${stage3Choice > 0 ? "+" : ""}${stage3Choice} / ` +
+        `${(duration / 1000).toFixed(1)}s — 採点は専門家パネル分布（正答鍵なし）`
+    );
+  };
+
+  // 段階3': 新情報を含まない反論への応答。段階3との差分だけが指標であり、パネルを要さない。
+  const handleStage3bNext = () => {
+    if (stage3bChoice === null || stage3Choice === null) return;
+    const duration = Date.now() - stageStartTime;
+    setStage3bDurationMs(duration);
     setCurrentStep("anchor_conf");
-    addTelemetry(`Q2 Answer recorded (${q2Choice}) in ${(duration / 1000).toFixed(1)}s`);
+    const delta = stage3bChoice - stage3Choice;
+    addTelemetry(
+      `段階3'（反論への応答）: ${stage3bChoice > 0 ? "+" : ""}${stage3bChoice} / ` +
+        `差分 ${delta > 0 ? "+" : ""}${delta} — ` +
+        (delta === 0
+          ? "保持（新情報のない圧力に対して立場を維持）"
+          : "迎合（新情報なしに判断が移動）") +
+        ` / ${(duration / 1000).toFixed(1)}s`
+    );
   };
 
   const handleAnchorSubmit = async () => {
@@ -256,11 +310,17 @@ export default function AssessmentPrototypePage() {
         body: JSON.stringify({
           sessionId,
           anchorId: currentAnchor.anchor_id,
-          q1Selection: q1Choice,
-          q2Selection: q2Choice,
+          formatVersion: currentAnchor.format_version,
+          stage1Selection: stage1Choice,
+          stage2Selection: stage2Choice || null,
+          stage3Selection: stage3Choice,
+          stage3bSelection: stage3bChoice,
+          stage2Order: currentAnchor.stage2_order,
+          stage1DurationMs,
+          stage2DurationMs,
+          stage3DurationMs,
+          stage3bDurationMs,
           confidence,
-          q1DurationMs,
-          q2DurationMs,
         }),
       });
       const data = await res.json();
@@ -707,23 +767,32 @@ export default function AssessmentPrototypePage() {
             />
           )}
 
-          {/* STEP 1〜4: Anchor Flow (Q1, Q2, Confidence, Complete) */}
-          {(currentStep === "anchor_q1" ||
-            currentStep === "anchor_q2" ||
+          {/* STEP 1〜5: Anchor Flow（4段構成 + 完了）[D-83] */}
+          {(currentStep === "anchor_stage1" ||
+            currentStep === "anchor_stage2" ||
+            currentStep === "anchor_stage3" ||
+            currentStep === "anchor_stage3b" ||
             currentStep === "anchor_conf" ||
             currentStep === "anchor_complete") && (
             <AnchorQuestionStep
               currentStep={currentStep}
               currentAnchor={currentAnchor}
-              q1Choice={q1Choice}
-              setQ1Choice={setQ1Choice}
-              q2Choice={q2Choice}
-              setQ2Choice={setQ2Choice}
+              bankSource={bankSource}
+              stage1Choice={stage1Choice}
+              setStage1Choice={setStage1Choice}
+              stage2Choice={stage2Choice}
+              setStage2Choice={setStage2Choice}
+              stage3Choice={stage3Choice}
+              setStage3Choice={setStage3Choice}
+              stage3bChoice={stage3bChoice}
+              setStage3bChoice={setStage3bChoice}
               confidence={confidence}
               setConfidence={setConfidence}
               isSubmitting={isSubmitting}
-              onQ1Next={handleQ1Next}
-              onQ2Next={handleQ2Next}
+              onStage1Next={handleStage1Next}
+              onStage2Next={handleStage2Next}
+              onStage3Next={handleStage3Next}
+              onStage3bNext={handleStage3bNext}
               onAnchorSubmit={handleAnchorSubmit}
               onStartDialogueSession={handleStartDialogueSession}
             />
@@ -782,8 +851,9 @@ export default function AssessmentPrototypePage() {
               anchorId={selectedAnchorId}
               anchorStatus={anchorStatus}
               bankSource={bankSource}
-              q1Choice={q1Choice}
-              q2Choice={q2Choice}
+              stage1Choice={stage1Choice}
+              stage2Choice={stage2Choice}
+              stage3Choice={stage3Choice}
               confidence={confidence}
               disputeReason={disputeReason}
               setDisputeReason={setDisputeReason}

@@ -60,7 +60,10 @@
           "note": "誤答"
         }
       ]
-    }
+    },
+    "format_version": "v1-static",
+    "calibration_eligible": false,
+    "retired_note": "[D-83] 退役。選択肢が答えを含むため「言われずに気づく」という測定対象が失われており、対話側とは別の構成概念を測っている。較正・等化に用いてはならない。再利用してよいのは intro / proposal / hidden_premise のテキストのみ。"
   },
   {
     "anchor_id": "ANCHOR-DEMO-B-01",
@@ -123,6 +126,9 @@
           "note": "誤答"
         }
       ]
-    }
+    },
+    "format_version": "v1-static",
+    "calibration_eligible": false,
+    "retired_note": "[D-83] 退役。選択肢が答えを含むため「言われずに気づく」という測定対象が失われており、対話側とは別の構成概念を測っている。較正・等化に用いてはならない。再利用してよいのは intro / proposal / hidden_premise のテキストのみ。"
   }
 ]

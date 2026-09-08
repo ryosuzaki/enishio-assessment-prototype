@@ -237,11 +237,28 @@ export interface RecordAnchorResponseParams {
     | "promotion"
     | "selection"
     | "verification";
-  q1Selection: string;
-  q2Selection: string;
+  /** "v1-static"（退役）| "v2-sct"（現行・[D-83]） */
+  formatVersion?: string;
+  // v1（退役形式）。v2 の応答では null が入る。
+  q1Selection?: string | null;
+  q2Selection?: string | null;
+  q1DurationMs?: number | null;
+  q2DurationMs?: number | null;
+  // v2（4段構成の疑似対話形式・[D-83]）
+  stage1Selection?: string | null;
+  /** 類型C（不備なし）では段階2を出題しないため null */
+  stage2Selection?: string | null;
+  /** -2..+2 の判断の移動 */
+  stage3Selection?: number | null;
+  /** 段階3': 新情報を含まない反論の後の再回答（-2..+2）。stage3 との差分が迎合の指標 */
+  stage3bSelection?: number | null;
+  stage3bDurationMs?: number | null;
+  /** 段階2の提示順（例 "C,A,D,B"）。記録しないと応答を解釈できない */
+  stage2Order?: string | null;
+  stage1DurationMs?: number | null;
+  stage2DurationMs?: number | null;
+  stage3DurationMs?: number | null;
   confidence: number;
-  q1DurationMs: number;
-  q2DurationMs: number;
 }
 
 /**
@@ -255,11 +272,21 @@ export async function recordAnchorResponse(params: RecordAnchorResponseParams) {
       anchor_status: params.anchorStatus,
       // [D-67] 決定2
       stakes_context: params.stakesContext ?? "formative",
-      q1_selection: params.q1Selection,
-      q2_selection: params.q2Selection,
+      format_version: params.formatVersion ?? "v1-static",
+      q1_selection: params.q1Selection ?? null,
+      q2_selection: params.q2Selection ?? null,
+      q1_duration_ms: params.q1DurationMs ?? null,
+      q2_duration_ms: params.q2DurationMs ?? null,
+      stage1_selection: params.stage1Selection ?? null,
+      stage2_selection: params.stage2Selection ?? null,
+      stage3_selection: params.stage3Selection ?? null,
+      stage3b_selection: params.stage3bSelection ?? null,
+      stage3b_duration_ms: params.stage3bDurationMs ?? null,
+      stage2_order: params.stage2Order ?? null,
+      stage1_duration_ms: params.stage1DurationMs ?? null,
+      stage2_duration_ms: params.stage2DurationMs ?? null,
+      stage3_duration_ms: params.stage3DurationMs ?? null,
       confidence: params.confidence,
-      q1_duration_ms: params.q1DurationMs,
-      q2_duration_ms: params.q2DurationMs,
     },
   });
 }

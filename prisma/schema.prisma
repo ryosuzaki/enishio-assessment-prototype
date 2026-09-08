@@ -108,11 +108,36 @@ model AnchorResponse {
   anchor_status  String   @default("pretest")
   // [D-67] 決定2：応答時の用途。Rating.stakes_context と同じ列挙。
   stakes_context String   @default("formative")
-  q1_selection   String
-  q2_selection   String
+  // --- v1（静的選択式・[D-83] で退役）---
+  // 新規応答は v2 側の列へ入る。旧行を保持するため nullable にしてある。
+  q1_selection   String?
+  q2_selection   String?
+  q1_duration_ms Int?
+  q2_duration_ms Int?
+
+  // --- v2（4段構成の疑似対話形式・[D-83]）---
+  // "v1-static" | "v2-sct"。どちらの形式で答えた応答かを応答側にも凍結して持つ
+  // （項目側は改版されうるため、ここに無いと後から復元できない。MVP 4.1.1 と同じ理由）。
+  format_version     String  @default("v1-static")
+  // 段階1: 選択肢に答えを含めない「採用可否」の3択。ここが「言われずに気づいたか」の測定点。
+  stage1_selection   String?
+  // 段階2: 懸念領域の粗い分類。段階1で「そのまま採用してよい」を選んだ場合は null。
+  stage2_selection   String?
+  // 段階3: 新情報を受けた判断の移動（-2..+2）。正答鍵ではなく専門家パネル分布で採点する。
+  stage3_selection   Int?
+  // 段階3': 新情報を含まない反論（社会的圧力のみ）を受けた後の再回答（-2..+2）。
+  // 採点は stage3 との差分のみで、専門家パネルを必要としない。差が出れば迎合である [D-83]。
+  // 全項目には付けない（付く項目を読まれると測れなくなる）ため nullable。
+  stage3b_selection   Int?
+  stage3b_duration_ms Int?
+  // 提示順（例 "C,A,D,B"）。サーバ側でシャッフルして出すため、記録しないと応答を解釈できない。
+  stage1_order       String?
+  stage2_order       String?
+  stage1_duration_ms Int?
+  stage2_duration_ms Int?
+  stage3_duration_ms Int?
+
   confidence     Int // 1..5
-  q1_duration_ms Int
-  q2_duration_ms Int
   created_at     DateTime @default(now())
 
   session     Session    @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
