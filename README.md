@@ -178,11 +178,21 @@ npm run seed:anchors
 ### テスト・検証スクリプト
 
 ```bash
-npm run test                  # 単体テスト（Vitest 32件）
-npm run test:e2e              # E2Eテスト（Playwright 8シナリオ）
+npm run test                  # 単体テスト（Vitest 45件）
+npm run test:e2e              # E2Eテスト（Playwright 10シナリオ）
 npm run capture:screenshots   # UIスクリーンショット取得（docs/screenshots/ へ高解像度出力）
 npm run check:flaw-detection  # 代行無効化チェック（Claude / Gemini マルチプロバイダ実測）
 npm run check:no-leak         # クライアントバンドルへの正答鍵・秘密情報非漏洩チェック
+```
+
+**E2E とスクリーンショット取得は、稼働中のデータベースを必要としない。**API ルートは
+すべて Playwright のルートモックで塞いであり（未モックのまま DB へ抜けるルートがあると
+例外になるので、ルートを増やしたらモックも足すこと）、実際に DB を読むのは
+`GET /api/anchor` だけで、これはファイル読み込みである。ただし Prisma クライアントの
+生成に `DATABASE_URL` の存在自体は要るため、DB を立てずに走らせる場合はダミーを渡す。
+
+```bash
+DATABASE_URL="postgresql://dummy:dummy@127.0.0.1:5432/dummy" npm run test:e2e
 ```
 
 ---

@@ -285,6 +285,85 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("この区間は採点されません。結果も返りません。")).toBeVisible();
   });
 
+  /**
+   * 分岐は「見えていたら答える」で通してしまうと、サイレントにスキップされても
+   * テストが通る。段階3'（新情報を含まない反論）と類型C（段階2を出題しない）は
+   * どちらも分岐であり、**出ることと出ないことの両方**を明示的に押さえる [D-83]。
+   *
+   * 同梱サンプル固有の項目IDを名指しするため、運用バンクが入っている環境では skip する。
+   */
+  async function selectAnchorOrSkip(page: import("@playwright/test").Page, anchorId: string) {
+    const select = page.locator("select").first();
+    await expect(select).toBeEnabled();
+    const hasOption = (await select.locator(`option[value="${anchorId}"]`).count()) > 0;
+    test.skip(!hasOption, `${anchorId} は同梱サンプル固有の項目。運用バンク環境では検証しない`);
+    await select.selectOption(anchorId);
+  }
+
+  test("段階3'（新情報を含まない反論）が設定された項目では、反論画面が必ず出る", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await selectAnchorOrSkip(page, "ANCHOR-V2-A-01");
+    await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
+
+    await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
+    // 「条件付きで採用してよい」を選ぶ
+    await page.locator("input[name='stage1']").nth(1).check();
+    await page.getByRole("button", { name: "この判断で確定する" }).click();
+
+    // この項目は類型Cではないので段階2が出る
+    await expect(page.getByText(/段階 2（懸念の所在）/)).toBeVisible();
+    await page.locator("input[name='stage2']").first().check();
+    await page.getByRole("button", { name: "次へ" }).click();
+
+    await expect(page.getByText(/段階 3（前提変化への判断更新）/)).toBeVisible();
+    await expect(page.getByText("新しい情報が入りました")).toBeVisible();
+    // 「変わらない」(0) を選ぶ
+    await page.locator("input[name='stage3']").nth(2).check();
+    await page.getByRole("button", { name: "確信度評定へ" }).click();
+
+    // 段階3': 反論画面が確かに出る
+    await expect(page.getByText(/段階 4（反論への応答）/)).toBeVisible();
+    await expect(page.getByText("AI同僚からの反論")).toBeVisible();
+    // 総段数を出していない（出すと段階3' の有無が最初から読めてしまう）
+    await expect(page.getByText(/段階 \d+ \/ \d+/)).toHaveCount(0);
+
+    // 段階3と同じ「変わらない」を選ぶ＝差分0＝保持
+    await page.locator("input[name='stage3b']").nth(2).check();
+    await page.getByRole("button", { name: "確信度評定へ" }).click();
+
+    await expect(page.getByText("確信度の自己評定（5段階）")).toBeVisible();
+    await page.getByRole("button", { name: /4\s*やや自信あり/ }).click();
+    await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
+
+    await expect(page.getByText("共通アンカー項目の記録が完了しました")).toBeVisible();
+    // 設計注記に段階3' の採点方式が出る（受検者向けではなく開発者・審査員向け）
+    await expect(page.getByText(/stage3b − stage3/)).toBeVisible();
+  });
+
+  test("類型C（仕込んだ不備が無い項目）では段階2を出題せず、段階3' も無い", async ({ page }) => {
+    await page.goto("/");
+    await selectAnchorOrSkip(page, "ANCHOR-V2-C-01");
+    await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
+
+    await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
+    // 不備が無い項目なので「そのまま採用してよい」が正答にあたる
+    await page.locator("input[name='stage1']").first().check();
+    await page.getByRole("button", { name: "この判断で確定する" }).click();
+
+    // 段階2は飛ぶ。懸念領域を問うこと自体が「不備がある」というヒントになるため
+    await expect(page.getByText(/段階 3（前提変化への判断更新）/)).toBeVisible();
+    await expect(page.locator("input[name='stage2']")).toHaveCount(0);
+
+    await page.locator("input[name='stage3']").nth(2).check();
+    await page.getByRole("button", { name: "確信度評定へ" }).click();
+
+    // この項目に段階3' は無い。確信度へ直行する
+    await expect(page.getByText("確信度の自己評定（5段階）")).toBeVisible();
+    await expect(page.locator("input[name='stage3b']")).toHaveCount(0);
+  });
+
   test("動的3ペイン対話 → CFF暫定判断 → AutoSCORE採点 → XAIレポート表示の全フローが完走する", async ({ page }) => {
     await page.goto("/");
 

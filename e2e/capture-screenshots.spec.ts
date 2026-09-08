@@ -77,6 +77,33 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       });
     });
 
+    // probe / blur は未モックのままだと DB へ抜けて例外になる（スクリーンショットが
+    // 崩れる原因になるため塞ぐ）。
+    await page.route("**/api/dialogue/probe", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          probeIssued: true,
+          probeMove: "socratic_probe",
+          evidenceTarget: "premise_articulation",
+          selectionRationale: "前提の言語化が不足しているため深掘りする",
+          mediationStateEstimate: { premise_articulation: 0.4 },
+          probesIssued: 1,
+          message: "その判断の前提を、仕様のどの記述から導きましたか。",
+        }),
+      });
+    });
+
+    await page.route("**/api/session/blur", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ success: true }),
+      });
+    });
+
     await page.route("**/api/dialogue/preliminary-judgement", async (route) => {
       await route.fulfill({
         status: 200,
@@ -172,12 +199,29 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       await capStage2.check();
       await page.getByRole("button", { name: "次へ" }).click();
     }
+    // 02b. 段階3（前提変化の注入）。SCT型の核であり、静的選択式には無かった段 [D-83]
     await expect(page.getByText(/段階 3（前提変化への判断更新）/)).toBeVisible();
-    await page.locator("input[name='stage3']").first().check();
+    await expect(page.getByText("新しい情報が入りました")).toBeVisible();
+    // 「変わらない」(0) を選ぶ。段階3' との差分を 0（保持）として見せるため
+    await page.locator("input[name='stage3']").nth(2).check();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: path.join(screenshotsDir, "02b-anchor-stage3-premise-shift.png"),
+      fullPage: true,
+    });
     await page.getByRole("button", { name: "確信度評定へ" }).click();
-    const capStage3b = page.locator("input[name='stage3b']").first();
-    if (await capStage3b.isVisible().catch(() => false)) {
-      await capStage3b.check();
+
+    // 02c. 段階3'（新情報を含まない反論）。付いている項目でだけ現れる
+    const capStage3bOptions = page.locator("input[name='stage3b']");
+    if (await capStage3bOptions.first().isVisible().catch(() => false)) {
+      await expect(page.getByText("AI同僚からの反論")).toBeVisible();
+      // 段階3と同じ「変わらない」(0) を選ぶ。差分0＝保持を撮る
+      await capStage3bOptions.nth(2).check();
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({
+        path: path.join(screenshotsDir, "02c-anchor-stage3b-pushback.png"),
+        fullPage: true,
+      });
       await page.getByRole("button", { name: "確信度評定へ" }).click();
     }
     await expect(page.getByText("確信度の自己評定（5段階）")).toBeVisible();
