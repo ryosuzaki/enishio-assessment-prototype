@@ -6,6 +6,7 @@ import {
   ScoringUnavailableError,
   SCORER_MODEL_VERSION,
   resolveConfidenceThreshold,
+  getScorerModel,
 } from "@/lib/evaluator";
 import {
   recordRating,
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
       axisId: "axis_4",
       ratingCategory: isPending ? null : scoring.rating_category,
       raterType: isPending ? "pending_human" : "llm",
-      raterId: isPending ? "awaiting-human-review" : (process.env.EVALUATOR_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5"),
+      raterId: isPending ? "awaiting-human-review" : getScorerModel(),
       scorerModelVersion: SCORER_MODEL_VERSION,
       stimulusRef: task.task_id,
       stimulusType: "generated",

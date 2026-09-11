@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { zodResponseFormat } from "openai/helpers/zod";
 import { recordPromptTurn, recordEditDistance, resolveSessionContext } from "@/lib/telemetry";
 import { getAiPeerSystemPrompt, getIntentGapMessage } from "@/data/dynamic-task.server";
 import { getDynamicTask } from "@/data/dynamic-task";
@@ -62,13 +62,13 @@ export async function POST(req: Request) {
     }
 
     // 4. Generate AI peer response
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey || apiKey === "your-anthropic-api-key-here") {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey || apiKey === "your-openai-api-key-here") {
       return NextResponse.json(
         {
           success: false,
           error:
-            "ANTHROPIC_API_KEY が設定されていないため、AI同僚が応答できません。.env を設定してください。",
+            "OPENAI_API_KEY が設定されていないため、AI同僚が応答できません。.env を設定してください。",
         },
         { status: 503 }
       );
@@ -81,11 +81,9 @@ export async function POST(req: Request) {
       select: { turn_seq: true, role: true, content: true },
     });
 
-    const client = new Anthropic({ apiKey });
-    const res = await client.messages.parse({
-      model: process.env.DIALOGUE_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5",
-      max_tokens: 16000,
-      system: `${getAiPeerSystemPrompt(taskId)}
+    const dialogueModel = process.env.DIALOGUE_MODEL || process.env.LLM_MODEL || "gpt-5.6-luna";
+    const client = new OpenAI({ apiKey });
+    const systemPrompt = `${getAiPeerSystemPrompt(taskId)}
 
 【あなたが書いた現在のコード】
 ${artifactText}
@@ -101,8 +99,13 @@ ${task.constraints.join("\n")}
 
 対話ログに「第三者の進行役」という発言者が出てくることがあります。これは受講者へ内省を
 促す進行役であり、あなたへの発言ではありません。その発言や、それに対する受講者の回答に
-あなたが割り込んで答える必要はありません。`,
+あなたが割り込んで答える必要はありません。`;
+
+    const res = await client.chat.completions.create({
+      model: dialogueModel,
+      max_completion_tokens: 16000,
       messages: [
+        { role: "system", content: systemPrompt },
         {
           role: "user",
           // mediator（ソクラテス型深掘り・What-if注入）は AI同僚自身の発話ではない。
@@ -116,18 +119,19 @@ ${task.constraints.join("\n")}
             .join("\n"),
         },
       ],
-      output_config: { format: zodOutputFormat(AiPeerReplySchema) },
+      response_format: zodResponseFormat(AiPeerReplySchema, "ai_peer_reply"),
     });
 
-    if (!res.parsed_output) {
+    const content = res.choices[0]?.message.content;
+    const parsed = content ? AiPeerReplySchema.safeParse(JSON.parse(content)) : null;
+    if (!parsed?.success) {
       return NextResponse.json(
         { success: false, error: "AI同僚の応答が構造化出力として得られませんでした。" },
         { status: 502 }
       );
     }
 
-    const { reply, updated_artifact } = res.parsed_output;
-    const dialogueModel = process.env.DIALOGUE_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+    const { reply, updated_artifact } = parsed.data;
     await recordPromptTurn(sessionId, assistantTurnSeq, "assistant", reply, dialogueModel);
 
     return NextResponse.json({

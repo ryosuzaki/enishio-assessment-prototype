@@ -49,7 +49,7 @@ export function TelemetryPanel({
           </div>
           <div className="flex justify-between py-1 border-b border-slate-800/60">
             <span className="text-slate-500">Scorer Version:</span>
-            <span className="text-slate-400 text-[10px]">configurable (claude-sonnet-4-5/extract-v5/score-v3)</span>
+            <span className="text-slate-400 text-[10px]">configurable LLM / extract-v5 / score-v3</span>
           </div>
         </div>
 

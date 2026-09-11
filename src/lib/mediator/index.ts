@@ -29,9 +29,9 @@
  * - ZPD に依拠した表現を画面・ドキュメントへ書かない（`[D-29]` `[P-12]`）。
  * - 受講者を集めて一貫性の分布を測らない（`[P-17]`）。ここは実装であって実験ではない。
  */
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { zodResponseFormat } from "openai/helpers/zod";
 
 /** 軸4のルーブリックが要求する根拠のカテゴリ。状態推定はこの単位で行う。 */
 export const EVIDENCE_TARGETS = [
@@ -100,7 +100,7 @@ export type ProbeSelection = z.infer<typeof ProbeSelectionSchema>;
 
 // メディエーターモデルの選定設定（設定ファイル / 環境変数から動的取得）
 export function getMediatorModel(): string {
-  return process.env.MEDIATOR_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+  return process.env.MEDIATOR_MODEL || process.env.LLM_MODEL || "gpt-5.6-luna";
 }
 
 export function getMediatorModelVersion(): string {
@@ -165,14 +165,14 @@ export async function selectProbe(params: {
   constraints: string[];
   probesSoFar: ProbeMove[];
 }): Promise<ProbeSelection> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey === "your-anthropic-api-key-here") {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey || apiKey === "your-openai-api-key-here") {
     throw new MediationUnavailableError(
-      "ANTHROPIC_API_KEY が設定されていないため深掘りを実行できません。.env を設定してください。"
+      "OPENAI_API_KEY が設定されていないため深掘りを実行できません。.env を設定してください。"
     );
   }
 
-  const client = new Anthropic({ apiKey });
+  const client = new OpenAI({ apiKey });
 
   const promptText = `【受講者にも提示されている業務要件】
 ${params.businessRequirements.join("\n")}
@@ -190,16 +190,25 @@ ${params.probesSoFar.length > 0 ? params.probesSoFar.join(" → ") : "（まだ1
 
 現時点の状態推定と、次に打つ手を1つ決めてください。同じ手を続けて打たないでください。`;
 
-  const res = await client.messages.parse({
+  const res = await client.chat.completions.create({
     model: getMediatorModel(),
-    max_tokens: MAX_TOKENS,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: promptText }],
-    output_config: { format: zodOutputFormat(ProbeSelectionSchema) },
+    max_completion_tokens: MAX_TOKENS,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: promptText },
+    ],
+    response_format: zodResponseFormat(ProbeSelectionSchema, "probe_selection"),
   });
 
-  if (!res.parsed_output) {
+  const content = res.choices[0]?.message.content;
+  if (!content) {
     throw new MediationUnavailableError("プローブ選択の構造化出力が得られませんでした。");
   }
-  return res.parsed_output;
+  const validated = ProbeSelectionSchema.safeParse(JSON.parse(content));
+  if (!validated.success) {
+    throw new MediationUnavailableError(
+      `プローブ選択の構造化出力がスキーマに適合しませんでした: ${validated.error.message}`
+    );
+  }
+  return validated.data;
 }

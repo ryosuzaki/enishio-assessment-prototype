@@ -35,7 +35,7 @@ function baseRatingParams(overrides: Partial<RecordRatingParams> = {}): RecordRa
     ratingCategory: 3,
     raterType: "llm",
     raterId: "rater-1",
-    scorerModelVersion: "claude-opus-5/extract-v1/score-v1",
+    scorerModelVersion: "gpt-5.6-luna/extract-v1/score-v1",
     stimulusRef: "stimulus-ref-1",
     stimulusType: "generated",
     stimulusFeatures: {},
@@ -52,7 +52,7 @@ function baseFeedbackParams(
     actorRole: "learner",
     disagreementDirection: "too_high",
     freeTextReason: "根拠が不十分だと思う",
-    scorerModelVersion: "claude-opus-5/extract-v1/score-v1",
+    scorerModelVersion: "gpt-5.6-luna/extract-v1/score-v1",
     ...overrides,
   };
 }

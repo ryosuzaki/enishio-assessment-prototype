@@ -112,7 +112,7 @@ export interface EvaluationResult {
 
 // --- Mediation (MVP 2.1 ステップ7・8: ソクラテス型深掘り・What-if注入) ---
 // src/lib/mediator/index.ts の EVIDENCE_TARGETS / PROBE_MOVES と対応する。
-// あちらはサーバ専用モジュール（`.server.ts` ではないが Anthropic SDK を使うためクライアント
+// あちらはサーバ専用モジュール（`.server.ts` ではないが LLM SDK を使うためクライアント
 // から import しない）なので、画面側の型と表示ラベルはここに複製する。
 
 export const EVIDENCE_TARGETS = [

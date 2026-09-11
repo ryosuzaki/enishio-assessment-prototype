@@ -155,7 +155,7 @@ export interface RecordRatingParams {
   ratingCategory: number | null;
   raterType: "llm" | "human" | "pending_human";
   raterId: string;
-  scorerModelVersion: string; // e.g. "claude-opus-5/extract-v1/score-v1"
+  scorerModelVersion: string; // e.g. "gpt-5.6-luna/extract-v1/score-v1"
   stimulusRef: string;
   stimulusType: "generated" | "anchor";
   anchorId?: string | null;

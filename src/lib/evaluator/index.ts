@@ -1,6 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { z } from "zod";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { zodResponseFormat } from "openai/helpers/zod";
 import { getInjectedFlaws, getRubricHint } from "@/data/dynamic-task.server";
 
 // Stage 1 Schema: Evidence Components Extraction [MVP 2.6, W4]
@@ -101,7 +101,7 @@ export function levelLabelFor(ratingCategory: number): string {
 // 採点モデルの選定設定（設定ファイル / 環境変数から動的取得）
 // 最先端水準の性能帯の中から費用対効果（コストパフォーマンス）の高いモデルを選定可能
 export function getScorerModel(): string {
-  return process.env.EVALUATOR_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5";
+  return process.env.EVALUATOR_MODEL || process.env.LLM_MODEL || "gpt-5.6-luna";
 }
 
 export function getScorerModelVersion(): string {
@@ -160,15 +160,38 @@ export class ScoringUnavailableError extends Error {
   }
 }
 
-function getClient(stage: "extract" | "score"): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey === "your-anthropic-api-key-here") {
+function getClient(stage: "extract" | "score"): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey || apiKey === "your-openai-api-key-here") {
     throw new ScoringUnavailableError(
       stage,
-      "ANTHROPIC_API_KEY が設定されていないため採点できません。.env を設定してください。"
+      "OPENAI_API_KEY が設定されていないため採点できません。.env を設定してください。"
     );
   }
-  return new Anthropic({ apiKey });
+  return new OpenAI({ apiKey });
+}
+
+/**
+ * 構造化出力の取り出し。スキーマ検証に通らなければ ScoringUnavailableError を投げる。
+ * ここで握りつぶして推測値を返すと、採点できなかったことが記録に残らなくなる。
+ */
+function parseStructured<T extends z.ZodTypeAny>(
+  content: string | null | undefined,
+  schema: T,
+  stage: "extract" | "score",
+  label: string
+): z.infer<T> {
+  if (!content) {
+    throw new ScoringUnavailableError(stage, `${label}の構造化出力が得られませんでした。`);
+  }
+  const validated = schema.safeParse(JSON.parse(content));
+  if (!validated.success) {
+    throw new ScoringUnavailableError(
+      stage,
+      `${label}の構造化出力がスキーマに適合しませんでした: ${validated.error.message}`
+    );
+  }
+  return validated.data;
 }
 
 /**
@@ -204,17 +227,19 @@ ${transcript.map((t) => `[Turn ${t.turnSeq}] ${t.role.toUpperCase()}: ${t.conten
 ${finalArtifact}
 `;
 
-  const res = await client.messages.parse({
+  const res = await client.chat.completions.create({
     model: getScorerModel(),
-    max_tokens: MAX_TOKENS,
+    max_completion_tokens: MAX_TOKENS,
     messages: [{ role: "user", content: promptText }],
-    output_config: { format: zodOutputFormat(EvidenceExtractionOutputSchema) },
+    response_format: zodResponseFormat(EvidenceExtractionOutputSchema, "evidence_extraction"),
   });
 
-  if (!res.parsed_output) {
-    throw new ScoringUnavailableError("extract", "第1段階（根拠抽出）の構造化出力が得られませんでした。");
-  }
-  return res.parsed_output;
+  return parseStructured(
+    res.choices[0]?.message.content,
+    EvidenceExtractionOutputSchema,
+    "extract",
+    "第1段階（根拠抽出）"
+  );
 }
 
 /**
@@ -252,15 +277,17 @@ ${rubricHint}
 - 判定に迷う場合は scoring_confidence を低く申告してください。低確信度の判定は人間の確認へ回されます。推測でバンドを確定させないでください。
 `;
 
-  const res = await client.messages.parse({
+  const res = await client.chat.completions.create({
     model: getScorerModel(),
-    max_tokens: MAX_TOKENS,
+    max_completion_tokens: MAX_TOKENS,
     messages: [{ role: "user", content: promptText }],
-    output_config: { format: zodOutputFormat(ScoringOutputSchema) },
+    response_format: zodResponseFormat(ScoringOutputSchema, "band_scoring"),
   });
 
-  if (!res.parsed_output) {
-    throw new ScoringUnavailableError("score", "第2段階（バンド採点）の構造化出力が得られませんでした。");
-  }
-  return res.parsed_output;
+  return parseStructured(
+    res.choices[0]?.message.content,
+    ScoringOutputSchema,
+    "score",
+    "第2段階（バンド採点）"
+  );
 }
