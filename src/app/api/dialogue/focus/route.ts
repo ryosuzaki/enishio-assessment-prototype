@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/api-error";
 import { recordVerificationFocusSequence, resolveSessionContext } from "@/lib/telemetry";
 
 /**
@@ -28,11 +29,7 @@ export async function POST(req: Request) {
       success: true,
       recordedCount: count,
     });
-  } catch (error: any) {
-    console.error("Verification focus sequence recording error:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Failed to record verification focus sequence" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return apiErrorResponse("Verification focus sequence recording error", error, "Failed to record verification focus sequence");
   }
 }

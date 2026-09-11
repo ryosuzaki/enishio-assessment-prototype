@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/api-error";
 import { recordAnchorResponse, resolveSessionContext } from "@/lib/telemetry";
 import { prisma } from "@/lib/db";
 import {
@@ -229,11 +230,7 @@ export async function POST(req: Request) {
       anchorStatus: responseRecord.anchor_status,
       scored: false,
     });
-  } catch (error: any) {
-    console.error("Anchor response error:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Failed to record anchor response" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return apiErrorResponse("Anchor response error", error, "Failed to record anchor response");
   }
 }

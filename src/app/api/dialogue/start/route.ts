@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/api-error";
 import { recordInjectedFlawMap, resolveSessionContext } from "@/lib/telemetry";
 import { getInjectedFlaws } from "@/data/dynamic-task.server";
 import { getDynamicTask } from "@/data/dynamic-task";
@@ -45,11 +46,7 @@ export async function POST(req: Request) {
       flawCount: injectedFlaws.filter((f) => f.is_flaw).length,
       normalSpanCount: injectedFlaws.filter((f) => !f.is_flaw).length,
     });
-  } catch (error: any) {
-    console.error("Dialogue start error:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Failed to start dynamic task" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return apiErrorResponse("Dialogue start error", error, "Failed to start dynamic task");
   }
 }

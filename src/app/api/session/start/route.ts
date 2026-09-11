@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/api-error";
 import { generateLearnerId, startSession } from "@/lib/telemetry";
 
 export async function POST(req: Request) {
@@ -17,11 +18,7 @@ export async function POST(req: Request) {
       sessionSeq: session.session_seq,
       startedAt: session.started_at,
     });
-  } catch (error: any) {
-    console.error("Session start error:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Failed to start session" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return apiErrorResponse("Session start error", error, "Failed to start session");
   }
 }

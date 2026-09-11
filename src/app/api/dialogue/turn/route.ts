@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/api-error";
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
@@ -140,8 +141,7 @@ ${task.constraints.join("\n")}
       updatedArtifact: updated_artifact ?? undefined,
       assistantTurnSeq,
     });
-  } catch (error: any) {
-    console.error("Dialogue turn error:", error);
-    return NextResponse.json({ success: false, error: error.message || "Turn error" }, { status: 500 });
+  } catch (error: unknown) {
+    return apiErrorResponse("Dialogue turn error", error, "Turn error");
   }
 }

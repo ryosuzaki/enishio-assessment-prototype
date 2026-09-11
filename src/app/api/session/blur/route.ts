@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/api-error";
 import { accumulateWindowBlurDuration, resolveSessionContext } from "@/lib/telemetry";
 
 /**
@@ -28,12 +29,8 @@ export async function POST(req: Request) {
     await accumulateWindowBlurDuration(sessionId, deltaSec);
 
     return NextResponse.json({ success: true, recorded: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // 記録専用の副次的なテレメトリである。失敗してもセッションは続行させる。
-    console.error("Window blur telemetry error:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Failed to record blur duration" },
-      { status: 500 }
-    );
+    return apiErrorResponse("Window blur telemetry error", error, "Failed to record blur duration");
   }
 }

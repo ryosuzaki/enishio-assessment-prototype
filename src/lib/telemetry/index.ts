@@ -1,4 +1,5 @@
 import { prisma } from "../db";
+import { prismaErrorCode } from "@/lib/error-message";
 import { v5 as uuidv5 } from "uuid";
 
 // Enishio standard namespace for learner_id generation [D-28, D-42]
@@ -42,9 +43,9 @@ export async function startSession(learnerId: string) {
         session_seq: session.session_seq,
         started_at: session.started_at,
       };
-    } catch (e: any) {
+    } catch (e: unknown) {
       // P2002 = unique constraint violation on (learner_id, session_seq)
-      if (e?.code !== "P2002") throw e;
+      if (prismaErrorCode(e) !== "P2002") throw e;
     }
   }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/api-error";
 import { recordPreliminaryJudgement, resolveSessionContext } from "@/lib/telemetry";
 
 /**
@@ -52,11 +53,7 @@ export async function POST(req: Request) {
       action: record.action,
       recordedAt: record.created_at,
     });
-  } catch (error: any) {
-    console.error("Preliminary judgement recording error:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Failed to record preliminary judgement" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return apiErrorResponse("Preliminary judgement recording error", error, "Failed to record preliminary judgement");
   }
 }

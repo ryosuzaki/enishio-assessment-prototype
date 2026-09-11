@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/api-error";
 import {
   extractEvidence,
   computeBandScore,
@@ -118,20 +119,15 @@ export async function POST(req: Request) {
       probeConsistency: evidence.probe_consistency ?? null,
       scorerModelVersion: SCORER_MODEL_VERSION,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof ScoringUnavailableError) {
       // 採点できないときに推測値で埋めない。埋めると「LLMが採点した」という
       // 偽のログが ratings に残り、scorer_model_version による追跡可能性が崩れる。
-      console.error(`Scoring unavailable at stage '${error.stage}':`, error.message);
-      return NextResponse.json(
-        { success: false, error: error.message, stage: error.stage, scoringUnavailable: true },
-        { status: 503 }
-      );
+      return apiErrorResponse(`Scoring unavailable at stage '${error.stage}'`, error, "Evaluation failed", {
+        status: 503,
+        extra: { stage: error.stage, scoringUnavailable: true },
+      });
     }
-    console.error("Evaluation error:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Evaluation failed" },
-      { status: 500 }
-    );
+    return apiErrorResponse("Evaluation error", error, "Evaluation failed");
   }
 }

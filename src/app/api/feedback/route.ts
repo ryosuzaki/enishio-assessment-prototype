@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/api-error";
 import {
   recordScoreFeedback,
   resolveSessionContext,
@@ -53,11 +54,7 @@ export async function POST(req: Request) {
       feedbackId: feedback.feedback_id,
       recordedAt: feedback.created_at,
     });
-  } catch (error: any) {
-    console.error("Score feedback error:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Failed to record score feedback" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return apiErrorResponse("Score feedback error", error, "Failed to record score feedback");
   }
 }

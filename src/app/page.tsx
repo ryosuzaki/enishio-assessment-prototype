@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { messageOf } from "@/lib/error-message";
 import { DYNAMIC_TASKS, getDynamicTask } from "@/data/dynamic-task";
 import { levenshtein } from "@/lib/edit-distance";
 import type {
@@ -122,7 +123,7 @@ export default function AssessmentPrototypePage() {
           );
         }
       })
-      .catch((e) => setErrorMessage("アンカー項目の取得に失敗しました: " + e.message));
+      .catch((e) => setErrorMessage("アンカー項目の取得に失敗しました: " + messageOf(e)));
   }, []);
 
   // URLクエリによる初期タブの反映（?tab=dashboard / ?tab=learner / ?tab=session）
@@ -231,8 +232,8 @@ export default function AssessmentPrototypePage() {
       } else {
         setErrorMessage(data.error ?? "セッションを開始できませんでした。");
       }
-    } catch (e: any) {
-      setErrorMessage("セッション開始エラー: " + e.message);
+    } catch (e: unknown) {
+      setErrorMessage("セッション開始エラー: " + messageOf(e));
     } finally {
       setIsSubmitting(false);
     }
@@ -335,8 +336,8 @@ export default function AssessmentPrototypePage() {
       } else {
         setErrorMessage("アンカー記録エラー: " + data.error);
       }
-    } catch (e: any) {
-      setErrorMessage("送信エラー: " + e.message);
+    } catch (e: unknown) {
+      setErrorMessage("送信エラー: " + messageOf(e));
     } finally {
       setIsSubmitting(false);
     }
@@ -361,8 +362,8 @@ export default function AssessmentPrototypePage() {
         setErrorMessage("課題開始エラー: " + data.error);
         return;
       }
-    } catch (e: any) {
-      setErrorMessage("課題開始エラー: " + e.message);
+    } catch (e: unknown) {
+      setErrorMessage("課題開始エラー: " + messageOf(e));
       return;
     }
 
@@ -458,8 +459,8 @@ export default function AssessmentPrototypePage() {
           await runMediationProbe(nextTurn, historyWithAssistant);
         }
       }
-    } catch (e: any) {
-      setErrorMessage("対話送信エラー: " + e.message);
+    } catch (e: unknown) {
+      setErrorMessage("対話送信エラー: " + messageOf(e));
     } finally {
       setIsSubmitting(false);
     }
@@ -502,8 +503,8 @@ export default function AssessmentPrototypePage() {
       } else {
         addTelemetry(`Mediation: no probe needed (${data.reason ?? data.probeMove})`);
       }
-    } catch (e: any) {
-      addTelemetry(`Mediation probe request failed: ${e.message}`);
+    } catch (e: unknown) {
+      addTelemetry(`Mediation probe request failed: ${messageOf(e)}`);
     } finally {
       setIsProbing(false);
     }
@@ -637,8 +638,8 @@ export default function AssessmentPrototypePage() {
       } else {
         setErrorMessage("評価エラー: " + data.error);
       }
-    } catch (e: any) {
-      setErrorMessage("評価リクエスト失敗: " + e.message);
+    } catch (e: unknown) {
+      setErrorMessage("評価リクエスト失敗: " + messageOf(e));
     } finally {
       setIsEvaluating(false);
     }
@@ -670,8 +671,8 @@ export default function AssessmentPrototypePage() {
         setDisputeSubmitted(true);
         addTelemetry(`Score dispute recorded in score_feedback (ID: ${data.feedbackId.slice(0, 8)}...)`);
       }
-    } catch (e: any) {
-      setErrorMessage("異議申立エラー: " + e.message);
+    } catch (e: unknown) {
+      setErrorMessage("異議申立エラー: " + messageOf(e));
     }
   };
 

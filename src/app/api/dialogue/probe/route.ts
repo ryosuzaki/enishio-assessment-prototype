@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorResponse } from "@/lib/api-error";
 import {
   selectProbe,
   MediationUnavailableError,
@@ -111,20 +112,15 @@ export async function POST(req: Request) {
       probeTurnSeq: turnSeq,
       probesSoFar: probesSoFar.length + 1,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof MediationUnavailableError) {
       // 深掘りできないときに定型文で埋めない。埋めると mediation_probes に
       // 「モデルが選んだ手」ではないログが残り、媒介方針の追跡可能性が崩れる。
-      console.error("Mediation unavailable:", error.message);
-      return NextResponse.json(
-        { success: false, error: error.message, mediationUnavailable: true },
-        { status: 503 }
-      );
+      return apiErrorResponse("Mediation unavailable", error, "Probe selection failed", {
+        status: 503,
+        extra: { mediationUnavailable: true },
+      });
     }
-    console.error("Probe selection error:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Probe selection failed" },
-      { status: 500 }
-    );
+    return apiErrorResponse("Probe selection error", error, "Probe selection failed");
   }
 }
