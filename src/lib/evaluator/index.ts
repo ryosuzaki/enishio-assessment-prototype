@@ -117,7 +117,7 @@ export const SCORER_MODEL_VERSION = getScorerModelVersion();
 export const HITL_CONFIDENCE_THRESHOLD = 0.7;
 
 /**
- * デモ用の閾値上書き。二次審査等で `pending_human` 経路を意図的に実演するためのもの。
+ * デモ用の閾値上書き。デモの場で `pending_human` 経路を意図的に実演するためのもの。
  *
  * `scoring_confidence`（モデルの自己申告値）そのものは一切改変しない。変わるのは
  * 「確定させるかどうか」を決める運用パラメータ側だけである。**推測で保留を装う

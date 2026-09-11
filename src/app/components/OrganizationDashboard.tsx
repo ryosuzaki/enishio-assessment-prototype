@@ -332,7 +332,20 @@ export function OrganizationDashboard({
         </div>
       )}
 
-      {/* KPI Cards Grid (4 Cards - Verifiable Real Metrics) */}
+      {/*
+        この画面に並ぶ受講者・組織の数値はすべてダミー値である。稼働実績ではない。
+        本プロトタイプの目的は B2B SaaS としての画面設計（Viability）を示すことであり、
+        効果量の測定は採択後の PoC で行う。実際に動く評価エンジンは「実務演習セッション」側にある。
+      */}
+      <div className="p-3.5 rounded-xl bg-slate-900/80 border border-amber-600/30 text-amber-200/90 text-xs flex items-start gap-2">
+        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-px" />
+        <span>
+          本画面はモックUIです。受講者名・受講状況・各指標はすべて画面設計を示すためのダミー値であり、稼働実績ではありません。
+          実際に動作する評価エンジンは「実務演習セッション」タブでご確認いただけます。
+        </span>
+      </div>
+
+      {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Completion */}
         <div className="glass-panel p-5 rounded-xl border border-slate-800 bg-slate-900/60 relative overflow-hidden">
@@ -624,12 +637,15 @@ export function OrganizationDashboard({
                   バイアス克服・教育成果（Before / After）
                 </h3>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                実測データ
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                ダミー値
               </span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              受講者全員の初期演習（初回〜2回目）と直近演習の比較。AI出力を批判的に検証する行動が確実に定着しています。
+              受講者全員の初期演習（初回〜2回目）と直近演習の比較を想定した画面です。AI出力を批判的に検証する行動の定着を、この形で提示します。
+            </p>
+            <p className="text-[11px] text-amber-300/80 leading-relaxed border border-amber-500/20 bg-amber-500/5 rounded-lg px-3 py-2">
+              本カードの数値は画面設計を示すためのダミー値であり、実測値ではありません。効果量の測定は採択後のPoCで行います。
             </p>
 
             <div className="space-y-3.5 pt-1">

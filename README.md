@@ -6,7 +6,7 @@
 
 > 📌 **ドキュメント案内**:
 > 本書は本プロトタイプの全体像、画面構成、設計上の判断、動作手順を網羅したドキュメントです。
-> 未踏事業期間中に開発する本番SaaS全体の仕様は `products/enishio-education/docs/AIアセスメントMVP定義書.md`、設計決定の経緯は `products/enishio-education/docs/設計決定記録.md` を参照してください。
+> 本格開発フェーズで構築する本番SaaS全体の仕様は `products/enishio-education/docs/AIアセスメントMVP定義書.md`、設計決定の経緯は `products/enishio-education/docs/設計決定記録.md` を参照してください。
 
 ---
 

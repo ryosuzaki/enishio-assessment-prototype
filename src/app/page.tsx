@@ -720,7 +720,7 @@ export default function AssessmentPrototypePage() {
 
         <div className="text-xs text-slate-500 hidden xl:flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-          <span>審査用2層構造プロトタイプ [D-79]</span>
+          <span>2層構造プロトタイプ（Viability / Feasibility）</span>
         </div>
       </div>
 

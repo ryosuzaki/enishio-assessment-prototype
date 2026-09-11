@@ -270,6 +270,15 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
         </div>
       </div>
 
+      {/* この画面の受講者名・スコア・履歴はすべてダミー値である。稼働実績ではない。 */}
+      <div className="p-3.5 rounded-xl bg-slate-900/80 border border-amber-600/30 text-amber-200/90 text-xs flex items-start gap-2">
+        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-px" />
+        <span>
+          本画面はモックUIです。受講者名・各領域のスコア・演習履歴はすべて画面設計を示すためのダミー値であり、稼働実績ではありません。
+          実際に動作する評価エンジンは「実務演習セッション」タブでご確認いただけます。
+        </span>
+      </div>
+
       {/* Psychological Safety & Autonomy Notice Banner */}
       <div className="p-4 rounded-xl bg-indigo-950/25 border border-indigo-500/30 flex items-start gap-3 text-xs text-slate-300 leading-relaxed">
         <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
