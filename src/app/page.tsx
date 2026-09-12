@@ -677,7 +677,7 @@ export default function AssessmentPrototypePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="max-w-[1536px] mx-auto px-4 sm:px-6 lg:px-6 py-8 space-y-6">
       {/* 2-Layer Navigation Tab Bar ([D-79]: Viability & Feasibility) */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
         <div className="flex flex-wrap items-center gap-2 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
@@ -748,9 +748,9 @@ export default function AssessmentPrototypePage() {
 
       {/* Tab 3: Core Evaluation Session (Vertical Cut) */}
       {activeTab === "session" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Main Content Area */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-8 xl:col-span-9 space-y-6 min-w-0">
             <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
 
           {/* STEP 0: Initialization */}
@@ -868,7 +868,7 @@ export default function AssessmentPrototypePage() {
         </div>
 
         {/* Right Column: Live Telemetry Monitor & System Architecture */}
-        <div className="space-y-6">
+        <div className="lg:col-span-4 xl:col-span-3 space-y-6 min-w-0">
           <TelemetryPanel
             learnerId={learnerId}
             sessionId={sessionId}

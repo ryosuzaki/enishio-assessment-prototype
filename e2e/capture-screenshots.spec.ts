@@ -86,12 +86,19 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
         body: JSON.stringify({
           success: true,
           probeIssued: true,
-          probeMove: "socratic_probe",
-          evidenceTarget: "premise_articulation",
-          selectionRationale: "前提の言語化が不足しているため深掘りする",
-          mediationStateEstimate: { premise_articulation: 0.4 },
-          probesIssued: 1,
-          message: "その判断の前提を、仕様のどの記述から導きましたか。",
+          probeMove: "trace_grounding",
+          probeText: "その判断の前提（SPOFリスク）を、仕様のどの記述およびコードのどの箇所から導きましたか。",
+          stateEstimate: [
+            { target: "premise_articulation", status: "partial", basis: "単一障害点への言及はあるが根拠仕様の特定が途上" },
+            { target: "tradeoff_reasoning", status: "not_elicited", basis: "可用性と一貫性のトレードオフは未言及" },
+            { target: "requirement_grounding", status: "elicited", basis: "PCI DSS要件と耐障害性要件を名指しで引用" },
+            { target: "normal_span_discrimination", status: "not_elicited", basis: "正常箇所の弁別は未実施" },
+            { target: "robustness_under_changed_premise", status: "not_elicited", basis: "前提変化時の挙動検証は未実施" },
+          ],
+          selectionRationale: "前提の言語化と要件紐づけをさらに深掘りするため、根拠の文脈を問う手を選択",
+          mediatorModelVersion: "claude-sonnet-4-5/probe-v1",
+          probeTurnSeq: 3,
+          probesSoFar: 1,
         }),
       });
     });
@@ -259,6 +266,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     );
     await page.getByRole("button", { name: "送信" }).click();
     await expect(page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時")).toBeVisible();
+    await expect(page.getByText("その判断の前提（SPOFリスク）を、仕様のどの記述")).toBeVisible();
 
     // 04. 3ペイン対話画面 (3-Pane Dialogue)
     await page.evaluate(() => window.scrollTo(0, 0));

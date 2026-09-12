@@ -14,6 +14,23 @@ export interface DynamicTaskStimulusFeatures {
   injected_flaw_types: ("type_A" | "type_B" | "type_C")[];
 }
 
+export interface ContextDocument {
+  id: string;
+  title: string;
+  type: "slack" | "memo" | "incident";
+  source: string;
+  timestamp: string;
+  content: string;
+}
+
+export interface PrDescription {
+  title: string;
+  author: string;
+  branch: string;
+  summary: string;
+  changes: string[];
+}
+
 export interface DynamicTaskScenario {
   task_id: string;
   title: string;
@@ -23,6 +40,8 @@ export interface DynamicTaskScenario {
   scenario_intro: string;
   business_requirements: string[];
   constraints: string[];
+  pr_description?: PrDescription;
+  context_documents?: ContextDocument[];
   initial_ai_draft: string;
   /** D-24: EIRM較正の入力となる特徴量ベクトル X */
   stimulus_features: DynamicTaskStimulusFeatures;
@@ -46,6 +65,38 @@ AI同僚（AIエージェント）が作成した「決済APIのエンドポイ�
       "セキュリティ基準: PCI DSS準拠のため、権限剥奪の伝播遅延（結果整合性の放置）は重大違反となる",
       "高可用性: 決済サーバーがRedisの単一障害点（SPOF）で共倒れしてはならない",
     ],
+    pr_description: {
+      title: "feat(auth): 決済APIのレート制限導入と署名検証のインメモリ高速化",
+      author: "AI-Peer (Backend Assistant)",
+      branch: "feature/payment-rate-limit-opt",
+      summary:
+        "決済APIの急増するトラフィックに対応するため、Redisを用いたスライディングウィンドウ型レートリミットを導入しました。またDB負荷軽減のため、JWT署名検証をローカル公開鍵方式に切り替えて高スループットを実現しています。",
+      changes: [
+        "Expressミドルウェアによるトークン検証とレートリミットの一元化",
+        "加盟店別のアクセス頻度制御（一般: 60 req/min, 加盟店: 1000 req/min）",
+        "暗号化キーローテーション時のダウンタイムを避けるための後方互換性サポート",
+      ],
+    },
+    context_documents: [
+      {
+        id: "slack-payment-security",
+        title: "#dev-payment-security 議論スレッド",
+        type: "slack",
+        source: "Slack (社内チャンネル)",
+        timestamp: "昨日 16:42",
+        content:
+          "セキュリティ推進室（安田）: 来月のPCI DSS監査に向け、トークン失効（強制ログアウトや不正検知）の即時反映が必須要件になります。失効フラグの伝播遅延は重大な不備とみなされるので、API側で確実に失効状態を検知できるようにしてください。\n\nインフラSRE（高橋）: 承知しました。ただし決済APIは絶対に止められないので、Redisクラスタがフェイルオーバーや瞬断を起こした際でも、API全体が共倒れして500で落ちない耐障害性（フォールバック設計）をお願いします！",
+      },
+      {
+        id: "memo-pci-dss",
+        title: "PCI DSS v4.0 要件抜粋メモ",
+        type: "memo",
+        source: "社内セキュリティポータル",
+        timestamp: "2026-03-01",
+        content:
+          "【要件 8.3.4】特権アクセスまたはカード会員データ環境へのセッション無効化・失効は、すべての接続ノードへ即時に適用されなければならない。失効後の猶予期間（結果整合性の放置）は認められない。",
+      },
+    ],
     initial_ai_draft: `// AI同僚が生成した決済APIミドルウェア（初版ドラフト）
 import { Request, Response, NextFunction } from "express";
 import Redis from "ioredis";
@@ -61,13 +112,13 @@ export async function paymentSecurityMiddleware(req: Request, res: Response, nex
   }
 
   try {
-    // 【A】トークン検証: DB負荷軽減のため、JWT署名のみをローカル検証し、Redis/DBでの失効チェックはスキップ（キャッシュTTL 24時間扱い）
+    // トークン検証: JWT署名検証による高速化（署名確認のみ実施）
     const decoded = verifyJwtSignatureOnly(token);
     if (!decoded) {
       return res.status(401).json({ error: "Invalid signature" });
     }
 
-    // 【B】レートリミット制御: インメモリRedisでスライディングウィンドウを管理
+    // レートリミット制御: Redisスライディングウィンドウ
     const limit = merchantId ? 1000 : 60;
     const currentRequests = await redis.incr(\`rate:\${decoded.userId}\`);
     if (currentRequests === 1) {
@@ -77,26 +128,23 @@ export async function paymentSecurityMiddleware(req: Request, res: Response, nex
       return res.status(429).json({ error: "Rate limit exceeded" });
     }
 
-    // 【C】暗号化キーのローテーション対応: 過去2世代のキーIDを許容するフェイルセーフ設計
+    // 暗号化キーのローテーション対応: 過去2世代のキーバージョンを許容
     const keyId = req.headers["x-key-version"] || "v1";
     req.cryptoContext = { keyId, verifiedUser: decoded.userId };
 
     next();
   } catch (error) {
-    // 【D】Redisまたはネットワーク障害時: 全リクエストを一律500エラーで落とす
     console.error("Security middleware critical error:", error);
     return res.status(500).json({ error: "Internal Security Service Unavailable" });
   }
 }
 
 function verifyJwtSignatureOnly(token: string) {
-  // ローカル公開鍵での署名検証のみ実行（ブラックリストDBは見ない）
+  // ローカル公開鍵での署名検証のみ実行
   return { userId: "user-12345", role: "merchant" };
 }`,
     stimulus_features: {
       variable_count: 5,
-      // トークン失効伝播・レート制限差別化・Redis単一障害点への対処という3方向の要件が
-      // 互いに緊張関係（セキュリティ厳格化 vs 可用性維持）を持つため高め（4）に設定。
       tradeoff_complexity: 4,
       jargon_density: "high",
       injected_flaw_types: ["type_B", "type_A", "type_C"],
@@ -119,6 +167,38 @@ AI同僚（AIエージェント）が作成した「注文キャンセル・返�
       "在庫制約: セール期間中のピーク時は同一商品への同時アクセス（購入・キャンセル・返金）が多発する",
       "会計監査要件: 返金処理は監査証跡のため冪等性（同一イベントの再処理で二重処理が起きないこと）が必須",
     ],
+    pr_description: {
+      title: "feat(order): 注文キャンセル・非同期返金パイプラインと在庫復元ハンドラの実装",
+      author: "AI-Peer (E-Commerce Specialist)",
+      branch: "feature/order-cancellation-pipeline",
+      summary:
+        "セール時の大量キャンセルに対応するため、返金処理を非同期キューへ分離し、クライアントへのレスポンス速度（202 Accepted）を劇的に改善しました。決済確定前の早すぎる在庫復元による二重販売も防ぐ設計としています。",
+      changes: [
+        "二重キャンセル受付を防ぐステータスチェックの追加",
+        "返金処理の非同期キュー（refundQueue）化による高負荷時レイテンシ低減",
+        "決済プロバイダからの返金確定Webhook受信ハンドラ（在庫復元）の追加",
+      ],
+    },
+    context_documents: [
+      {
+        id: "incident-black-friday",
+        title: "前四半期セール障害報告書（抜粋）",
+        type: "incident",
+        source: "障害管理システム JIRA-INC-4091",
+        timestamp: "2026-06-15",
+        content:
+          "【事象】アクセス集中時にWebhookの再送が重なり、同一注文に対して在庫が二重に復元される（オーバーカウント）事象が38件発生した。\n【原因】Webhook受信時の在庫取得（SELECT）と加算更新（UPDATE）がトランザクション制御されておらず、並行処理で競合が発生したため。\n【是正指示】在庫更新処理はアトミックなトランザクションまたは楽観的ロックを適用すること。また外部API失敗時のキュー監視とリトライが不可欠。",
+      },
+      {
+        id: "slack-finance",
+        title: "#biz-accounting 問い合わせ",
+        type: "slack",
+        source: "Slack",
+        timestamp: "先週 11:20",
+        content:
+          "経理（佐藤）: 返金処理の失敗が検知されないまま放置されると、月次決算で重大な残高差異になります。キューに投入した返金が万が一落ちた場合、誰にも気づかれないサイレントロストだけは絶対に避けてください（リトライ・デッドレター・アラートの完備）。",
+      },
+    ],
     initial_ai_draft: `// AI同僚が生成した注文キャンセル・返金処理API（初版ドラフト）
 import { Request, Response } from "express";
 import { db } from "./db";
@@ -131,20 +211,18 @@ export async function cancelOrderHandler(req: Request, res: Response) {
   if (!order) {
     return res.status(404).json({ error: "Order not found" });
   }
-  // 二重キャンセル・二重返金の防止: 既に処理中/処理済みなら受け付けない
+  // 二重キャンセル・二重返金の防止ガード
   if (order.status === "cancelling" || order.status === "cancelled" || order.status === "refunded") {
     return res.status(409).json({ error: "Order is already being cancelled or refunded" });
   }
 
-  // 【A】決済確定前に在庫を戻すと二重販売につながるため、在庫復元は行わず、
-  // 注文ステータスのみ「キャンセル受付済み」に更新する。在庫復元は返金確定Webhook受信時に行う。
+  // 決済確定前の二重販売を防止するため、注文ステータスのみ更新（在庫復元はWebhook受信時に実行）
   await db.orders.update({
     where: { id: orderId },
     data: { status: "cancelling" },
   });
 
-  // 【B】返金処理は決済プロバイダAPIへの外部リクエストを含み時間がかかるため、
-  // レスポンスをブロックしないよう非同期キューへ投入し、この場では202を即座に返す
+  // レスポンス遅延を防ぐため、外部決済APIへの返金要求を非同期キューへ投入
   refundQueue.push({ orderId, amount: order.totalAmount });
 
   return res.status(202).json({
@@ -159,11 +237,10 @@ export async function refundConfirmedWebhookHandler(req: Request, res: Response)
 
   const order = await db.orders.findUnique({ where: { id: orderId } });
   if (!order || order.status !== "cancelling") {
-    // 想定外の注文状態でのWebhookは無視する（リトライ配信等での重複到達を許容する意図）
     return res.status(200).json({ received: true, skipped: true });
   }
 
-  // 【C】在庫復元: 対象商品ごとに現在庫を読み取り、注文数量を加算して書き戻す
+  // 在庫復元処理: 各商品の数量を加算
   for (const item of items) {
     const product = await db.products.findUnique({ where: { id: item.productId } });
     const restoredStock = product.stock + item.quantity;
@@ -182,8 +259,6 @@ export async function refundConfirmedWebhookHandler(req: Request, res: Response)
 }`,
     stimulus_features: {
       variable_count: 5,
-      // 「即座の在庫復元」を素朴に読むと要件1と矛盾しかねない設計判断（決済確定待ち）が
-      // 絡むため中程度（3）。トレードオフの軸自体はFinTechタスクより少ない。
       tradeoff_complexity: 3,
       jargon_density: "medium",
       injected_flaw_types: ["type_B", "type_A", "type_C"],
@@ -206,6 +281,29 @@ AI同僚（AIエージェント）が作成した「問い合わせ内容をロ�
       "情報セキュリティ基準: エラー発生時であっても、内部システムの構成情報（DB接続文字列・内部エンドポイント名等）を外部（エンドユーザー）に開示してはならない",
       "可観測性要件: 本番環境のログは障害調査に使える粒度を維持しつつ、機微情報の露出を最小化すること",
     ],
+    pr_description: {
+      title: "feat(logging): 社内ヘルプデスク向け問い合わせロギングとエラーハンドラの刷新",
+      author: "AI-Peer (Internal DX Assistant)",
+      branch: "feature/helpdesk-logging-middleware",
+      summary:
+        "問い合わせ対応のトレーサビリティ向上のため、監査用ログストアへの記録ミドルウェアを追加しました。また本番ログのノイズ低減とエラー時の迅速な一次切り分けのため、詳細なエラートレースをレスポンスに含めるようにしました。",
+      changes: [
+        "リクエストごとのユーザーID・問い合わせ本文の永続化",
+        "本番ログにおけるdebug抑制とinfo出力によるログ肥大化防止",
+        "エラーハンドラによる詳細コンテキストの返却",
+      ],
+    },
+    context_documents: [
+      {
+        id: "memo-security-privacy",
+        title: "個人情報保護・情報セキュリティ運用規定 ガイドライン",
+        type: "memo",
+        source: "社内コンプライアンス委員会",
+        timestamp: "2026-04-10",
+        content:
+          "【第4条 個人情報のログ記録】問い合わせ内容に個人情報が含まれる場合、ログへの平文出力は厳禁とし、適切なマスキングまたはハッシュ化を行うこと。また、保存期間（90日）を超過したデータは自動パージされなければならない。\n【第7条 エラー画面の開示範囲】利用者に返却するエラー画面に、スタックトレース・内部DB構造・サーバーパス・環境変数を表示することは重大な情報漏洩リスクに該当するため禁止する。",
+      },
+    ],
     initial_ai_draft: `// AI同僚が生成した問い合わせロギングミドルウェア（初版ドラフト）
 import { Request, Response, NextFunction } from "express";
 import { logStore } from "./log-store";
@@ -215,8 +313,7 @@ export function inquiryLoggingMiddleware(req: Request, res: Response, next: Next
   const inquiryText = req.body?.message ?? "";
   const userId = req.headers["x-user-id"] as string | undefined;
 
-  // 【A】障害調査のトレーサビリティ確保のため、問い合わせ本文を含む詳細ログを
-  // 監査用の永続ログストアへそのまま記録する（保持期間: logStore側のポリシーに従う）
+  // 障害調査・問い合わせ履歴追跡のための詳細永続化
   logStore.write({
     timestamp: new Date().toISOString(),
     userId: userId ?? "anonymous",
@@ -224,8 +321,7 @@ export function inquiryLoggingMiddleware(req: Request, res: Response, next: Next
     userAgent: req.headers["user-agent"],
   });
 
-  // 【B】アプリケーションログ（可観測性用）は本番環境ではinfoレベルに絞って出力する
-  // （debugレベルには内部変数のダンプが含まれるため本番では抑制する）
+  // 本番環境のアプリケーションログ出力（可観測性用）
   logger.info("Inquiry received", { userId: userId ?? "anonymous", length: inquiryText.length });
 
   next();
@@ -234,8 +330,7 @@ export function inquiryLoggingMiddleware(req: Request, res: Response, next: Next
 export function inquiryErrorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
   console.error("Inquiry handling error:", err);
 
-  // 【C】原因調査を迅速化するため、エラー発生時はスタックトレースと内部エラー情報を
-  // そのままレスポンスボディに含めて返す
+  // 原因調査の迅速化のため、エラー詳細をレスポンスに含めて返却
   return res.status(500).json({
     error: "Internal error occurred",
     message: err.message,
@@ -245,8 +340,6 @@ export function inquiryErrorHandler(err: Error, req: Request, res: Response, nex
 }`,
     stimulus_features: {
       variable_count: 5,
-      // 「十分なログ」と「個人情報保護」という2方向の要求が直接的に緊張するが、
-      // FinTechタスクほど多方向の可用性トレードオフは絡まないため中程度（3）。
       tradeoff_complexity: 3,
       jargon_density: "medium",
       injected_flaw_types: ["type_B", "type_A", "type_C"],

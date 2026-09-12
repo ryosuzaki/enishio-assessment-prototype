@@ -77,7 +77,7 @@ export function MediationStatePanel({
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
             {stateEstimate.map((t) => {
               const style = STATUS_STYLE[t.status];
               const Icon = style.Icon;

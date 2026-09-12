@@ -33,7 +33,7 @@ export function TelemetryPanel({
         <div className="space-y-2 text-xs font-mono">
           <div className="flex justify-between py-1 border-b border-slate-800/60">
             <span className="text-slate-500">Learner ID:</span>
-            <span className="text-slate-300 truncate max-w-[160px]" title={learnerId}>
+            <span className="text-slate-300 truncate max-w-[200px]" title={learnerId}>
               {learnerId ? learnerId.slice(0, 16) + "..." : "Not initialized"}
             </span>
           </div>
@@ -57,7 +57,7 @@ export function TelemetryPanel({
           <div className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
             Telemetry Event Stream
           </div>
-          <div className="h-60 overflow-y-auto bg-slate-950/90 p-3 rounded-lg border border-slate-800/80 font-mono text-[11px] text-slate-300 space-y-1.5">
+          <div className="h-[270px] overflow-y-auto bg-slate-950/90 p-3 rounded-lg border border-slate-800/80 font-mono text-[11px] text-slate-300 space-y-1.5">
             {telemetryLog.length === 0 ? (
               <div className="text-slate-600 italic">待機中... セッションを開始するとイベントが記録されます</div>
             ) : (

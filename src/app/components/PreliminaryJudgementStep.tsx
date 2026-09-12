@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Quote,
   ShieldCheck,
+  MessageSquare,
 } from "lucide-react";
 import type { ChatMessage } from "../types";
 
@@ -48,64 +49,25 @@ export function PreliminaryJudgementStep({
       .slice(-3);
   }, [chatHistory]);
 
-  // Structured mirroring points by task domain [D-80]
-  const domainPoints = useMemo(() => {
-    if (taskId.includes("FINTECH") || taskId.includes("fintech")) {
-      return [
-        {
-          num: "①",
-          title: "耐障害性・単一障害点（SPOF）脆弱性の指摘",
-          detail: "Redis瞬断時に全APIが500エラーとなる設計の不備を指摘し、DB直接フェイルオーバー等のフォールバック機構を要請。",
-        },
-        {
-          num: "②",
-          title: "セキュリティ基準（PCI DSS）失効確認の是正",
-          detail: "JWTのローカル署名検証のみで失効DB照合をスキップしている点を看破し、不正通過リスクの排除を指示。",
-        },
-        {
-          num: "③",
-          title: "過去世代キー許容によるゼロダウンタイム移行の妥当性評価",
-          detail: "安全な鍵ローテーション手順としての正当な互換パスを過剰指摘せず、正しく許容・評価。",
-        },
-      ];
+  // Dynamically synthesize points actually raised by the learner [D-80] (No spoilers of unmentioned flaws)
+  const synthesizedPoints = useMemo(() => {
+    const userMessages = chatHistory.filter((m) => m.role === "user");
+    if (userMessages.length === 0) {
+      return [];
     }
-    if (taskId.includes("ECOMMERCE") || taskId.includes("ecommerce")) {
-      return [
-        {
-          num: "①",
-          title: "非同期キュー投入失敗時の監視・リトライ欠落の指摘",
-          detail: "返金キューへのpublish失敗時にイベントが消失し二重返金・未返金となるリスクを摘発。",
-        },
-        {
-          num: "②",
-          title: "在庫引当・キャンセルのRace Condition是正",
-          detail: "非アトミックな在庫確認・更新処理に対するトランザクション制御の導入を指示。",
-        },
-        {
-          num: "③",
-          title: "決済確定前の在庫即時復元防止設計の承認",
-          detail: "決済ゲートウェイ応答待ち状態での即時復元をブロックする正当な防御ロジックを認識。",
-        },
-      ];
-    }
-    return [
-      {
-        num: "①",
-        title: "エラーレスポンスにおける内部コンテキスト漏洩の指摘",
-        detail: "スタックトレースやDB接続情報がクライアントへ露出する情報漏洩脆弱性を摘発。",
-      },
-      {
-        num: "②",
-        title: "個人情報（PII）の無マスキング永続化是正",
-        detail: "ログ集約基盤へ平文で個人情報が書き込まれる設計を是正し、マスキング処理を指示。",
-      },
-      {
-        num: "③",
-        title: "本番環境でのdebugログ抑制トレードオフの承認",
-        detail: "ログ肥大化とディスクI/O逼迫を防ぐ正当なフィルタリング設計を過剰指摘せず承認。",
-      },
-    ];
-  }, [taskId]);
+    return userMessages.map((msg, idx) => {
+      const content = msg.content.trim();
+      const firstLine = content.split("\n")[0];
+      const title = firstLine.length > 50 ? firstLine.slice(0, 50) + "…" : firstLine;
+      const turnSeq = msg.turnSeq ?? (idx + 1) * 2 - 1;
+      return {
+        num: `指摘 #${idx + 1}`,
+        turnSeq,
+        title,
+        detail: content,
+      };
+    });
+  }, [chatHistory]);
 
   return (
     <div className="glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/80 shadow-2xl space-y-6">
@@ -151,23 +113,31 @@ export function PreliminaryJudgementStep({
             <span>進行役（メディエーター）による対話論点のミラーリング要約</span>
           </div>
           <span className="text-[10px] text-slate-400 font-mono">
-            ※ 対話ログから受講者の主張を抽出・整理済み
+            ※ 対話ログから受講者の主張を抽出・整理済み（先回り正答開示なし）
           </span>
         </div>
 
         <div className="space-y-2">
-          {domainPoints.map((pt) => (
-            <div
-              key={pt.num}
-              className="flex items-start gap-2.5 text-xs text-slate-200 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800/60"
-            >
-              <span className="font-bold text-indigo-400 shrink-0">{pt.num}</span>
-              <div>
-                <span className="font-semibold text-slate-100">{pt.title}: </span>
-                <span className="text-slate-300">{pt.detail}</span>
+          {synthesizedPoints.length > 0 ? (
+            synthesizedPoints.map((pt) => (
+              <div
+                key={pt.num}
+                className="flex items-start gap-2.5 text-xs text-slate-200 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800/60"
+              >
+                <span className="font-bold text-indigo-400 shrink-0 font-mono text-[11px] bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-800/40">
+                  {pt.num} (Turn {pt.turnSeq})
+                </span>
+                <div className="flex-1 min-w-0">
+                  <span className="font-semibold text-slate-100">{pt.title}: </span>
+                  <span className="text-slate-300">{pt.detail}</span>
+                </div>
               </div>
+            ))
+          ) : (
+            <div className="text-xs text-slate-400 bg-slate-900/40 p-3 rounded-lg border border-slate-800/60 italic">
+              ※ 対話ログに受講者からの指摘・指示発言が記録されていません。対話を経ずに判断に進む場合は、以下の「判断理由（必須）」欄に成果物に対する具体的な理由を直接記述してください。
             </div>
-          ))}
+          )}
         </div>
 
         {userQuotes.length > 0 && (
@@ -299,32 +269,22 @@ export function PreliminaryJudgementStep({
 
 /**
  * [D-80]: 白紙再作文を行わない場合のフォールバック論点要約テキスト生成
- * 進行役がまとめた対話論点＋受講者発言引用を統合し、DB記録用の理由テキストとして返す
+ * 進行役がまとめた対話論点＋受講者発言引用を統合し、DB記録用の理由テキストとして返す（事前ネタバレ排除）
  */
 export function getDefaultMirroringSummary(
   taskId: string = "",
   chatHistory: ChatMessage[] = []
 ): string {
-  const userQuotes = chatHistory
-    .filter((m) => m.role === "user")
-    .map((m) => m.content)
+  const userMessages = chatHistory.filter((m) => m.role === "user");
+  if (userMessages.length === 0) {
+    return "対話ログに基づく受講者判定（直接確定）";
+  }
+
+  const quotes = userMessages
+    .map((m) => m.content.trim())
+    .filter(Boolean)
     .slice(-3);
 
-  let domainSummary = "";
-  if (taskId.includes("FINTECH") || taskId.includes("fintech")) {
-    domainSummary =
-      "【進行役まとめ・FinTech認証基盤】①Redis瞬断時のフォールバック欠落による単一障害点（SPOF）脆弱性、②PCI DSS基準に基づくJWT失効確認の欠落を指摘。③過去世代キーの許容は正当なゼロダウンタイム移行パスとして受容。";
-  } else if (taskId.includes("ECOMMERCE") || taskId.includes("ecommerce")) {
-    domainSummary =
-      "【進行役まとめ・EC返金パイプライン】①非同期返金キュー投入失敗時の監視・リトライ欠落、②非アトミックな在庫引当・キャンセルのRace Condition脆弱性を指摘。③決済確定前の在庫即時復元防止は正当な防御ロジックとして承認。";
-  } else {
-    domainSummary =
-      "【進行役まとめ・HelpDesk監査ログ】①エラーレスポンスにおけるスタックトレース等の内部コンテキスト露出脆弱性、②個人情報（PII）の平文永続化不備を指摘。③本番環境でのdebugログ抑制は適切なフィルタリングとして承認。";
-  }
-
-  if (userQuotes.length > 0) {
-    const quotesStr = userQuotes.map((q) => `「${q.slice(0, 40)}」`).join("、");
-    return `${domainSummary}（受講者の主対話論点: ${quotesStr}）`;
-  }
-  return domainSummary;
+  const quotesStr = quotes.map((q) => `「${q.length > 50 ? q.slice(0, 50) + "…" : q}」`).join("、");
+  return `【進行役対話要約】受講者の対話発言・指摘事項（${quotesStr}）を踏まえた最終コミットメント。`;
 }

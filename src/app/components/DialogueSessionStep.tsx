@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Layers,
   ArrowRight,
@@ -13,6 +13,7 @@ import {
   MessageSquare,
   AlertCircle,
   Send,
+  GitPullRequest,
 } from "lucide-react";
 import type { DynamicTaskScenario } from "@/data/dynamic-task";
 import type { ChatMessage, EvidenceTargetState, FocusItem, ProbeMove } from "../types";
@@ -66,19 +67,21 @@ export function DialogueSessionStep({
   onRemoveFocusItem,
   onSendDialogueTurn,
 }: DialogueSessionStepProps) {
+  const [leftTab, setLeftTab] = useState<"requirements" | "context">("requirements");
+
   return (
     <div className="space-y-6">
       {/* Task Header */}
       <div className="glass-panel p-5 rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
+        <div className="flex-1 min-w-0">
           <div className="text-xs font-mono text-blue-400 mb-1 flex items-center gap-2">
             <Layers className="w-3.5 h-3.5" /> 動的課題: {selectedTask.task_id}
           </div>
-          <h2 className="text-base font-bold text-white">{selectedTask.title}</h2>
+          <h2 className="text-base sm:text-lg font-bold text-white break-keep leading-snug">{selectedTask.title}</h2>
         </div>
         <button
           onClick={onProceedToPreliminaryJudgement}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/20"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/20 shrink-0 whitespace-nowrap"
         >
           レビュー完了 ➔ 暫定判断へ進む
           <ArrowRight className="w-4 h-4" />
@@ -86,81 +89,157 @@ export function DialogueSessionStep({
       </div>
 
       {/* 3-Pane Layout Grid (Left: Requirements / Middle: Artifact / Right: Verification Panel) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left Pane (1): Scenario & Requirements */}
-        <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-3 flex flex-col h-[480px] overflow-y-auto">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300 border-b border-slate-800 pb-2">
-            <FileText className="w-3.5 h-3.5 text-blue-400" />
-            【第1ペイン】業務要件と制約条件
+      <div className="flex flex-col lg:flex-row gap-4 items-stretch">
+        {/* Left Pane (1): Scenario & Requirements with Sub-tabs */}
+        <div className="w-full lg:w-[28%] glass-panel p-3.5 rounded-xl border border-slate-800 bg-slate-950/60 space-y-3 flex flex-col h-[520px] overflow-y-auto min-w-0 shrink-0">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2 shrink-0">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+              <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span>【第1ペイン】業務要件と制約条件</span>
+            </div>
           </div>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            {selectedTask.scenario_intro}
-          </p>
-          <div className="space-y-1.5 pt-1">
-            <span className="text-[11px] font-bold text-slate-400">必須要件:</span>
-            {selectedTask.business_requirements.map((req, i) => (
-              <div key={i} className="text-xs text-slate-300 bg-slate-900/70 p-2 rounded border border-slate-800">
-                {req}
+
+          {/* Sub-tabs: Requirements vs Context Documents */}
+          <div className="flex border-b border-slate-800 shrink-0">
+            <button
+              onClick={() => setLeftTab("requirements")}
+              className={`flex-1 py-1.5 text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+                leftTab === "requirements"
+                  ? "border-blue-500 text-blue-400"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <FileText className="w-3 h-3" />
+              要件・制約
+            </button>
+            <button
+              onClick={() => setLeftTab("context")}
+              className={`flex-1 py-1.5 text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+                leftTab === "context"
+                  ? "border-blue-500 text-blue-400"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <MessageSquare className="w-3 h-3 text-indigo-400" />
+              関連Slack・経緯
+              {selectedTask.context_documents && (
+                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 font-mono">
+                  {selectedTask.context_documents.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {leftTab === "requirements" ? (
+            <div className="space-y-3 flex-1 overflow-y-auto">
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {selectedTask.scenario_intro}
+              </p>
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[11px] font-bold text-slate-400">必須要件:</span>
+                {selectedTask.business_requirements.map((req, i) => (
+                  <div key={i} className="text-xs text-slate-300 bg-slate-900/70 p-2.5 rounded-lg border border-slate-800 leading-relaxed">
+                    {req}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="space-y-1.5 pt-1">
-            <span className="text-[11px] font-bold text-amber-400">制約・セキュリティ基準:</span>
-            {selectedTask.constraints.map((c, i) => (
-              <div key={i} className="text-xs text-amber-200/90 bg-amber-950/20 p-2 rounded border border-amber-900/30">
-                {c}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[11px] font-bold text-amber-400">制約・セキュリティ基準:</span>
+                {selectedTask.constraints.map((c, i) => (
+                  <div key={i} className="text-xs text-amber-200/90 bg-amber-950/20 p-2.5 rounded-lg border border-amber-900/30 leading-relaxed">
+                    {c}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div className="space-y-2.5 flex-1 overflow-y-auto">
+              <div className="text-[10px] text-slate-400 italic">
+                ※ 関連チャンネルのやり取りや障害報告メモです。散らばった情報から暗黙の前提や経緯を読み解いてください。
+              </div>
+              {selectedTask.context_documents?.map((doc) => (
+                <div key={doc.id} className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-1">
+                    <span className="font-bold text-indigo-300 text-[11px] flex items-center gap-1">
+                      {doc.type === "slack" ? "💬" : doc.type === "incident" ? "🚨" : "📄"} {doc.title}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">{doc.timestamp}</span>
+                  </div>
+                  <p className="text-slate-300 text-[11px] leading-relaxed whitespace-pre-wrap">
+                    {doc.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Middle Pane (2): AI Artifact Code Editor */}
-        <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2 flex flex-col h-[480px]">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+        {/* Middle Pane (2): AI Artifact Code Editor & PR Description */}
+        <div className="w-full lg:flex-1 glass-panel p-3.5 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2 flex flex-col h-[520px] min-w-0">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2 shrink-0">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
-              <Code className="w-3.5 h-3.5 text-emerald-400" />
-              【第2ペイン】成果物ドラフト
+              <Code className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>【第2ペイン】成果物ドラフト</span>
             </div>
-            <span className="text-[10px] font-mono text-slate-500">Live Editor</span>
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded shrink-0 whitespace-nowrap">Live Editor</span>
           </div>
+
+          {/* PR Description Header Card */}
+          {selectedTask.pr_description && (
+            <div className="bg-slate-900/90 border border-slate-800 rounded-lg p-2.5 text-xs space-y-1.5 shrink-0">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 font-bold text-slate-200 truncate">
+                  <GitPullRequest className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span className="truncate">{selectedTask.pr_description.title}</span>
+                </div>
+                <span className="text-[10px] font-mono text-indigo-300 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800/40 shrink-0">
+                  {selectedTask.pr_description.branch}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {selectedTask.pr_description.summary}
+              </p>
+            </div>
+          )}
+
           <textarea
             value={artifactCode}
             onChange={(e) => setArtifactCode(e.target.value)}
-            className="w-full flex-1 bg-slate-900/90 font-mono text-[11px] text-slate-200 p-3 rounded-lg border border-slate-800 resize-none focus:outline-none focus:border-blue-500"
+            className="w-full flex-1 bg-slate-900/90 font-mono text-xs leading-relaxed text-slate-200 p-3.5 rounded-lg border border-slate-800 resize-none focus:outline-none focus:border-blue-500 overflow-x-auto whitespace-pre min-h-0"
           />
           {/* Quick Focus Add Bar */}
-          <div className="pt-1 flex gap-1.5">
+          <div className="pt-1.5 flex gap-2 items-center shrink-0">
             <input
               type="text"
               value={focusInputText}
               onChange={(e) => setFocusInputText(e.target.value)}
               placeholder="検証対象とするコード断片・キーワード"
-              className="flex-1 bg-slate-900 text-[11px] text-slate-200 px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500"
+              className="flex-1 min-w-0 bg-slate-900 text-xs text-slate-200 px-2 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500 placeholder:text-[10px] placeholder:text-slate-500"
             />
             <button
               onClick={() => onAddFocusItem()}
               disabled={!focusInputText.trim()}
-              className="px-3 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white text-[11px] font-medium transition-all disabled:opacity-40 flex items-center gap-1 shrink-0"
+              className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-all disabled:opacity-40 flex items-center gap-1 shrink-0 whitespace-nowrap shadow-sm"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-3.5 h-3.5" />
               検証パネルへ追加
             </button>
           </div>
         </div>
 
         {/* Right Pane (3): Verification Focus Panel [MVP 4.4, T-17b] */}
-        <div className="glass-panel p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2 flex flex-col h-[480px]">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
-              <Eye className="w-3.5 h-3.5 text-purple-400" />
-              【第3ペイン】検証パネル
+        <div className="w-full lg:w-[28%] glass-panel p-3.5 rounded-xl border border-slate-800 bg-slate-950/60 space-y-2 flex flex-col h-[520px] min-w-0 shrink-0">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2 shrink-0 gap-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-300 shrink-0">
+              <Eye className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+              <span>【第3ペイン】検証パネル</span>
             </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
-              focus_seq 順序記録
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0 whitespace-nowrap">
+              focus_seq
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
             {focusItems.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-500 text-xs">
                 <CheckSquare className="w-8 h-8 mb-2 opacity-30" />
@@ -181,10 +260,10 @@ export function DialogueSessionStep({
                       className="text-slate-500 hover:text-red-400 p-0.5 transition-colors"
                       title="削除"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <p className="text-[11px] font-mono text-slate-200 bg-slate-950 p-1.5 rounded border border-slate-800/80 break-all">
+                  <p className="text-[11px] font-mono text-slate-200 bg-slate-950 p-2 rounded border border-slate-800/80 break-words leading-relaxed">
                     {item.selectedText}
                   </p>
                 </div>
@@ -192,7 +271,7 @@ export function DialogueSessionStep({
             )}
           </div>
 
-          <div className="pt-2 border-t border-slate-800/80 text-[10px] text-slate-500 leading-tight">
+          <div className="pt-2 border-t border-slate-800/80 text-[10px] text-slate-500 leading-tight shrink-0">
             ※ 選択箇所と順序は <code className="text-purple-400">verification_focus_sequence</code> ログとして保存されます（AI採点には入力されません）。
           </div>
         </div>
@@ -219,7 +298,7 @@ export function DialogueSessionStep({
         </div>
 
         {/* Chat Message List */}
-        <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+        <div className="space-y-3 min-h-[220px] max-h-[380px] overflow-y-auto pr-2">
           {chatHistory.map((msg, i) => (
             <div
               key={i}
@@ -239,11 +318,11 @@ export function DialogueSessionStep({
                     : "AI Peer (同僚エージェント)"}
               </div>
               <div
-                className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
+                className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed shadow-sm ${
                   msg.role === "user"
                     ? "bg-blue-600 text-white rounded-tr-sm"
                     : msg.role === "mediator"
-                      ? "bg-cyan-950/40 text-cyan-100 border border-cyan-800/50 italic"
+                      ? "bg-cyan-950/50 text-cyan-100 border border-cyan-800/60 italic"
                       : "bg-slate-800/90 text-slate-100 rounded-tl-sm border border-slate-700/60"
                 }`}
               >
