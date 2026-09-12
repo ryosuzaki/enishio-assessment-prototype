@@ -144,6 +144,8 @@ export const PROBE_MOVES = [
   "trace_grounding",
   "what_if",
   "self_report_gap",
+  "scope_refocus",
+  "test_scenario_probe",
   "none",
 ] as const;
 
@@ -158,6 +160,8 @@ export const PROBE_MOVE_LABELS: Record<ProbeMove, string> = {
   trace_grounding: "深掘り：その根拠は文脈のどこから来ているか",
   what_if: "What-if 注入：前提が変わったら指摘は変わるか",
   self_report_gap: "自己申告：見落とした観点はあるか",
+  scope_refocus: "視座の引き上げ：非機能要件・運用基準の観点で懸念はあるか",
+  test_scenario_probe: "異常系の想起：本番障害を防ぐためにどんなテストシナリオを想定すべきか",
   none: "問わない（十分に引き出せている）",
 };
 

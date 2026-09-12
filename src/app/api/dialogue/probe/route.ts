@@ -70,6 +70,10 @@ export async function POST(req: Request) {
       })),
       businessRequirements: task.business_requirements,
       constraints: task.constraints,
+      contextDocuments: (task.context_documents ?? []).map((d) => ({
+        title: d.title,
+        type: d.type,
+      })),
       probesSoFar,
     });
 

@@ -56,6 +56,8 @@ export const PROBE_MOVES = [
   "trace_grounding",
   "what_if",
   "self_report_gap",
+  "scope_refocus",
+  "test_scenario_probe",
   "none",
 ] as const;
 
@@ -66,6 +68,8 @@ export const PROBE_MOVE_LABELS: Record<ProbeMove, string> = {
   trace_grounding: "深掘り：その根拠は文脈のどこから来ているか",
   what_if: "What-if 注入：前提が変わったら指摘は変わるか",
   self_report_gap: "自己申告：見落とした観点はあるか",
+  scope_refocus: "視座の引き上げ：非機能要件・運用基準の観点で懸念はあるか",
+  test_scenario_probe: "異常系の想起：本番障害を防ぐためにどんなテストシナリオを想定すべきか",
   none: "問わない（十分に引き出せている）",
 };
 
@@ -104,7 +108,7 @@ export function getMediatorModel(): string {
 }
 
 export function getMediatorModelVersion(): string {
-  return `${getMediatorModel()}/probe-v1`;
+  return `${getMediatorModel()}/probe-v2`;
 }
 
 // モデルID＋プロンプト版。方針を変えたら必ず上げる。
@@ -126,20 +130,21 @@ export class MediationUnavailableError extends Error {
   }
 }
 
-const SYSTEM_PROMPT = `あなたは業務判断のアセスメントにおける「メディエーター」です。
-受講者がAI同僚の成果物をレビューしている対話に割り込み、**受講者自身の判断を引き出す問い**を1つだけ投げます。
+const SYSTEM_PROMPT = `あなたは業務判断のアセスメントにおける「メディエーター（進行役・技術面接ファシリテーター）」です。
+受講者がAI同僚の成果物をレビューしている対話に割り込み、**受講者自身の思考と判断を引き出す問い**を1つだけ投げます。
 
 【あなたの役割の境界（最重要）】
-- あなたの目的は**引き出すこと（elicitation）**であって、**教えること・気づかせること・正解へ導くこと**ではありません。
-- あなたはこの成果物にどんな不備があるかを**知りません。** 推測して示唆することも禁止です。
-- 「ここは見ましたか」「この箇所は問題ないですか」のように、特定の箇所へ注意を向けさせる問いを投げてはいけません。それは受講者の判断ではなくあなたの判断を測ることになります。
-- 投げてよいのは、受講者が**すでに述べたこと**について、その理由・根拠・射程を言わせる問いだけです。
+- あなたの目的は**引き出すこと（elicitation）と視座の交通整理（facilitation）**であって、**正解コードを教えること・特定の欠陥箇所を直接指示すること**ではありません。
+- あなたはこの成果物にどんな不備があるかを**知りません。** 推測して特定のコード行（「○行目を見ましたか」等）を示唆することは厳禁です。
+- あなたが提供してよいのは、「特定の答え」ではなく**「思考のレンズ・視座（非機能要件、異常系テスト、運用背景）」**です。
 
 【打てる手】
 - deepen_rationale: 受講者が下した判断について「なぜそう判断したか」を言わせる
-- trace_grounding: 「その根拠は業務要件・制約のどこから来ているか」を言わせる
+- trace_grounding: 「その根拠は業務要件・制約・チーム情報のどこから来ているか」を言わせる
 - what_if: 「前提がこう変わったら、その指摘は変わるか」を問う（前提の変更はあなたが具体的に指定する）
 - self_report_gap: 「自分が見落としているかもしれない観点は何か」を自己申告させる
+- scope_refocus: 受講者がコードスタイルや変数名などの些細な表面上の議論に執着（迷走）している場合、「スタイルの議論は一旦置き、システムの非機能要件（可用性・耐障害性・セキュリティ等）やチーム運用基準の観点で他に気になる点はあるか」と視座を一段引き上げる
+- test_scenario_probe: 受講者が正常系のフローしか見ていなかったり、十分に検証しないまま安易にApproveしようとしている場合、「本番リリースで障害を防ぐため、どんな異常系シナリオ（外部サービスのダウン、通信の再送・重複、急激な高負荷など）を検証すべきか」とテスト観点の想起を促す
 - none: 5つの根拠カテゴリが十分に引き出せている、または受講者がまだ何も判断を述べていないため問う材料がない
 
 【状態推定】
@@ -148,8 +153,9 @@ const SYSTEM_PROMPT = `あなたは業務判断のアセスメントにおける
 まだ引き出せていないカテゴリのうち、いま問うのが自然なものを1つ選んで手を決めてください。
 
 【問いの作り方】
-- 1〜2文。詰問にしない。受講者の直前の発言を引用して接続する。
-- 受講者がまだ何の判断も述べていない段階では none を選び、問いを投げないでください。無から理由は引き出せません。`;
+- 1〜2文。詰問にしない。受講者の直前の発言や文脈に自然に接続する。
+- 答えや特定の行番号を絶対に言わない。
+- 受講者がまだ何の判断も述べていない極初期（ターン1で挨拶や確認のみ）では none を選び、問いを投げないでください。無から理由は引き出せません。`;
 
 /**
  * 対話ログの現状から、次に打つ手と状態推定を返す。
@@ -157,12 +163,14 @@ const SYSTEM_PROMPT = `あなたは業務判断のアセスメントにおける
  * @param transcript 受講者・AI同僚・過去のメディエーターの全ターン。**正答鍵は渡さない。**
  * @param businessRequirements 受講者にも提示済みの業務要件（画面に出ているもののみ）
  * @param constraints 受講者にも提示済みの制約（画面に出ているもののみ）
+ * @param contextDocuments 受講者も閲覧できる共有ドキュメント情報（タイトルと種別のみ）
  * @param probesSoFar これまでに投げた手（同じ手を続けて打たないため）
  */
 export async function selectProbe(params: {
   transcript: { turnSeq: number; role: string; content: string }[];
   businessRequirements: string[];
   constraints: string[];
+  contextDocuments?: { title: string; type: string }[];
   probesSoFar: ProbeMove[];
 }): Promise<ProbeSelection> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -174,11 +182,17 @@ export async function selectProbe(params: {
 
   const client = new OpenAI({ apiKey });
 
+  const contextDocsText =
+    params.contextDocuments && params.contextDocuments.length > 0
+      ? `\n\n【チーム内で共有されている関連ドキュメント（受講者も閲覧可能）】\n` +
+        params.contextDocuments.map((d) => `- [${d.type}] ${d.title}`).join("\n")
+      : "";
+
   const promptText = `【受講者にも提示されている業務要件】
 ${params.businessRequirements.join("\n")}
 
 【受講者にも提示されている制約】
-${params.constraints.join("\n")}
+${params.constraints.join("\n")}${contextDocsText}
 
 【これまでの対話】
 ${params.transcript

@@ -12,8 +12,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja" className="dark">
-      <body className="antialiased min-h-screen bg-[#090d16] text-slate-100 selection:bg-blue-600 selection:text-white">
+    <html lang="ja" className="dark" suppressHydrationWarning>
+      <body
+        className="antialiased min-h-screen bg-[#090d16] text-slate-100 selection:bg-blue-600 selection:text-white"
+        suppressHydrationWarning
+      >
         <header className="border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div className="flex items-center gap-3">

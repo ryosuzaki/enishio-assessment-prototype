@@ -1,13 +1,14 @@
 "use client";
 
 import React from "react";
-import { Zap, ShieldCheck } from "lucide-react";
+import { Zap, ShieldCheck, PanelRightClose } from "lucide-react";
 
 interface TelemetryPanelProps {
   learnerId: string;
   sessionId: string;
   sessionSeq: number;
   telemetryLog: string[];
+  onToggleCollapse?: () => void;
 }
 
 export function TelemetryPanel({
@@ -15,6 +16,7 @@ export function TelemetryPanel({
   sessionId,
   sessionSeq,
   telemetryLog,
+  onToggleCollapse,
 }: TelemetryPanelProps) {
   return (
     <div className="space-y-6">
@@ -25,9 +27,22 @@ export function TelemetryPanel({
             <Zap className="w-4 h-4 text-amber-400" />
             Live Telemetry Monitor
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            Connected
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              Connected
+            </span>
+            {onToggleCollapse && (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                title="モニターを閉じて画面を広く使う"
+                className="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-slate-800 transition-colors flex items-center gap-1 text-[11px]"
+              >
+                <PanelRightClose className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">閉じる</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-2 text-xs font-mono">

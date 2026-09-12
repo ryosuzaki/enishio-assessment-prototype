@@ -402,7 +402,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.getByRole("button", { name: "動的対話セッションへ進む" }).click();
 
     // 3ペインの表示確認
-    await expect(page.getByText("【第1ペイン】業務要件と制約条件")).toBeVisible();
+    await expect(page.getByText("【第1ペイン】開発Issue ＆ チーム情報")).toBeVisible();
     await expect(page.getByText("【第2ペイン】成果物ドラフト")).toBeVisible();
     await expect(page.getByText("【第3ペイン】検証パネル")).toBeVisible();
     await expect(page.getByText("AI同僚との対話・修正指示（マルチターン対話）")).toBeVisible();

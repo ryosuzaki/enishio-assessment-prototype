@@ -16,7 +16,7 @@ import type {
   AppTab,
 } from "./types";
 import { MAX_PROBES_PER_SESSION } from "./types";
-import { Play, Building2, UserCheck, Award } from "lucide-react";
+import { Play, Building2, UserCheck, Award, Zap, PanelRightOpen } from "lucide-react";
 import { InitStep } from "./components/InitStep";
 import { AnchorQuestionStep } from "./components/AnchorQuestionStep";
 import { DialogueSessionStep } from "./components/DialogueSessionStep";
@@ -36,6 +36,7 @@ export default function AssessmentPrototypePage() {
   // Navigation & Tab State ([D-79]: 2-layer Viability & Feasibility)
   const [activeTab, setActiveTab] = useState<AppTab>("session");
   const [galleryTaskId, setGalleryTaskId] = useState<string>(DYNAMIC_TASKS[0].task_id);
+  const [showTelemetry, setShowTelemetry] = useState<boolean>(true);
 
   // Session & Phase State
   const [sessionId, setSessionId] = useState<string>("");
@@ -785,140 +786,167 @@ export default function AssessmentPrototypePage() {
 
       {/* Tab 4: Core Evaluation Session (Vertical Cut) */}
       {activeTab === "session" && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Main Content Area */}
-          <div className="lg:col-span-8 xl:col-span-9 space-y-6 min-w-0">
-            <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
-
-          {/* STEP 0: Initialization */}
-          {currentStep === "init" && (
-            <InitStep
-              selectedAnchorId={selectedAnchorId}
-              setSelectedAnchorId={setSelectedAnchorId}
-              anchorList={anchorList}
-              bankSource={bankSource}
-              selectedTaskId={selectedTaskId}
-              setSelectedTaskId={setSelectedTaskId}
-              selectedTask={selectedTask}
-              isSubmitting={isSubmitting}
-              onStartSession={handleStartSession}
-            />
+        <div className="space-y-4">
+          {!showTelemetry && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowTelemetry(true)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs shadow-sm transition-all hover:border-slate-700"
+                title="テレメトリモニターを展開する"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Live Telemetry を表示</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Connected
+                </span>
+                <PanelRightOpen className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+            </div>
           )}
 
-          {/* STEP 1〜5: Anchor Flow（4段構成 + 完了）[D-83] */}
-          {(currentStep === "anchor_stage1" ||
-            currentStep === "anchor_stage2" ||
-            currentStep === "anchor_stage3" ||
-            currentStep === "anchor_stage3b" ||
-            currentStep === "anchor_conf" ||
-            currentStep === "anchor_complete") && (
-            <AnchorQuestionStep
-              currentStep={currentStep}
-              currentAnchor={currentAnchor}
-              bankSource={bankSource}
-              stage1Choice={stage1Choice}
-              setStage1Choice={setStage1Choice}
-              stage2Choice={stage2Choice}
-              setStage2Choice={setStage2Choice}
-              stage3Choice={stage3Choice}
-              setStage3Choice={setStage3Choice}
-              stage3bChoice={stage3bChoice}
-              setStage3bChoice={setStage3bChoice}
-              confidence={confidence}
-              setConfidence={setConfidence}
-              isSubmitting={isSubmitting}
-              onStage1Next={handleStage1Next}
-              onStage2Next={handleStage2Next}
-              onStage3Next={handleStage3Next}
-              onStage3bNext={handleStage3bNext}
-              onAnchorSubmit={handleAnchorSubmit}
-              onStartDialogueSession={handleStartDialogueSession}
-            />
-          )}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Main Content Area */}
+            <div
+              className={`${
+                showTelemetry ? "lg:col-span-8 xl:col-span-9" : "col-span-12"
+              } space-y-6 min-w-0 transition-all`}
+            >
+              <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
 
-          {/* STEP 5: Dynamic 3-Pane Dialogue Session (W3) */}
-          {currentStep === "dialogue_session" && (
-            <DialogueSessionStep
-              selectedTask={selectedTask}
-              artifactCode={artifactCode}
-              setArtifactCode={setArtifactCode}
-              focusItems={focusItems}
-              focusInputText={focusInputText}
-              setFocusInputText={setFocusInputText}
-              chatHistory={chatHistory}
-              turnCounter={turnCounter}
-              userPromptInput={userPromptInput}
-              setUserPromptInput={setUserPromptInput}
-              cffActiveWarning={cffActiveWarning}
-              isSubmitting={isSubmitting}
-              mediationStateEstimate={mediationStateEstimate}
-              lastProbeMove={lastProbeMove}
-              lastSelectionRationale={lastSelectionRationale}
-              probesIssued={probesIssued}
-              isProbing={isProbing}
-              onProceedToPreliminaryJudgement={handleProceedToPreliminaryJudgement}
-              onAddFocusItem={handleAddFocusItem}
-              onRemoveFocusItem={handleRemoveFocusItem}
-              onSendDialogueTurn={handleSendDialogueTurn}
-            />
-          )}
+              {/* STEP 0: Initialization */}
+              {currentStep === "init" && (
+                <InitStep
+                  selectedAnchorId={selectedAnchorId}
+                  setSelectedAnchorId={setSelectedAnchorId}
+                  anchorList={anchorList}
+                  bankSource={bankSource}
+                  selectedTaskId={selectedTaskId}
+                  setSelectedTaskId={setSelectedTaskId}
+                  selectedTask={selectedTask}
+                  isSubmitting={isSubmitting}
+                  onStartSession={handleStartSession}
+                />
+              )}
 
-          {/* STEP 5.5: CFF Force Decision First & Facilitator Mirroring Summary [MVP 2.5, T-17b, D-80] */}
-          {currentStep === "preliminary_judgement" && (
-            <PreliminaryJudgementStep
-              taskId={selectedTaskId}
-              chatHistory={chatHistory}
-              prelimAction={prelimAction}
-              setPrelimAction={setPrelimAction}
-              prelimJustification={prelimJustification}
-              setPrelimJustification={setPrelimJustification}
-              prelimError={prelimError}
-              isEvaluating={isEvaluating}
-              onBackToDialogue={() => setCurrentStep("dialogue_session")}
-              onConfirmPreliminaryAndEvaluate={handleConfirmPreliminaryAndEvaluate}
-            />
-          )}
+              {/* STEP 1〜5: Anchor Flow（4段構成 + 完了）[D-83] */}
+              {(currentStep === "anchor_stage1" ||
+                currentStep === "anchor_stage2" ||
+                currentStep === "anchor_stage3" ||
+                currentStep === "anchor_stage3b" ||
+                currentStep === "anchor_conf" ||
+                currentStep === "anchor_complete") && (
+                <AnchorQuestionStep
+                  currentStep={currentStep}
+                  currentAnchor={currentAnchor}
+                  bankSource={bankSource}
+                  stage1Choice={stage1Choice}
+                  setStage1Choice={setStage1Choice}
+                  stage2Choice={stage2Choice}
+                  setStage2Choice={setStage2Choice}
+                  stage3Choice={stage3Choice}
+                  setStage3Choice={setStage3Choice}
+                  stage3bChoice={stage3bChoice}
+                  setStage3bChoice={setStage3bChoice}
+                  confidence={confidence}
+                  setConfidence={setConfidence}
+                  isSubmitting={isSubmitting}
+                  onStage1Next={handleStage1Next}
+                  onStage2Next={handleStage2Next}
+                  onStage3Next={handleStage3Next}
+                  onStage3bNext={handleStage3bNext}
+                  onAnchorSubmit={handleAnchorSubmit}
+                  onStartDialogueSession={handleStartDialogueSession}
+                />
+              )}
 
-          {/* STEP 6: XAI Evaluation Report Screen (W5) */}
-          {currentStep === "evaluation_report" && evaluation && (
-            <EvaluationReportStep
-              evaluation={evaluation}
-              chatHistory={chatHistory}
-              prelimAction={prelimAction}
-              prelimJustification={prelimJustification}
-              anchorId={selectedAnchorId}
-              anchorStatus={anchorStatus}
-              bankSource={bankSource}
-              stage1Choice={stage1Choice}
-              stage2Choice={stage2Choice}
-              stage3Choice={stage3Choice}
-              confidence={confidence}
-              disputeReason={disputeReason}
-              setDisputeReason={setDisputeReason}
-              disputeDirection={disputeDirection}
-              setDisputeDirection={setDisputeDirection}
-              disputeSubmitted={disputeSubmitted}
-              onSubmitDispute={handleSubmitDispute}
-              onResetToInit={() => setCurrentStep("init")}
-              onViewBenchmarkGallery={() => {
-                setGalleryTaskId(selectedTaskId);
-                setActiveTab("benchmark_gallery");
-              }}
-            />
-          )}
+              {/* STEP 5: Dynamic 3-Pane Dialogue Session (W3) */}
+              {currentStep === "dialogue_session" && (
+                <DialogueSessionStep
+                  selectedTask={selectedTask}
+                  artifactCode={artifactCode}
+                  setArtifactCode={setArtifactCode}
+                  focusItems={focusItems}
+                  focusInputText={focusInputText}
+                  setFocusInputText={setFocusInputText}
+                  chatHistory={chatHistory}
+                  turnCounter={turnCounter}
+                  userPromptInput={userPromptInput}
+                  setUserPromptInput={setUserPromptInput}
+                  cffActiveWarning={cffActiveWarning}
+                  isSubmitting={isSubmitting}
+                  mediationStateEstimate={mediationStateEstimate}
+                  lastProbeMove={lastProbeMove}
+                  lastSelectionRationale={lastSelectionRationale}
+                  probesIssued={probesIssued}
+                  isProbing={isProbing}
+                  onProceedToPreliminaryJudgement={handleProceedToPreliminaryJudgement}
+                  onAddFocusItem={handleAddFocusItem}
+                  onRemoveFocusItem={handleRemoveFocusItem}
+                  onSendDialogueTurn={handleSendDialogueTurn}
+                />
+              )}
+
+              {/* STEP 5.5: CFF Force Decision First & Facilitator Mirroring Summary [MVP 2.5, T-17b, D-80] */}
+              {currentStep === "preliminary_judgement" && (
+                <PreliminaryJudgementStep
+                  taskId={selectedTaskId}
+                  chatHistory={chatHistory}
+                  prelimAction={prelimAction}
+                  setPrelimAction={setPrelimAction}
+                  prelimJustification={prelimJustification}
+                  setPrelimJustification={setPrelimJustification}
+                  prelimError={prelimError}
+                  isEvaluating={isEvaluating}
+                  onBackToDialogue={() => setCurrentStep("dialogue_session")}
+                  onConfirmPreliminaryAndEvaluate={handleConfirmPreliminaryAndEvaluate}
+                />
+              )}
+
+              {/* STEP 6: XAI Evaluation Report Screen (W5) */}
+              {currentStep === "evaluation_report" && evaluation && (
+                <EvaluationReportStep
+                  evaluation={evaluation}
+                  chatHistory={chatHistory}
+                  prelimAction={prelimAction}
+                  prelimJustification={prelimJustification}
+                  anchorId={selectedAnchorId}
+                  anchorStatus={anchorStatus}
+                  bankSource={bankSource}
+                  stage1Choice={stage1Choice}
+                  stage2Choice={stage2Choice}
+                  stage3Choice={stage3Choice}
+                  confidence={confidence}
+                  disputeReason={disputeReason}
+                  setDisputeReason={setDisputeReason}
+                  disputeDirection={disputeDirection}
+                  setDisputeDirection={setDisputeDirection}
+                  disputeSubmitted={disputeSubmitted}
+                  onSubmitDispute={handleSubmitDispute}
+                  onResetToInit={() => setCurrentStep("init")}
+                  onViewBenchmarkGallery={() => {
+                    setGalleryTaskId(selectedTaskId);
+                    setActiveTab("benchmark_gallery");
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Right Column: Live Telemetry Monitor & System Architecture */}
+            {showTelemetry && (
+              <div className="lg:col-span-4 xl:col-span-3 space-y-6 min-w-0">
+                <TelemetryPanel
+                  learnerId={learnerId}
+                  sessionId={sessionId}
+                  sessionSeq={sessionSeq}
+                  telemetryLog={telemetryLog}
+                  onToggleCollapse={() => setShowTelemetry(false)}
+                />
+              </div>
+            )}
+          </div>
         </div>
-
-        {/* Right Column: Live Telemetry Monitor & System Architecture */}
-        <div className="lg:col-span-4 xl:col-span-3 space-y-6 min-w-0">
-          <TelemetryPanel
-            learnerId={learnerId}
-            sessionId={sessionId}
-            sessionSeq={sessionSeq}
-            telemetryLog={telemetryLog}
-          />
-        </div>
-      </div>
-    )}
+      )}
   </div>
 );
 }

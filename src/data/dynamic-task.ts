@@ -54,17 +54,17 @@ export const DYNAMIC_TASKS: DynamicTaskScenario[] = [
     title: "金融決済APIのレートリミットおよびトークン検証ロジックのレビュー",
     domain: "fintech_security",
     target_dimension: "axis_4",
-    scenario_intro: `あなたはFinTech決済サービスを開発するチームの若手エンジニアです。
-AI同僚（AIエージェント）が作成した「決済APIのエンドポイント保護とレートリミット制御コード」のPR（プルリクエスト）をレビューし、
-本番適用に向けて問題点を対話で指摘・修正指示を出してください。`,
+    scenario_intro: `あなたはFinTech決済サービスを開発するチームのエンジニアです。
+同僚のAIエンジニアが作成した「決済APIのエンドポイント保護とレートリミット制御コード」のPR（プルリクエスト）をレビューし、
+受入要件やチームの運用基準に適合しているかを検証し、本番デプロイ可能か（Approve）、あるいは修正・差し戻しが必要か（Remand）を対話を通じて判断してください。`,
     business_requirements: [
       "1. 一般ユーザー（無料）は 60 req/min、プレミアム加盟店は 1000 req/min のレートリミットを適用すること",
-      "2. 認証トークン失効時（ログアウト・強制無効化）は即座にアクセスを遮断し、不正利用を防止すること",
-      "3. 万が一Redis障害が発生した際も、決済API全体を停止させず、フォールバックして稼働を継続すること（耐障害性要件）",
+      "2. JWTトークンの検証を行い、正当な認証済みリクエストのみを通過させること",
+      "3. 決済APIの急増するトラフィックに対応し、低レイテンシで決済受付を完了すること",
     ],
     constraints: [
-      "セキュリティ基準: PCI DSS準拠のため、権限剥奪の伝播遅延（結果整合性の放置）は重大違反となる",
-      "高可用性: 決済サーバーがRedisの単一障害点（SPOF）で共倒れしてはならない",
+      "可用性SLA: 決済受付はチームの最重要サービスであり、外部依存サービスの瞬断時にも決済基盤全体の可用性を維持すること",
+      "セキュリティ基準: 金融決済システムとしてPCI DSS等の業界セキュリティ規程を遵守すること",
     ],
     pr_description: {
       title: "feat(auth): 決済APIのレート制限導入と署名検証のインメモリ高速化",
@@ -80,22 +80,31 @@ AI同僚（AIエージェント）が作成した「決済APIのエンドポイ�
     },
     context_documents: [
       {
-        id: "slack-payment-security",
-        title: "#dev-payment-security 議論スレッド",
+        id: "slack-dev-payment",
+        title: "#dev-payment チーム議論",
         type: "slack",
-        source: "Slack (社内チャンネル)",
-        timestamp: "昨日 16:42",
+        source: "Slack",
+        timestamp: "昨日 14:15",
         content:
-          "セキュリティ推進室（安田）: 来月のPCI DSS監査に向け、トークン失効（強制ログアウトや不正検知）の即時反映が必須要件になります。失効フラグの伝播遅延は重大な不備とみなされるので、API側で確実に失効状態を検知できるようにしてください。\n\nインフラSRE（高橋）: 承知しました。ただし決済APIは絶対に止められないので、Redisクラスタがフェイルオーバーや瞬断を起こした際でも、API全体が共倒れして500で落ちない耐障害性（フォールバック設計）をお願いします！",
+          "SRE高橋: お疲れ様です！来月の大型セールに向けてRedisクラスタの増強を進めていますが、先期のようにフェイルオーバー時に数秒の瞬断が発生する可能性があります。決済受付APIは一番クリティカルなので、Redisが一時的に応答しなくなっても全決済が500で巻き添え死しないよう、フォールバック設計を意識してくださいね。\n\nAI同僚: 了解です！高速化と合わせて対応進めます！",
       },
       {
-        id: "memo-pci-dss",
-        title: "PCI DSS v4.0 要件抜粋メモ",
-        type: "memo",
-        source: "社内セキュリティポータル",
-        timestamp: "2026-03-01",
+        id: "slack-security-audit",
+        title: "#security-compliance 周知",
+        type: "slack",
+        source: "Slack",
+        timestamp: "2日前 10:30",
         content:
-          "【要件 8.3.4】特権アクセスまたはカード会員データ環境へのセッション無効化・失効は、すべての接続ノードへ即時に適用されなければならない。失効後の猶予期間（結果整合性の放置）は認められない。",
+          "セキュリティ安田: 【重要】来月のPCI DSS年次監査について。特権アカウントやトークン失効（強制ログアウト、不正検知時のブラックリスト）の即時反映が重点確認項目になっています。失効したトークンがキャッシュやインメモリ検証で生き残り続けるような結果整合性の放置は指摘対象になりますので、各API担当は失効状態の検知フローを再確認してください。",
+      },
+      {
+        id: "incident-postmortem-cache",
+        title: "過去インシデント報告書 INC-2025-0812（抜粋）",
+        type: "incident",
+        source: "社内Wiki Postmortem",
+        timestamp: "2025-08-15",
+        content:
+          "【事象概要】Redisクラスタのノード切り替えに伴う2秒間の通信途絶により、接続中だった決済APIインスタンスがエラーハンドラ内で一律500 Internal Server Errorを返却し、全加盟店で決済が全停止した。\n【再発防止策】キャッシュやレートリミット等の周辺サービス障害時は、セキュリティ上許容される範囲でフェイルオープンまたはグレースフル・デグラデーション（縮退運転）を行い、決済本体の可用性を優先すること。",
       },
     ],
     initial_ai_draft: `// AI同僚が生成した決済APIミドルウェア（初版ドラフト）
@@ -200,17 +209,17 @@ describe("paymentSecurityMiddleware", () => {
     title: "ECサイト在庫管理・注文キャンセル/返金APIのレビュー",
     domain: "ecommerce_transaction_integrity",
     target_dimension: "axis_4",
-    scenario_intro: `あなたはECサイトを運営する開発チームの若手エンジニアです。
-AI同僚（AIエージェント）が作成した「注文キャンセル・返金処理API」のPR（プルリクエスト）をレビューし、
-本番適用に向けて問題点を対話で指摘・修正指示を出してください。`,
+    scenario_intro: `あなたはECサイトを運営する開発チームのエンジニアです。
+同僚のAIエンジニアが作成した「注文キャンセル・返金処理API」のPR（プルリクエスト）をレビューし、
+受入要件やチームの運用基準に適合しているかを検証し、本番デプロイ可能か（Approve）、あるいは修正・差し戻しが必要か（Remand）を対話を通じて判断してください。`,
     business_requirements: [
-      "1. 注文がキャンセルされた場合、対象商品の在庫を正しく復元し、他の顧客が購入可能な状態に戻すこと（決済確定前の早すぎる復元による二重販売は避けること）",
-      "2. 同一注文に対する二重返金（多重リクエスト・Webhookの重複配信による重複処理）を防止すること",
-      "3. 決済プロバイダ側から非同期に届く返金確定Webhookと、社内の注文ステータス・在庫状態との整合性を保つこと",
+      "1. 注文キャンセル受付時に非同期で返金キューへ処理をエンキューし、クライアントへ即座に応答（202）を返すこと",
+      "2. 決済プロバイダからの返金確定Webhookを受信した段階で、在庫を適切に復元すること",
+      "3. 処理中・キャンセル済みの注文に対する重複キャンセル受付を防止すること",
     ],
     constraints: [
-      "在庫制約: セール期間中のピーク時は同一商品への同時アクセス（購入・キャンセル・返金）が多発する",
-      "会計監査要件: 返金処理は監査証跡のため冪等性（同一イベントの再処理で二重処理が起きないこと）が必須",
+      "データ整合性: セール時の大量トラフィック下でも、実在庫と販売可能数の整合性を厳密に維持すること",
+      "運用信頼性: 外部決済プロバイダ連携における処理の冪等性と耐障害性を確保すること",
     ],
     pr_description: {
       title: "feat(order): 注文キャンセル・非同期返金パイプラインと在庫復元ハンドラの実装",
@@ -227,12 +236,12 @@ AI同僚（AIエージェント）が作成した「注文キャンセル・返�
     context_documents: [
       {
         id: "incident-black-friday",
-        title: "前四半期セール障害報告書（抜粋）",
+        title: "前四半期セール障害報告書 INC-4091（抜粋）",
         type: "incident",
         source: "障害管理システム JIRA-INC-4091",
         timestamp: "2026-06-15",
         content:
-          "【事象】アクセス集中時にWebhookの再送が重なり、同一注文に対して在庫が二重に復元される（オーバーカウント）事象が38件発生した。\n【原因】Webhook受信時の在庫取得（SELECT）と加算更新（UPDATE）がトランザクション制御されておらず、並行処理で競合が発生したため。\n【是正指示】在庫更新処理はアトミックなトランザクションまたは楽観的ロックを適用すること。また外部API失敗時のキュー監視とリトライが不可欠。",
+          "【事象概要】アクセス集中時にWebhook再送が重なり、在庫数が実際のキャンセル数より多くカウントされる（オーバーカウント）不整合が38件発生した。\n【原因分析】Webhook受信ハンドラで同時並行リクエストが発生した際、排他制御が行われておらず競合状態（Race Condition）が生じたため。\n【是正指示】並行実行下でも二重加算が起きないアトミックな更新制御を徹底すること。",
       },
       {
         id: "slack-finance",
@@ -241,7 +250,7 @@ AI同僚（AIエージェント）が作成した「注文キャンセル・返�
         source: "Slack",
         timestamp: "先週 11:20",
         content:
-          "経理（佐藤）: 返金処理の失敗が検知されないまま放置されると、月次決算で重大な残高差異になります。キューに投入した返金が万が一落ちた場合、誰にも気づかれないサイレントロストだけは絶対に避けてください（リトライ・デッドレター・アラートの完備）。",
+          "経理佐藤: お疲れ様です！決済プロバイダとの月次照合で返金残高に差異が出ると決算監査上の大問題になります。キューに投入した返金が万が一ワーカ障害やAPIエラーで落ちた場合、誰にも気づかれないサイレントロストだけは絶対に避けてください（リトライ・デッドレター・アラートの完備）。\n\nAI同僚: 了解です！非同期キューで高速に応答を返す設計にしています！",
       },
     ],
     initial_ai_draft: `// AI同僚が生成した注文キャンセル・返金処理API（初版ドラフト）
@@ -256,45 +265,48 @@ export async function cancelOrderHandler(req: Request, res: Response) {
   if (!order) {
     return res.status(404).json({ error: "Order not found" });
   }
-  // 二重キャンセル・二重返金の防止ガード
-  if (order.status === "cancelling" || order.status === "cancelled" || order.status === "refunded") {
+
+  // 二重キャンセル防止のステータスチェック
+  if (order.status === "cancelling" || order.status === "refunded") {
     return res.status(409).json({ error: "Order is already being cancelled or refunded" });
   }
 
-  // 決済確定前の二重販売を防止するため、注文ステータスのみ更新（在庫復元はWebhook受信時に実行）
+  // 決済確定前の在庫二重戻しを防ぐため、注文ステータスのみ更新
   await db.orders.update({
     where: { id: orderId },
     data: { status: "cancelling" },
   });
 
-  // レスポンス遅延を防ぐため、外部決済APIへの返金要求を非同期キューへ投入
+  // 非同期キューへ返金処理を投入して即座に 202 Accepted を返す（高スループット対応）
   refundQueue.push({ orderId, amount: order.totalAmount });
 
   return res.status(202).json({
-    status: "cancelling",
-    message: "キャンセルを受け付けました。返金確定後に在庫が復元されます。",
+    message: "Cancellation request accepted. Processing refund asynchronously.",
   });
 }
 
-// 決済プロバイダからの返金確定Webhook受信ハンドラ
+// 決済プロバイダからの返金完了Webhook受信ハンドラ
 export async function refundConfirmedWebhookHandler(req: Request, res: Response) {
   const { orderId, refundId, items } = req.body;
 
   const order = await db.orders.findUnique({ where: { id: orderId } });
   if (!order || order.status !== "cancelling") {
-    return res.status(200).json({ received: true, skipped: true });
+    return res.status(400).json({ error: "Invalid order state for refund confirmation" });
   }
 
-  // 在庫復元処理: 各商品の数量を加算
+  // 返金確定を受け、各商品の在庫を復元
   for (const item of items) {
     const product = await db.products.findUnique({ where: { id: item.productId } });
-    const restoredStock = product.stock + item.quantity;
-    await db.products.update({
-      where: { id: item.productId },
-      data: { stock: restoredStock },
-    });
+    if (product) {
+      const restoredStock = product.stock + item.quantity;
+      await db.products.update({
+        where: { id: item.productId },
+        data: { stock: restoredStock },
+      });
+    }
   }
 
+  // 最終ステータスへ更新
   await db.orders.update({
     where: { id: orderId },
     data: { status: "refunded", refund_id: refundId },
@@ -358,17 +370,17 @@ describe("Order Cancellation & Refund Pipeline", () => {
     title: "社内ヘルプデスクAIチャットボットのログ記録ミドルウェアのレビュー",
     domain: "internal_tooling_privacy",
     target_dimension: "axis_4",
-    scenario_intro: `あなたは社内DX推進チームの若手エンジニアです。
-AI同僚（AIエージェント）が作成した「問い合わせ内容をロギングするミドルウェア」のPR（プルリクエスト）をレビューし、
-本番適用に向けて問題点を対話で指摘・修正指示を出してください。`,
+    scenario_intro: `あなたは社内DX推進チームのエンジニアです。
+同僚のAIエンジニアが作成した「社内ヘルプデスク問い合わせロギングとエラーハンドラ」のPR（プルリクエスト）をレビューし、
+受入要件や情報セキュリティ基準に適合しているかを検証し、本番デプロイ可能か（Approve）、あるいは修正・差し戻しが必要か（Remand）を対話を通じて判断してください。`,
     business_requirements: [
-      "1. 問い合わせ内容には個人情報（氏名・社員番号・連絡先等）が含まれうるため、適切に取り扱うこと",
-      "2. 障害調査・問い合わせ対応のトレーサビリティ確保のため、十分な情報をログに残すこと",
-      "3. 個人情報保護規定に定める保存期間（例: 90日）を超えたログは確実に削除すること",
+      "1. 社員からの問い合わせ内容を監査用ログストアへ確実に永続化し、対応履歴のトレーサビリティを確保すること",
+      "2. アプリケーションログの肥大化を防ぎつつ、障害調査に必要な最小限の可観測性を担保すること",
+      "3. エラー発生時に適切なHTTPステータスおよびレスポンスを返却すること",
     ],
     constraints: [
-      "情報セキュリティ基準: エラー発生時であっても、内部システムの構成情報（DB接続文字列・内部エンドポイント名等）を外部（エンドユーザー）に開示してはならない",
-      "可観測性要件: 本番環境のログは障害調査に使える粒度を維持しつつ、機微情報の露出を最小化すること",
+      "情報セキュリティ基準: 社内ツールであっても社内規程およびプライバシー保護原則（最小特権・機微情報の保護）を遵守すること",
+      "堅牢性要件: エンドユーザー向けレスポンスに不要な内部システム情報を露出させないこと（Fail-Safe原則）",
     ],
     pr_description: {
       title: "feat(logging): 社内ヘルプデスク向け問い合わせロギングとエラーハンドラの刷新",
@@ -384,13 +396,22 @@ AI同僚（AIエージェント）が作成した「問い合わせ内容をロ�
     },
     context_documents: [
       {
-        id: "memo-security-privacy",
-        title: "個人情報保護・情報セキュリティ運用規定 ガイドライン",
+        id: "slack-security-review",
+        title: "#it-security 脆弱性診断フィードバック",
+        type: "slack",
+        source: "Slack",
+        timestamp: "先週木曜 15:40",
+        content:
+          "情シス田中: お疲れ様です！先日のセキュリティ監査で、『社内限定ツールだからといって、エラーレスポンスに生のスタックトレースや内部コンテキストが丸見えになっているのは、万一の内部不正や権限昇格攻撃の踏み台にされるリスクがある』と指摘を受けました。エラー時は汎用メッセージを返し、詳細はサーバーログ側にのみ残す方針で統一してください。\n\nAI同僚: 承知しました！迅速な一次切り分けとセキュリティのバランスを考慮して実装します。",
+      },
+      {
+        id: "memo-privacy-guideline",
+        title: "社内データ取り扱いガイドライン（抜粋）",
         type: "memo",
-        source: "社内コンプライアンス委員会",
+        source: "コンプライアンス委員会",
         timestamp: "2026-04-10",
         content:
-          "【第4条 個人情報のログ記録】問い合わせ内容に個人情報が含まれる場合、ログへの平文出力は厳禁とし、適切なマスキングまたはハッシュ化を行うこと。また、保存期間（90日）を超過したデータは自動パージされなければならない。\n【第7条 エラー画面の開示範囲】利用者に返却するエラー画面に、スタックトレース・内部DB構造・サーバーパス・環境変数を表示することは重大な情報漏洩リスクに該当するため禁止する。",
+          "【第4条 ログ記録とプライバシー】\n業務ログを永続化する際は、社員番号・氏名・連絡先などの個人情報が含まれないよう配慮（マスキングや暗号化）すること。また、ログストアの保存期間ポリシー（最長90日等）に適合しない無制限な蓄積は是正対象となる。",
       },
     ],
     initial_ai_draft: `// AI同僚が生成した問い合わせロギングミドルウェア（初版ドラフト）

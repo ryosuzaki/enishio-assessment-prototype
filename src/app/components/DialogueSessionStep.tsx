@@ -97,7 +97,7 @@ export function DialogueSessionStep({
           <div className="flex items-center justify-between border-b border-slate-800 pb-2 shrink-0">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
               <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-              <span>【第1ペイン】業務要件と制約条件</span>
+              <span>【第1ペイン】開発Issue ＆ チーム情報</span>
             </div>
           </div>
 
@@ -112,7 +112,7 @@ export function DialogueSessionStep({
               }`}
             >
               <FileText className="w-3 h-3" />
-              要件・制約
+              開発Issue
             </button>
             <button
               onClick={() => setLeftTab("context")}
@@ -123,7 +123,7 @@ export function DialogueSessionStep({
               }`}
             >
               <MessageSquare className="w-3 h-3 text-indigo-400" />
-              関連Slack・経緯
+              運用コンテキスト
               {selectedTask.context_documents && (
                 <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 font-mono">
                   {selectedTask.context_documents.length}
@@ -138,7 +138,7 @@ export function DialogueSessionStep({
                 {selectedTask.scenario_intro}
               </p>
               <div className="space-y-1.5 pt-1">
-                <span className="text-[11px] font-bold text-slate-400">必須要件:</span>
+                <span className="text-[11px] font-bold text-slate-400">受入基準（Acceptance Criteria）:</span>
                 {selectedTask.business_requirements.map((req, i) => (
                   <div key={i} className="text-xs text-slate-300 bg-slate-900/70 p-2.5 rounded-lg border border-slate-800 leading-relaxed">
                     {req}
@@ -146,9 +146,9 @@ export function DialogueSessionStep({
                 ))}
               </div>
               <div className="space-y-1.5 pt-1">
-                <span className="text-[11px] font-bold text-amber-400">制約・セキュリティ基準:</span>
+                <span className="text-[11px] font-bold text-slate-400">非機能・運用目標:</span>
                 {selectedTask.constraints.map((c, i) => (
-                  <div key={i} className="text-xs text-amber-200/90 bg-amber-950/20 p-2.5 rounded-lg border border-amber-900/30 leading-relaxed">
+                  <div key={i} className="text-xs text-slate-300 bg-slate-900/40 p-2.5 rounded-lg border border-slate-800/80 leading-relaxed">
                     {c}
                   </div>
                 ))}
@@ -157,7 +157,7 @@ export function DialogueSessionStep({
           ) : (
             <div className="space-y-2.5 flex-1 overflow-y-auto">
               <div className="text-[10px] text-slate-400 italic">
-                ※ 関連チャンネルのやり取りや障害報告メモです。散らばった情報から暗黙の前提や経緯を読み解いてください。
+                ※ チーム内Slack、過去の障害報告書、社内規程メモです。散らばった情報から運用環境の前提を読み解いてください。
               </div>
               {selectedTask.context_documents?.map((doc) => (
                 <div key={doc.id} className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1.5 text-xs">
