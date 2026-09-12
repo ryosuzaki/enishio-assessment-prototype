@@ -31,9 +31,9 @@ export async function POST(req: Request) {
       );
     }
 
-    if (action !== "approve" && action !== "remand") {
+    if (action !== "approve" && action !== "remand" && action !== "comment") {
       return NextResponse.json(
-        { success: false, error: "判定アクションは 'approve' または 'remand' を指定してください" },
+        { success: false, error: "判定アクションは 'approve', 'remand', または 'comment' を指定してください" },
         { status: 400 }
       );
     }

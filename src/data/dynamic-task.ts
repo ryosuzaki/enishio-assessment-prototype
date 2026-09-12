@@ -54,60 +54,60 @@ export const DYNAMIC_TASKS: DynamicTaskScenario[] = [
     title: "金融決済APIのレートリミットおよびトークン検証ロジックのレビュー",
     domain: "fintech_security",
     target_dimension: "axis_4",
-    scenario_intro: `あなたはFinTech決済サービスを開発するチームのエンジニアです。
-同僚のAIエンジニアが作成した「決済APIのエンドポイント保護とレートリミット制御コード」のPR（プルリクエスト）をレビューし、
-受入要件やチームの運用基準に適合しているかを検証し、本番デプロイ可能か（Approve）、あるいは修正・差し戻しが必要か（Remand）を対話を通じて判断してください。`,
+    scenario_intro: `【🎯 あなたの目標】
+来週の大型決済キャンペーン本番リリースに向け、AI同僚が作成した PR #204 をレビューしてください。
+単に欠陥を探すのではなく、チームの運用基準を満たす安全な水準までAI同僚と議論・修正し、チームとしてのリリース判断（承認 / 条件付き承認 / 修正要求）を決定することがゴールです。`,
     business_requirements: [
-      "1. 一般ユーザー（無料）は 60 req/min、プレミアム加盟店は 1000 req/min のレートリミットを適用すること",
-      "2. JWTトークンの検証を行い、正当な認証済みリクエストのみを通過させること",
-      "3. 決済APIの急増するトラフィックに対応し、低レイテンシで決済受付を完了すること",
+      "1. 【レート制限の機能性】一般ユーザー（無料）は 60 req/min、プレミアム加盟店は 1,000 req/min の頻度制御を適用し、超過時は 429 を返却すること",
+      "2. 【耐障害性と可用性】決済受付はチームの最重要サービス。周辺基盤（Redis等）の障害や瞬断時にも、決済基盤全体の全停止（巻き添え死）を避けること",
+      "3. 【セキュリティと規程遵守】金融決済システム（PCI DSS等）として、不正トークンや失効トークンがすり抜けない安全性を担保すること",
     ],
     constraints: [
-      "可用性SLA: 決済受付はチームの最重要サービスであり、外部依存サービスの瞬断時にも決済基盤全体の可用性を維持すること",
-      "セキュリティ基準: 金融決済システムとしてPCI DSS等の業界セキュリティ規程を遵守すること",
+      "【🚫 レビュー対象外】コードスタイル・命名・フォーマットはCI/Linterで自動修正されるため対象外です。またExpressルーティングやインフラ設定も本PRの対象外です。",
+      "【SLA目標】決済受付APIの p99 レイテンシを 15ms 以内に維持し、急激なスパイクアクセス下でも安定して動作すること",
     ],
     pr_description: {
       title: "feat(auth): 決済APIのレート制限導入と署名検証のインメモリ高速化",
       author: "AI-Peer (Backend Assistant)",
       branch: "feature/payment-rate-limit-opt",
       summary:
-        "決済APIの急増するトラフィックに対応するため、Redisを用いたスライディングウィンドウ型レートリミットを導入しました。またDB負荷軽減のため、JWT署名検証をローカル公開鍵方式に切り替えて高スループットを実現しています。",
+        "来週のキャンペーン時のトラフィック急増に対応するため、Redisを用いたスライディングウィンドウ型レート制限を導入しました。またDB負荷軽減と低レイテンシ（<15ms）達成のため、JWT検証をローカル公開鍵によるインメモリ署名検証に切り替えて高スループットを実現しています。",
       changes: [
         "Expressミドルウェアによるトークン検証とレートリミットの一元化",
         "加盟店別のアクセス頻度制御（一般: 60 req/min, 加盟店: 1000 req/min）",
-        "暗号化キーローテーション時のダウンタイムを避けるための後方互換性サポート",
+        "暗号化キーローテーション時のダウンタイムを避けるための過去世代キー（x-key-version）許容",
       ],
     },
     context_documents: [
       {
         id: "slack-dev-payment",
-        title: "#dev-payment チーム議論",
+        title: "#dev-payment チーム告知",
         type: "slack",
         source: "Slack",
         timestamp: "昨日 14:15",
         content:
-          "SRE高橋: お疲れ様です！来月の大型セールに向けてRedisクラスタの増強を進めていますが、先期のようにフェイルオーバー時に数秒の瞬断が発生する可能性があります。決済受付APIは一番クリティカルなので、Redisが一時的に応答しなくなっても全決済が500で巻き添え死しないよう、フォールバック設計を意識してくださいね。\n\nAI同僚: 了解です！高速化と合わせて対応進めます！",
+          "SRE高橋: お疲れ様です！来週水曜深夜2:00〜4:00に、セール対策のRedisクラスタ増強に伴うノード切り替え（フェイルオーバー）試験を実施します。\n切り替え時に2〜3秒の通信途絶（ECONNREFUSED / ETIMEDOUT）が発生する見込みです。昨期のインシデント（INC-2025-0812）のように、Redisの瞬断で決済API全体が一律500を返して全停止しないよう、各サービスのタイムアウト設定とフォールバック（縮退運転）を徹底してください！\n\nAI同僚: 了解しました！今回のレートリミットPRでも意識して対応進めます！",
       },
       {
         id: "slack-security-audit",
-        title: "#security-compliance 周知",
+        title: "#security-compliance 監査通知",
         type: "slack",
         source: "Slack",
         timestamp: "2日前 10:30",
         content:
-          "セキュリティ安田: 【重要】来月のPCI DSS年次監査について。特権アカウントやトークン失効（強制ログアウト、不正検知時のブラックリスト）の即時反映が重点確認項目になっています。失効したトークンがキャッシュやインメモリ検証で生き残り続けるような結果整合性の放置は指摘対象になりますので、各API担当は失効状態の検知フローを再確認してください。",
+          "セキュリティ安田: 【全社周知】来月のPCI DSS v4.0（要件8.3: 資格情報失効とセッション管理）年次監査の事前チェックリストを共有します。\n特に不正検知チームがRedisブラックリストに流す「強制ログアウト・盗難トークン失効イベント」が、認証ゲートウェイ側で即座に検証・遮断されているかが重点確認項目です。トークンの有効期限（exp）だけを見て失効をスルーする実装は監査一発NGとなりますので、各API担当は必ず失効判定フローを確認してください。",
       },
       {
         id: "incident-postmortem-cache",
-        title: "過去インシデント報告書 INC-2025-0812（抜粋）",
+        title: "決済基盤障害報告書 INC-2025-0812（抜粋）",
         type: "incident",
         source: "社内Wiki Postmortem",
         timestamp: "2025-08-15",
         content:
-          "【事象概要】Redisクラスタのノード切り替えに伴う2秒間の通信途絶により、接続中だった決済APIインスタンスがエラーハンドラ内で一律500 Internal Server Errorを返却し、全加盟店で決済が全停止した。\n【再発防止策】キャッシュやレートリミット等の周辺サービス障害時は、セキュリティ上許容される範囲でフェイルオープンまたはグレースフル・デグラデーション（縮退運転）を行い、決済本体の可用性を優先すること。",
+          "【事象概要】ElastiCache (Redis) の定期フェイルオーバー時、決済APIインスタンス群が接続エラー例外を適切にハンドリングできず、未捕捉エラーとして全リクエストに HTTP 500 を返却。約3分間にわたり全加盟店の決済が完全停止した。\n【根本原因】レートリミットやキャッシュ等の周辺サービス呼び出しを共通try-catchで一括処理しており、周辺障害と決済本体の異常を区別していなかった。\n【恒久是正策】周辺サービス障害時は、可用性を最優先とし、エラーログ記録の上でレート制限をバイパス（フェイルオープン）またはローカル制限へフォールバックすること。",
       },
     ],
-    initial_ai_draft: `// AI同僚が生成した決済APIミドルウェア（初版ドラフト）
+    initial_ai_draft: `// AI同僚が作成した決済API認証・レート制限ミドルウェア（初版ドラフト）
 import { Request, Response, NextFunction } from "express";
 import Redis from "ioredis";
 
@@ -122,13 +122,13 @@ export async function paymentSecurityMiddleware(req: Request, res: Response, nex
   }
 
   try {
-    // トークン検証: JWT署名検証による高速化（署名確認のみ実施）
-    const decoded = verifyJwtSignatureOnly(token);
+    // 1. トークン認証: DBアクセスを排し、ローカル公開鍵によるJWT署名検証で高速処理
+    const decoded = verifyToken(token);
     if (!decoded) {
       return res.status(401).json({ error: "Invalid signature" });
     }
 
-    // レートリミット制御: Redisスライディングウィンドウ
+    // 2. レートリミット制御: Redisスライディングウィンドウ
     const limit = merchantId ? 1000 : 60;
     const currentRequests = await redis.incr(\`rate:\${decoded.userId}\`);
     if (currentRequests === 1) {
@@ -138,7 +138,7 @@ export async function paymentSecurityMiddleware(req: Request, res: Response, nex
       return res.status(429).json({ error: "Rate limit exceeded" });
     }
 
-    // 暗号化キーのローテーション対応: 過去2世代のキーバージョンを許容
+    // 3. 暗号化キーローテーション対応: ダウンタイムゼロ移行のため過去世代キーバージョンを許容
     const keyId = req.headers["x-key-version"] || "v1";
     req.cryptoContext = { keyId, verifiedUser: decoded.userId };
 
@@ -149,8 +149,8 @@ export async function paymentSecurityMiddleware(req: Request, res: Response, nex
   }
 }
 
-function verifyJwtSignatureOnly(token: string) {
-  // ローカル公開鍵での署名検証のみ実行
+function verifyToken(token: string) {
+  // ローカル公開鍵による署名・フォーマット検証
   return { userId: "user-12345", role: "merchant" };
 }`,
     test_code: `// tests/payment-security.test.ts
@@ -191,11 +191,6 @@ describe("paymentSecurityMiddleware", () => {
     await paymentSecurityMiddleware(req, res, next);
     expect(next).toHaveBeenCalled();
   });
-
-  // ⚠️ 【現場の抜け穴】
-  // ・強制ログアウト・失効トークン（PCI DSS失効伝播）をブロックするテストケースが未実装
-  // ・Redisダウン時・瞬断時のフォールバック可用性検証テストが未実装
-  // ・一般（60req）vs 加盟店（1000req）の超過時429レスポンス検証テストが未実装
 });`,
     stimulus_features: {
       variable_count: 5,
@@ -209,9 +204,9 @@ describe("paymentSecurityMiddleware", () => {
     title: "ECサイト在庫管理・注文キャンセル/返金APIのレビュー",
     domain: "ecommerce_transaction_integrity",
     target_dimension: "axis_4",
-    scenario_intro: `あなたはECサイトを運営する開発チームのエンジニアです。
-同僚のAIエンジニアが作成した「注文キャンセル・返金処理API」のPR（プルリクエスト）をレビューし、
-受入要件やチームの運用基準に適合しているかを検証し、本番デプロイ可能か（Approve）、あるいは修正・差し戻しが必要か（Remand）を対話を通じて判断してください。`,
+    scenario_intro: `【🎯 あなたの目標】
+セール対策の注文キャンセル・返金APIに関する PR をレビューしてください。
+データ整合性や運用信頼性を担保できる安全な水準までAI同僚と議論・修正し、チームとしてのリリース判断（承認 / 条件付き承認 / 修正要求）を決定することがゴールです。`,
     business_requirements: [
       "1. 注文キャンセル受付時に非同期で返金キューへ処理をエンキューし、クライアントへ即座に応答（202）を返すこと",
       "2. 決済プロバイダからの返金確定Webhookを受信した段階で、在庫を適切に復元すること",
@@ -353,10 +348,6 @@ describe("Order Cancellation & Refund Pipeline", () => {
     await refundConfirmedWebhookHandler(req, res);
     expect(res.status).toHaveBeenCalledWith(200);
   });
-
-  // ⚠️ 【現場の抜け穴】
-  // ・Webhookの重複配信（at-least-once）による在庫の多重戻し（オーバーカウント）の並行実行テストが未実装
-  // ・返金キュー（refundQueue.push）失敗時のリトライ・DLQ・アラート監視テストが未実装
 });`,
     stimulus_features: {
       variable_count: 5,
@@ -370,9 +361,9 @@ describe("Order Cancellation & Refund Pipeline", () => {
     title: "社内ヘルプデスクAIチャットボットのログ記録ミドルウェアのレビュー",
     domain: "internal_tooling_privacy",
     target_dimension: "axis_4",
-    scenario_intro: `あなたは社内DX推進チームのエンジニアです。
-同僚のAIエンジニアが作成した「社内ヘルプデスク問い合わせロギングとエラーハンドラ」のPR（プルリクエスト）をレビューし、
-受入要件や情報セキュリティ基準に適合しているかを検証し、本番デプロイ可能か（Approve）、あるいは修正・差し戻しが必要か（Remand）を対話を通じて判断してください。`,
+    scenario_intro: `【🎯 あなたの目標】
+社内ヘルプデスク向けロギングとエラーハンドラの PR をレビューしてください。
+プライバシー規程やセキュリティ基準を満たす安全な水準までAI同僚と議論・修正し、チームとしてのリリース判断（承認 / 条件付き承認 / 修正要求）を決定することがゴールです。`,
     business_requirements: [
       "1. 社員からの問い合わせ内容を監査用ログストアへ確実に永続化し、対応履歴のトレーサビリティを確保すること",
       "2. アプリケーションログの肥大化を防ぎつつ、障害調査に必要な最小限の可観測性を担保すること",
@@ -480,11 +471,6 @@ describe("Inquiry Logging Middleware", () => {
     inquiryErrorHandler(error, req, res, next);
     expect(res.status).toHaveBeenCalledWith(500);
   });
-
-  // ⚠️ 【現場の抜け穴】
-  // ・氏名・社員番号などの個人情報（PII）が平文保存されずマスキングされるかのテストが未実装
-  // ・エラーレスポンスにスタックトレースや内部コンテキストが外部漏洩しないかの検証テストが未実装
-  // ・個人情報保護規定に定める保存期間（90日）超過ログの自動削除テストが未実装
 });`,
     stimulus_features: {
       variable_count: 5,

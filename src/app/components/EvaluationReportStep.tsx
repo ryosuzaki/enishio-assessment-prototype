@@ -24,7 +24,7 @@ import {
 interface EvaluationReportStepProps {
   evaluation: EvaluationResult;
   chatHistory: ChatMessage[];
-  prelimAction?: "approve" | "remand" | "";
+  prelimAction?: "approve" | "remand" | "comment" | "";
   prelimJustification?: string;
   anchorId?: string;
   anchorStatus?: string;
@@ -303,6 +303,8 @@ export function EvaluationReportStep({
                     ? "bg-emerald-950 text-emerald-300 border border-emerald-800/50"
                     : prelimAction === "remand"
                     ? "bg-rose-950 text-rose-300 border border-rose-800/50"
+                    : prelimAction === "comment"
+                    ? "bg-sky-950 text-sky-300 border border-sky-800/50"
                     : "text-slate-400"
                 }`}
                 data-testid="prelim-action-display"
@@ -311,6 +313,8 @@ export function EvaluationReportStep({
                   ? "承認 (Approve)"
                   : prelimAction === "remand"
                   ? "差し戻し (Remand)"
+                  : prelimAction === "comment"
+                  ? "条件付き承認 (Comment)"
                   : "未選択"}
               </span>
             </div>
@@ -326,6 +330,10 @@ export function EvaluationReportStep({
                 ? `受講者はドラフトを「承認」と判断しましたが、対話ログからは仕込み不備（${matchedFlaws.join(", ")}）に対応する検証行動が抽出されています。`
                 : prelimAction === "remand" && matchedFlaws.length > 0
                 ? `受講者の「差し戻し」判断と、AI採点器が抽出した仕込み不備（${matchedFlaws.join(", ")}）への検証行動が対応しています。`
+                : prelimAction === "comment" && matchedFlaws.length > 0
+                ? `受講者は「条件付き承認」と判断し、不備（${matchedFlaws.join(", ")}）への検証行動を踏まえて追加条件付きでのリリースを指示しています。`
+                : prelimAction === "comment" && matchedFlaws.length === 0
+                ? "受講者は「条件付き承認」と判断しましたが、仕込み不備に対する直接の検証行動は抽出されませんでした。"
                 : prelimAction === "remand" && matchedFlaws.length === 0
                 ? "受講者は「差し戻し」と判断しましたが、仕込み不備に対する直接の検証行動は抽出されませんでした。"
                 : "受講者の「承認」判断と、不備指摘の非抽出状態が一致しています。"}

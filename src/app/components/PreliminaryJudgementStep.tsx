@@ -19,8 +19,8 @@ import type { ChatMessage } from "../types";
 interface PreliminaryJudgementStepProps {
   taskId?: string;
   chatHistory?: ChatMessage[];
-  prelimAction: "approve" | "remand" | "";
-  setPrelimAction: (action: "approve" | "remand" | "") => void;
+  prelimAction: "approve" | "remand" | "comment" | "";
+  setPrelimAction: (action: "approve" | "remand" | "comment" | "") => void;
   prelimJustification: string;
   setPrelimJustification: (justification: string) => void;
   prelimError: string | null;
@@ -95,7 +95,7 @@ export function PreliminaryJudgementStep({
       <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
         AIによる自動採点およびXAIレポートを開示する前に、受講者自身の最終判定をコミットさせます（Force Decision First）。
         <strong>白紙textareaへの長文再作文は恒久的に廃止されました（[D-80]）。</strong>
-        進行役が対話ログから整理した以下の論点要約を確認し、GitHub PRレビュー形式で［承認］または［差し戻し］の意思決定をワンクリックで確定してください。
+        進行役が対話ログから整理した以下の論点要約を確認し、GitHub PRレビュー形式で［承認］［条件付き承認］［差し戻し］の意思決定をワンクリックで確定してください。
       </p>
 
       {prelimError && (
@@ -166,9 +166,9 @@ export function PreliminaryJudgementStep({
           <span>① このプルリクエストに対する最終意思決定（GitHub PRレビュー形式・必須）</span>
           <span className="text-indigo-400 text-[10px] font-normal">※ 選択するだけでワンクリック確定可能</span>
         </label>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <label
-            className={`flex items-start gap-3 p-4 rounded-xl border transition-all cursor-pointer ${
+            className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
               prelimAction === "remand"
                 ? "bg-amber-600/15 border-amber-500 text-white shadow-lg shadow-amber-500/10"
                 : "bg-slate-950/40 border-slate-800 text-slate-300 hover:border-slate-700"
@@ -183,17 +183,42 @@ export function PreliminaryJudgementStep({
               className="mt-1 text-amber-600 focus:ring-0"
             />
             <div>
-              <div className="text-sm font-bold text-amber-400 flex items-center gap-1.5">
-                <AlertTriangle className="w-4 h-4" /> ⚠️ 差し戻す (Request Changes)
+              <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4" /> ⚠️ 修正を要求 (Request Changes)
               </div>
-              <p className="text-xs text-slate-400 mt-1">
-                セキュリティ基準違反や要件不備、暗黙の前提破綻があり、本番リリース不可と判定。上記の指摘事項の修正を指示。
+              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                重大な障害リスクや規程違反（P0ブロッカー）が残っており、本番リリース不可と判定。修正を指示。
               </p>
             </div>
           </label>
 
           <label
-            className={`flex items-start gap-3 p-4 rounded-xl border transition-all cursor-pointer ${
+            className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
+              prelimAction === "comment"
+                ? "bg-sky-600/15 border-sky-500 text-white shadow-lg shadow-sky-500/10"
+                : "bg-slate-950/40 border-slate-800 text-slate-300 hover:border-slate-700"
+            }`}
+          >
+            <input
+              type="radio"
+              name="prelim_action"
+              value="comment"
+              checked={prelimAction === "comment"}
+              onChange={() => setPrelimAction("comment")}
+              className="mt-1 text-sky-600 focus:ring-0"
+            />
+            <div>
+              <div className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+                <MessageSquare className="w-4 h-4" /> 💬 条件付きで進める (Comment)
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                主要設計には合意。ステージング環境での追加検証や運用監視（アラート設定）の追加を条件として許可。
+              </p>
+            </div>
+          </label>
+
+          <label
+            className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
               prelimAction === "approve"
                 ? "bg-emerald-600/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/10"
                 : "bg-slate-950/40 border-slate-800 text-slate-300 hover:border-slate-700"
@@ -208,11 +233,11 @@ export function PreliminaryJudgementStep({
               className="mt-1 text-emerald-600 focus:ring-0"
             />
             <div>
-              <div className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+              <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4" /> ✅ 承認する (Approve)
               </div>
-              <p className="text-xs text-slate-400 mt-1">
-                要件を満たしており、セキュリティ・可用性基準に適合していると判定。本番デプロイを許可。
+              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                要件およびチーム運用基準を満たしており、このまま本番デプロイ可能と判定。
               </p>
             </div>
           </label>

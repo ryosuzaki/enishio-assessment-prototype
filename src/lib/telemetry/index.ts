@@ -349,14 +349,14 @@ export async function recordScoreFeedback(params: RecordScoreFeedbackParams) {
 export interface RecordPreliminaryJudgementParams {
   sessionId: string;
   stepId: string;
-  action: "approve" | "remand";
+  action: "approve" | "remand" | "comment";
   justification: string;
 }
 
 /**
  * Record CFF preliminary judgement and mandatory justification [MVP 2.5, 4.4, T-17b, D-80]
  * Must be executed before showing AI evaluation report (Force Decision First).
- * Justification is mandatory for both approval and remand (Mandatory Justification).
+ * Justification is mandatory for all decisions (Mandatory Justification).
  */
 export async function recordPreliminaryJudgement(params: RecordPreliminaryJudgementParams) {
   if (!params.justification || params.justification.trim().length === 0) {
@@ -364,9 +364,9 @@ export async function recordPreliminaryJudgement(params: RecordPreliminaryJudgem
       "Validation error: justification is mandatory for preliminary judgement [MVP 2.5, T-17b]"
     );
   }
-  if (params.action !== "approve" && params.action !== "remand") {
+  if (params.action !== "approve" && params.action !== "remand" && params.action !== "comment") {
     throw new Error(
-      `Validation error: action must be 'approve' or 'remand', received: ${params.action}`
+      `Validation error: action must be 'approve', 'remand', or 'comment', received: ${params.action}`
     );
   }
 

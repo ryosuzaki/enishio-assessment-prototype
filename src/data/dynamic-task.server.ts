@@ -18,7 +18,7 @@ export const INJECTED_FLAWS_BY_TASK: Record<string, InjectedFlaw[]> = {
       flaw_id: "FLAW-01",
       flaw_type: "type_B",
       title: "トークン失効（強制ログアウト）の完全無視（結果整合性・セキュリティ前提の隠蔽）",
-      span_text: "verifyJwtSignatureOnly(token)",
+      span_text: "verifyToken(token)",
       is_flaw: true,
       description: "PCI DSSおよび要件2に反し、ログアウトや不正検知で失効したトークンが24時間有効なまま通過してしまう重大なセキュリティ欠陥。",
     },

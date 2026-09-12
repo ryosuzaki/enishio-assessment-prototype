@@ -91,7 +91,7 @@ export default function AssessmentPrototypePage() {
   const [focusInputNote, setFocusInputNote] = useState<string>("");
 
   // CFF: Force Decision First & Mandatory Justification State [MVP 2.5, T-17b, D-80]
-  const [prelimAction, setPrelimAction] = useState<"approve" | "remand" | "">("");
+  const [prelimAction, setPrelimAction] = useState<"approve" | "remand" | "comment" | "">("");
   const [prelimJustification, setPrelimJustification] = useState<string>("");
   const [prelimError, setPrelimError] = useState<string | null>(null);
 

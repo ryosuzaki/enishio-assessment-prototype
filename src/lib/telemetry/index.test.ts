@@ -191,10 +191,10 @@ describe("recordPreliminaryJudgement", () => {
 
 
 
-  it("throws when action is neither 'approve' nor 'remand'", async () => {
+  it("throws when action is invalid", async () => {
     await expect(
       recordPreliminaryJudgement(baseJudgementParams({ action: "reject" as never }))
-    ).rejects.toThrow(/action must be 'approve' or 'remand'/);
+    ).rejects.toThrow(/action must be 'approve', 'remand', or 'comment'/);
     expect(prisma.learnerPreliminaryJudgement.create).not.toHaveBeenCalled();
   });
 
@@ -208,6 +208,13 @@ describe("recordPreliminaryJudgement", () => {
   it("succeeds for valid 'remand' params", async () => {
     await expect(
       recordPreliminaryJudgement(baseJudgementParams({ action: "remand" }))
+    ).resolves.toEqual({ judgement_id: "judgement-1" });
+    expect(prisma.learnerPreliminaryJudgement.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("succeeds for valid 'comment' params", async () => {
+    await expect(
+      recordPreliminaryJudgement(baseJudgementParams({ action: "comment" }))
     ).resolves.toEqual({ judgement_id: "judgement-1" });
     expect(prisma.learnerPreliminaryJudgement.create).toHaveBeenCalledTimes(1);
   });
