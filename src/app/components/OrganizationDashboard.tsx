@@ -28,6 +28,7 @@ import {
 interface OrganizationDashboardProps {
   onStartSession: () => void;
   onViewLearnerProfile?: (learnerId?: string) => void;
+  onViewBenchmarkGallery?: (taskId?: string) => void;
 }
 
 export interface LearnerItem {
@@ -202,6 +203,7 @@ const TEAMS_SUMMARY: TeamSummary[] = [
 export function OrganizationDashboard({
   onStartSession,
   onViewLearnerProfile,
+  onViewBenchmarkGallery,
 }: OrganizationDashboardProps) {
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -298,6 +300,15 @@ export function OrganizationDashboard({
             <Download className="w-3.5 h-3.5 text-blue-400" />
             <span>助成金用受講ログCSV</span>
           </button>
+          {onViewBenchmarkGallery && (
+            <button
+              onClick={() => onViewBenchmarkGallery()}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-700/60 text-indigo-200 text-xs font-semibold transition-all"
+            >
+              <Award className="w-3.5 h-3.5 text-amber-400" />
+              <span>行動比較ギャラリー</span>
+            </button>
+          )}
           <button
             onClick={onStartSession}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 transition-all"

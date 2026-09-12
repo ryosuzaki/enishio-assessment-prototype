@@ -6,6 +6,7 @@ import { DYNAMIC_TASKS, getDynamicTask } from "@/data/dynamic-task";
 import { levenshtein } from "@/lib/edit-distance";
 import type {
   AnchorItem,
+  AnchorBankSourceView,
   ChatMessage,
   FocusItem,
   EvaluationResult,
@@ -15,8 +16,7 @@ import type {
   AppTab,
 } from "./types";
 import { MAX_PROBES_PER_SESSION } from "./types";
-import type { AnchorBankSourceView } from "./types";
-import { Play, Building2, UserCheck } from "lucide-react";
+import { Play, Building2, UserCheck, Award } from "lucide-react";
 import { InitStep } from "./components/InitStep";
 import { AnchorQuestionStep } from "./components/AnchorQuestionStep";
 import { DialogueSessionStep } from "./components/DialogueSessionStep";
@@ -30,10 +30,12 @@ import { TelemetryPanel } from "./components/TelemetryPanel";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { OrganizationDashboard } from "./components/OrganizationDashboard";
 import { LearnerProfile } from "./components/LearnerProfile";
+import { BenchmarkGallery } from "./components/BenchmarkGallery";
 
 export default function AssessmentPrototypePage() {
   // Navigation & Tab State ([D-79]: 2-layer Viability & Feasibility)
   const [activeTab, setActiveTab] = useState<AppTab>("session");
+  const [galleryTaskId, setGalleryTaskId] = useState<string>(DYNAMIC_TASKS[0].task_id);
 
   // Session & Phase State
   const [sessionId, setSessionId] = useState<string>("");
@@ -135,6 +137,10 @@ export default function AssessmentPrototypePage() {
         setActiveTab("org_dashboard");
       } else if (tab === "profile" || tab === "learner") {
         setActiveTab("learner_profile");
+      } else if (tab === "gallery" || tab === "benchmark") {
+        setActiveTab("benchmark_gallery");
+        const task = params.get("task");
+        if (task) setGalleryTaskId(task);
       } else if (tab === "session") {
         setActiveTab("session");
       }
@@ -717,6 +723,18 @@ export default function AssessmentPrototypePage() {
             <UserCheck className="w-3.5 h-3.5" />
             <span>② 受講者スキルカルテ（Viability・モックUI）</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("benchmark_gallery")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+              activeTab === "benchmark_gallery"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+            }`}
+          >
+            <Award className="w-3.5 h-3.5 text-amber-400" />
+            <span>③ 行動比較ギャラリー（専門家・他受講者）</span>
+          </button>
         </div>
 
         <div className="text-xs text-slate-500 hidden xl:flex items-center gap-2">
@@ -730,6 +748,10 @@ export default function AssessmentPrototypePage() {
         <OrganizationDashboard
           onStartSession={() => setActiveTab("session")}
           onViewLearnerProfile={() => setActiveTab("learner_profile")}
+          onViewBenchmarkGallery={(taskId) => {
+            if (taskId) setGalleryTaskId(taskId);
+            setActiveTab("benchmark_gallery");
+          }}
         />
       )}
 
@@ -746,7 +768,22 @@ export default function AssessmentPrototypePage() {
         />
       )}
 
-      {/* Tab 3: Core Evaluation Session (Vertical Cut) */}
+      {/* Tab 3: Scenario Benchmark & Archetype Gallery */}
+      {activeTab === "benchmark_gallery" && (
+        <BenchmarkGallery
+          initialTaskId={galleryTaskId}
+          onStartSession={(taskId) => {
+            if (taskId) {
+              const matched = DYNAMIC_TASKS.find((t) => t.task_id === taskId);
+              if (matched) setSelectedTaskId(matched.task_id);
+            }
+            setActiveTab("session");
+          }}
+          onBackToDashboard={() => setActiveTab("org_dashboard")}
+        />
+      )}
+
+      {/* Tab 4: Core Evaluation Session (Vertical Cut) */}
       {activeTab === "session" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Main Content Area */}
@@ -863,6 +900,10 @@ export default function AssessmentPrototypePage() {
               disputeSubmitted={disputeSubmitted}
               onSubmitDispute={handleSubmitDispute}
               onResetToInit={() => setCurrentStep("init")}
+              onViewBenchmarkGallery={() => {
+                setGalleryTaskId(selectedTaskId);
+                setActiveTab("benchmark_gallery");
+              }}
             />
           )}
         </div>

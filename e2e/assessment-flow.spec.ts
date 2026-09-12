@@ -715,5 +715,43 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.locator("h1")).toContainText("評価的判断力 動的アセスメント＆テレメトリ基盤");
     await expect(page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" })).toBeVisible();
   });
+
+  test("③ シナリオ別行動比較ギャラリーの表示・シナリオ切替・ペルソナ切替・演習遷移が動作する", async ({ page }) => {
+    await page.goto("/");
+
+    // 行動比較ギャラリータブへの切替
+    const galleryTabBtn = page.getByRole("button", { name: /③ 行動比較ギャラリー/ });
+    await expect(galleryTabBtn).toBeVisible();
+    await galleryTabBtn.click();
+
+    // ギャラリーヘッダーとインサイトの確認
+    await expect(page.locator("h1")).toContainText("シナリオ別行動比較ギャラリー");
+    await expect(page.getByText("【急所インサイト】")).toBeVisible();
+    await expect(page.getByText("受講者の評価バンド分布")).toBeVisible();
+
+    // 専門家のお手本ペルソナが表示されていることを確認
+    await expect(page.getByText("👑 専門家のお手本").first()).toBeVisible();
+    await expect(page.getByText("実際の対話ログ（Dialogue Transcript）")).toBeVisible();
+    await expect(page.getByText("最終成果物のコード差分")).toBeVisible();
+    await expect(page.getByText("AutoSCORE 採点根拠 & エキスパート講評")).toBeVisible();
+
+    // ペルソナの切替（AI過信者）
+    const blindPersonaBtn = page.getByRole("button", { name: /❌ AI過信者/ });
+    await expect(blindPersonaBtn).toBeVisible();
+    await blindPersonaBtn.click();
+
+    await expect(page.getByText("山本 大樹").first()).toBeVisible();
+    await expect(page.getByText("Level 1: 盲目的追従").first()).toBeVisible();
+
+    // 課題の演習開始ボタンを押してセッション画面へ遷移
+    const startExerciseBtn = page.getByRole("button", { name: "この課題の演習を解いてみる" });
+    await expect(startExerciseBtn).toBeVisible();
+    await startExerciseBtn.click();
+
+    // セッションタブに戻ることを確認
+    await expect(page.locator("h1")).toContainText("評価的判断力 動的アセスメント＆テレメトリ基盤");
+    await expect(page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" })).toBeVisible();
+  });
 });
+
 

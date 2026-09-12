@@ -9,6 +9,8 @@ import {
   Scale,
   ArrowRightLeft,
   Anchor,
+  Award,
+  ChevronRight,
 } from "lucide-react";
 import {
   DISAGREEMENT_OPTIONS,
@@ -38,6 +40,7 @@ interface EvaluationReportStepProps {
   disputeSubmitted: boolean;
   onSubmitDispute: () => void;
   onResetToInit: () => void;
+  onViewBenchmarkGallery?: () => void;
 }
 
 // 対話ログの1メッセージ本文に対し、同一ターンの evidenceComponents.quoted_span が
@@ -116,6 +119,7 @@ export function EvaluationReportStep({
   disputeSubmitted,
   onSubmitDispute,
   onResetToInit,
+  onViewBenchmarkGallery,
 }: EvaluationReportStepProps) {
   const components = evaluation?.evidenceComponents ?? [];
   const matchedFlaws = Array.from(
@@ -530,6 +534,30 @@ export function EvaluationReportStep({
           </div>
         )}
       </div>
+
+      {/* Debriefing & Benchmark Gallery Link */}
+      {onViewBenchmarkGallery && (
+        <div className="p-4 rounded-xl border border-indigo-900/60 bg-gradient-to-r from-indigo-950/40 via-slate-900 to-blue-950/40 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Award className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <div className="text-xs font-bold text-slate-100">
+                このシナリオの専門家（テックリード）のお手本と他受講者の行動を見る
+              </div>
+              <div className="text-[11px] text-slate-400">
+                意思決定の分岐点や典型的な失敗・停滞パターン（Level 1〜5）を対比して復習できます。
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onViewBenchmarkGallery}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/30 flex items-center gap-1.5 shrink-0"
+          >
+            <span>行動比較ギャラリーを開く</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       <div className="pt-4 flex justify-between items-center border-t border-slate-800">
         <button

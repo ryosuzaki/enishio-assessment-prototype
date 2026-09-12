@@ -174,5 +174,5 @@ export type StepType =
   | "preliminary_judgement"
   | "evaluation_report";
 
-export type AppTab = "session" | "org_dashboard" | "learner_profile";
+export type AppTab = "session" | "org_dashboard" | "learner_profile" | "benchmark_gallery";
 

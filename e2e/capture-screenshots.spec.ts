@@ -332,5 +332,15 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       path: path.join(screenshotsDir, "08-learner-profile.png"),
       fullPage: true,
     });
+
+    // 09. シナリオ別行動比較ギャラリー（専門家・他受講者ベンチマーク）
+    const galleryTabBtn = page.getByRole("button", { name: /③ 行動比較ギャラリー/ });
+    await galleryTabBtn.click();
+    await expect(page.locator("h1")).toContainText("シナリオ別行動比較ギャラリー");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: path.join(screenshotsDir, "09-benchmark-gallery.png"),
+      fullPage: true,
+    });
   });
 });
