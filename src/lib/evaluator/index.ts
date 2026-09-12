@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { getInjectedFlaws, getRubricHint } from "@/data/dynamic-task.server";
+import { getDynamicTask } from "@/data/dynamic-task";
 
 // Stage 1 Schema: Evidence Components Extraction [MVP 2.6, W4]
 export const EvidenceComponentSchema = z.object({
@@ -104,8 +105,10 @@ export function getScorerModel(): string {
   return process.env.EVALUATOR_MODEL || process.env.LLM_MODEL || "gpt-5.6-luna";
 }
 
+// v5: component_type に alternative_design_proposal を追加し、grounding（none/asserted/tied_to_requirement）を追加してルーブリック各バンドとの観測対応を整備（T-29）。
+// v6: 提出されたユニットテスト（task.test_code）の検証漏れ・異常系欠落の指摘を不備検知として評価できるようプロンプトとコンテキストを拡充。
 export function getScorerModelVersion(): string {
-  return `${getScorerModel()}/extract-v5/score-v3`;
+  return `${getScorerModel()}/extract-v6/score-v3`;
 }
 
 // v4: 第1段階に probe_consistency を追加し、injected_flaw_id を正常箇所にも付けさせる
@@ -204,6 +207,7 @@ export async function extractEvidence(
 ): Promise<EvidenceExtractionOutput> {
   const client = getClient("extract");
   const injectedFlaws = getInjectedFlaws(taskId);
+  const task = getDynamicTask(taskId);
 
   const promptText = `
 あなたは教育心理測定学に基づくアセスメントの「第1段階：根拠抽出パーサー」です。
@@ -213,13 +217,14 @@ export async function extractEvidence(
 - 抽出するのは「受講者が実際に行った判断」だけです。単語が出現しただけの発言（質問・雑談・無関係な数値への言及）を検証行動として抽出してはいけません。
 - 「Redisとは何ですか」のような知識を尋ねる発言は検証行動ではありません。
 - quoted_span は発言全文ではなく、根拠となる該当箇所だけを切り出してください。
+- 実装コードの不備だけでなく、受講者が「ユニットテストコードの検証漏れ・異常系テストの欠落（正常系のみ通過する設計の罠）」を具体的に指摘した場合も、関連する仕込み不備（injected_flaw_id）の flaw_detection または premise_identification として抽出してください。
 - avoided_false_positives は、受講者が正常箇所を明示的に「これは妥当だ」と判断した場合のみ true です。言及が無い場合は false です。
 - ログには MEDIATOR という役割の発話が混じることがあります。これは受講者の判断を**引き出すための問い**（ソクラテス型深掘り・What-if注入）であり、正解を教えるヒントではありません。**MEDIATOR の発話そのものを受講者の検証行動として抽出してはいけません。**抽出対象はあくまで USER（受講者）の発言です。
 - probe_consistency は、MEDIATOR の問いに対する USER の応答が、それ以前の USER 自身の発言と整合しているかの判定です。**MEDIATOR の発話がログに1件も無い場合は score を null にしてください。**
 
 【課題シナリオと仕込み不備の基準マップ】
 ${JSON.stringify(injectedFlaws, null, 2)}
-
+${task.test_code ? `\n【課題に含まれるユニットテストコード（正常系のみ通過する設計の罠が含まれうる）】\n${task.test_code}\n` : ""}
 【対話ログ】
 ${transcript.map((t) => `[Turn ${t.turnSeq}] ${t.role.toUpperCase()}: ${t.content}`).join("\n")}
 

@@ -84,9 +84,28 @@ export async function POST(req: Request) {
 
     const dialogueModel = process.env.DIALOGUE_MODEL || process.env.LLM_MODEL || "gpt-5.6-luna";
     const client = new OpenAI({ apiKey });
-    const systemPrompt = `${getAiPeerSystemPrompt(taskId)}
 
-【あなたが書いた現在のコード】
+    const prContext = task.pr_description
+      ? `\n【あなたが作成したPRの説明】\nタイトル: ${task.pr_description.title}\nブランチ: ${task.pr_description.branch}\n概要: ${task.pr_description.summary}\n主な変更点:\n${task.pr_description.changes.map((c) => `- ${c}`).join("\n")}`
+      : "";
+
+    const testCodeContext = task.test_code
+      ? `\n【あなたが作成したユニットテストコード】\n${task.test_code}`
+      : "";
+
+    const contextDocsContext =
+      task.context_documents && task.context_documents.length > 0
+        ? `\n【チーム内Slack・関連ログ（開発の経緯）】\n${task.context_documents
+            .map((d) => `[${d.title} (${d.source} ${d.timestamp})]\n${d.content}`)
+            .join("\n\n")}`
+        : "";
+
+    const systemPrompt = `${getAiPeerSystemPrompt(taskId)}
+${prContext}
+${testCodeContext}
+${contextDocsContext}
+
+【あなたが書いた現在の実装コード】
 ${artifactText}
 
 【この課題の業務要件】
@@ -97,6 +116,7 @@ ${task.constraints.join("\n")}
 
 受講者から具体的な指摘を受けてコードを直す場合のみ updated_artifact にコード全文を入れてください。
 自分から不備を列挙して先回りしてはいけません。指摘されていない箇所は直さないでください。
+ユニットテストコードについて受講者から指摘を受けた場合も、最初は自分のテスト方針（正常系スループットの担保等）を説明し、納得された論理的な指摘であればそのテスト不足を認めてください（updated_artifact には修正後の実装コード全文を返します）。
 
 対話ログに「第三者の進行役」という発言者が出てくることがあります。これは受講者へ内省を
 促す進行役であり、あなたへの発言ではありません。その発言や、それに対する受講者の回答に
