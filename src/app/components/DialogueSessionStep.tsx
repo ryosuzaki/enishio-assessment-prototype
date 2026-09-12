@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Send,
   GitPullRequest,
+  FlaskConical,
 } from "lucide-react";
 import type { DynamicTaskScenario } from "@/data/dynamic-task";
 import type { ChatMessage, EvidenceTargetState, FocusItem, ProbeMove } from "../types";
@@ -68,6 +69,7 @@ export function DialogueSessionStep({
   onSendDialogueTurn,
 }: DialogueSessionStepProps) {
   const [leftTab, setLeftTab] = useState<"requirements" | "context">("requirements");
+  const [codeTab, setCodeTab] = useState<"impl" | "test">("impl");
 
   return (
     <div className="space-y-6">
@@ -181,7 +183,9 @@ export function DialogueSessionStep({
               <Code className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>【第2ペイン】成果物ドラフト</span>
             </div>
-            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded shrink-0 whitespace-nowrap">Live Editor</span>
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded shrink-0 whitespace-nowrap">
+              {codeTab === "impl" ? "Live Editor" : "Spec / Test View"}
+            </span>
           </div>
 
           {/* PR Description Header Card */}
@@ -202,11 +206,59 @@ export function DialogueSessionStep({
             </div>
           )}
 
-          <textarea
-            value={artifactCode}
-            onChange={(e) => setArtifactCode(e.target.value)}
-            className="w-full flex-1 bg-slate-900/90 font-mono text-xs leading-relaxed text-slate-200 p-3.5 rounded-lg border border-slate-800 resize-none focus:outline-none focus:border-blue-500 overflow-x-auto whitespace-pre min-h-0"
-          />
+          {/* File Switcher Tabs: Implementation vs Unit Test */}
+          <div className="flex items-center justify-between border-b border-slate-800/80 pb-1 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setCodeTab("impl")}
+                className={`px-3 py-1 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 border ${
+                  codeTab === "impl"
+                    ? "bg-slate-800 text-emerald-300 border-emerald-500/40 font-bold shadow-sm"
+                    : "bg-slate-900/50 text-slate-400 border-transparent hover:text-slate-200"
+                }`}
+              >
+                <Code className="w-3.5 h-3.5 text-emerald-400" />
+                <span>実装コード</span>
+              </button>
+              {selectedTask.test_code && (
+                <button
+                  onClick={() => setCodeTab("test")}
+                  className={`px-3 py-1 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 border ${
+                    codeTab === "test"
+                      ? "bg-slate-800 text-amber-300 border-amber-500/40 font-bold shadow-sm"
+                      : "bg-slate-900/50 text-slate-400 border-transparent hover:text-slate-200"
+                  }`}
+                >
+                  <FlaskConical className="w-3.5 h-3.5 text-amber-400" />
+                  <span>テストコード (*.test.ts)</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono">
+                    Vitest
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {codeTab === "impl" ? (
+            <textarea
+              value={artifactCode}
+              onChange={(e) => setArtifactCode(e.target.value)}
+              className="w-full flex-1 bg-slate-900/90 font-mono text-xs leading-relaxed text-slate-200 p-3.5 rounded-lg border border-slate-800 resize-none focus:outline-none focus:border-blue-500 overflow-x-auto whitespace-pre min-h-0"
+            />
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0 space-y-1.5">
+              <div className="text-[11px] text-amber-200/90 bg-amber-950/30 px-3 py-1.5 rounded-lg border border-amber-900/40 flex items-center justify-between shrink-0">
+                <span>⚠️ AI同僚が作成したユニットテストです。正常系以外のテストが網羅されているか精査してください。</span>
+                <span className="font-mono text-[10px] text-amber-300 shrink-0">All tests passed (3/3)</span>
+              </div>
+              <textarea
+                readOnly
+                value={selectedTask.test_code}
+                className="w-full flex-1 bg-slate-900/90 font-mono text-xs leading-relaxed text-slate-300 p-3.5 rounded-lg border border-slate-800 resize-none focus:outline-none overflow-x-auto whitespace-pre min-h-0 select-text"
+              />
+            </div>
+          )}
+
           {/* Quick Focus Add Bar */}
           <div className="pt-1.5 flex gap-2 items-center shrink-0">
             <input

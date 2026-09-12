@@ -43,6 +43,7 @@ export interface DynamicTaskScenario {
   pr_description?: PrDescription;
   context_documents?: ContextDocument[];
   initial_ai_draft: string;
+  test_code?: string;
   /** D-24: EIRM較正の入力となる特徴量ベクトル X */
   stimulus_features: DynamicTaskStimulusFeatures;
 }
@@ -143,6 +144,50 @@ function verifyJwtSignatureOnly(token: string) {
   // ローカル公開鍵での署名検証のみ実行
   return { userId: "user-12345", role: "merchant" };
 }`,
+    test_code: `// tests/payment-security.test.ts
+// AI同僚が作成したユニットテスト（Vitest）
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { paymentSecurityMiddleware } from "../src/paymentSecurityMiddleware";
+
+describe("paymentSecurityMiddleware", () => {
+  let req: any;
+  let res: any;
+  let next: any;
+
+  beforeEach(() => {
+    req = { headers: {} };
+    res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+    next = vi.fn();
+  });
+
+  // 【テスト1: 正常系】有効なトークンでリクエストが通過すること
+  it("should allow request with valid authorization token", async () => {
+    req.headers["authorization"] = "Bearer valid_merchant_token";
+    await paymentSecurityMiddleware(req, res, next);
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  // 【テスト2: 正常系】一般ユーザーのレートリミット（60 req/min）のカウント
+  it("should enforce rate limit for standard users", async () => {
+    req.headers["authorization"] = "Bearer standard_user_token";
+    await paymentSecurityMiddleware(req, res, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  // 【テスト3: 正常系】過去世代のキーIDがローテーション互換性として許容されること
+  it("should accept previous key version for zero-downtime rotation", async () => {
+    req.headers["authorization"] = "Bearer valid_token";
+    req.headers["x-key-version"] = "v1";
+    await paymentSecurityMiddleware(req, res, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  // ⚠️ 【現場の抜け穴】
+  // ・強制ログアウト・失効トークン（PCI DSS失効伝播）をブロックするテストケースが未実装
+  // ・Redisダウン時・瞬断時のフォールバック可用性検証テストが未実装
+  // ・一般（60req）vs 加盟店（1000req）の超過時429レスポンス検証テストが未実装
+});`,
     stimulus_features: {
       variable_count: 5,
       tradeoff_complexity: 4,
@@ -257,6 +302,50 @@ export async function refundConfirmedWebhookHandler(req: Request, res: Response)
 
   return res.status(200).json({ received: true });
 }`,
+    test_code: `// tests/cancel-order.test.ts
+// AI同僚が作成したユニットテスト（Vitest）
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { cancelOrderHandler, refundConfirmedWebhookHandler } from "../src/cancelOrderHandler";
+
+describe("Order Cancellation & Refund Pipeline", () => {
+  let req: any;
+  let res: any;
+
+  beforeEach(() => {
+    res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  });
+
+  // 【テスト1: 正常系】有効な注文キャンセル受付（202 Accepted返却）
+  it("should accept valid cancellation and enqueue refund asynchronously", async () => {
+    req = { params: { orderId: "ord-1001" } };
+    await cancelOrderHandler(req, res);
+    expect(res.status).toHaveBeenCalledWith(202);
+  });
+
+  // 【テスト2: 正常系】処理中・処理済み注文の二重受付ガード（409 Conflict）
+  it("should reject cancellation if order is already cancelling or refunded", async () => {
+    req = { params: { orderId: "ord-already-cancelling" } };
+    await cancelOrderHandler(req, res);
+    expect(res.status).toHaveBeenCalledWith(409);
+  });
+
+  // 【テスト3: 正常系】返金確定Webhook受信時のステータス更新
+  it("should update order status to refunded on confirmed webhook", async () => {
+    req = {
+      body: {
+        orderId: "ord-1001",
+        refundId: "ref-9999",
+        items: [{ productId: "item-a", quantity: 1 }],
+      },
+    };
+    await refundConfirmedWebhookHandler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  // ⚠️ 【現場の抜け穴】
+  // ・Webhookの重複配信（at-least-once）による在庫の多重戻し（オーバーカウント）の並行実行テストが未実装
+  // ・返金キュー（refundQueue.push）失敗時のリトライ・DLQ・アラート監視テストが未実装
+});`,
     stimulus_features: {
       variable_count: 5,
       tradeoff_complexity: 3,
@@ -338,6 +427,44 @@ export function inquiryErrorHandler(err: Error, req: Request, res: Response, nex
     details: (err as any).internalContext ?? null,
   });
 }`,
+    test_code: `// tests/inquiry-logging.test.ts
+// AI同僚が作成したユニットテスト（Vitest）
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { inquiryLoggingMiddleware, inquiryErrorHandler } from "../src/inquiryLoggingMiddleware";
+
+describe("Inquiry Logging Middleware", () => {
+  let req: any;
+  let res: any;
+  let next: any;
+
+  beforeEach(() => {
+    res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+    next = vi.fn();
+  });
+
+  // 【テスト1: 正常系】問い合わせ本文のログストア永続化
+  it("should record inquiry text into logStore successfully", () => {
+    req = {
+      headers: { "x-user-id": "emp-4012", "user-agent": "Mozilla/5.0" },
+      body: { message: "VPNの接続方法を教えてください" },
+    };
+    inquiryLoggingMiddleware(req, res, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  // 【テスト2: 正常系】エラー発生時の500ステータス返却
+  it("should return 500 error response when critical error occurs", () => {
+    const error = new Error("Log store service unreachable");
+    req = { headers: {}, body: {} };
+    inquiryErrorHandler(error, req, res, next);
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
+
+  // ⚠️ 【現場の抜け穴】
+  // ・氏名・社員番号などの個人情報（PII）が平文保存されずマスキングされるかのテストが未実装
+  // ・エラーレスポンスにスタックトレースや内部コンテキストが外部漏洩しないかの検証テストが未実装
+  // ・個人情報保護規定に定める保存期間（90日）超過ログの自動削除テストが未実装
+});`,
     stimulus_features: {
       variable_count: 5,
       tradeoff_complexity: 3,
