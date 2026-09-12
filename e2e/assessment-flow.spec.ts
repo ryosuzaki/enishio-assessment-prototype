@@ -716,7 +716,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" })).toBeVisible();
   });
 
-  test("③ エキスパート事後講評の表示・トラップ解剖・攻略ルート・コンピテンシー突合・演習遷移が動作する", async ({ page }) => {
+  test("③ エキスパート事後講評の表示・トラップ解剖・攻略ルート・観測事実対比・ピン留め・演習遷移が動作する", async ({ page }) => {
     await page.goto("/");
 
     // エキスパート事後講評タブへの切替
@@ -728,22 +728,28 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.locator("h1")).toContainText("シナリオ分析＆エキスパート検証戦略");
     await expect(page.getByText("課題トラップ構造の解剖")).toBeVisible();
     await expect(page.getByText("上位者の攻略ルート分岐図")).toBeVisible();
-    await expect(page.getByText("動的コンピテンシー別・上位者メタ行動と自己ハイライト")).toBeVisible();
+    await expect(page.getByText("動的コンピテンシー別・上位者アクションと観測事実")).toBeVisible();
 
     // 攻略ルートの表示確認
     await expect(page.getByText("ルートA").first()).toBeVisible();
     await expect(page.getByText("ルートB").first()).toBeVisible();
     await expect(page.getByText("ルートC").first()).toBeVisible();
 
-    // 動的コンピテンシー別アクションと達成状況の確認
+    // 動的コンピテンシー別アクションと観測状況の確認
     await expect(page.getByText("評価的判断力").first()).toBeVisible();
-    await expect(page.getByText("達成済").first()).toBeVisible();
-    await expect(page.getByText("伸び代").first()).toBeVisible();
+    await expect(page.getByText("ログ観測あり").first()).toBeVisible();
+    await expect(page.getByText("未観測").first()).toBeVisible();
 
-    // フィルター操作（伸び代のみ表示）
-    const missedFilterBtn = page.getByRole("button", { name: /伸び代のみ/ });
-    await expect(missedFilterBtn).toBeVisible();
-    await missedFilterBtn.click();
+    // 自律的な「参考になった」ピン留めボタンの動作テスト
+    const bookmarkBtn = page.getByRole("button", { name: /参考になった（ピン留めして保存）/ }).first();
+    await expect(bookmarkBtn).toBeVisible();
+    await bookmarkBtn.click();
+    await expect(page.getByText("参考になった（ピン留め中）").first()).toBeVisible();
+
+    // フィルター操作（未観測のみ表示）
+    const notObservedFilterBtn = page.getByRole("button", { name: /未観測/ });
+    await expect(notObservedFilterBtn).toBeVisible();
+    await notObservedFilterBtn.click();
 
     // 課題の演習開始ボタンを押してセッション画面へ遷移
     const startExerciseBtn = page.getByRole("button", { name: "この課題を解いてみる" });

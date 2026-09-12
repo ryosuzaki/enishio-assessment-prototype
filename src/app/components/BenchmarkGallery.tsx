@@ -2,35 +2,29 @@
 
 import React, { useState } from "react";
 import {
-  Award,
-  CheckCircle2,
-  AlertTriangle,
   Play,
-  ArrowRight,
   ShieldCheck,
   Sparkles,
-  Layers,
   FlaskConical,
-  Info,
   GitBranch,
-  Eye,
-  Check,
-  Lightbulb,
-  Compass,
-  Cpu,
-  BrainCircuit,
   Filter,
   RefreshCw,
-  MessageSquareQuote,
   Target,
-  BarChart3,
-  HelpCircle,
+  Cpu,
+  BrainCircuit,
+  Compass,
+  AlertTriangle,
+  Bookmark,
+  BookmarkCheck,
+  CheckCircle,
+  Eye,
+  Info,
 } from "lucide-react";
 import {
   SCENARIO_DEBRIEFINGS,
   type ScenarioDebriefingData,
   type CompetencyActionItem,
-  type LearnerStatus,
+  type ObservationStatus,
 } from "@/data/benchmark-gallery-data";
 
 interface BenchmarkGalleryProps {
@@ -48,8 +42,9 @@ export function BenchmarkGallery({
     initialTaskId || SCENARIO_DEBRIEFINGS[0].taskId
   );
 
-  const [statusFilter, setStatusFilter] = useState<"all" | "missed" | "executed">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "observed" | "not_observed" | "bookmarked">("all");
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
 
   const currentScenario: ScenarioDebriefingData =
     SCENARIO_DEBRIEFINGS.find((b) => b.taskId === selectedTaskId) || SCENARIO_DEBRIEFINGS[0];
@@ -59,19 +54,32 @@ export function BenchmarkGallery({
     setSelectedRouteId(null);
   };
 
+  const toggleBookmark = (actionId: string) => {
+    setBookmarkedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(actionId)) {
+        next.delete(actionId);
+      } else {
+        next.add(actionId);
+      }
+      return next;
+    });
+  };
+
   // Filter actions based on statusFilter
   const filterAction = (action: CompetencyActionItem) => {
     if (statusFilter === "all") return true;
-    if (statusFilter === "missed") return action.userStatus === "missed" || action.userStatus === "partial";
-    if (statusFilter === "executed") return action.userStatus === "executed";
+    if (statusFilter === "observed") return action.status === "observed";
+    if (statusFilter === "not_observed") return action.status === "not_observed";
+    if (statusFilter === "bookmarked") return bookmarkedIds.has(action.id);
     return true;
   };
 
-  // Overall counts for summary
+  // Counts for summary
   const allActions = currentScenario.competencyGroups.flatMap((g) => g.actions);
-  const executedCount = allActions.filter((a) => a.userStatus === "executed").length;
-  const partialCount = allActions.filter((a) => a.userStatus === "partial").length;
-  const missedCount = allActions.filter((a) => a.userStatus === "missed").length;
+  const observedCount = allActions.filter((a) => a.status === "observed").length;
+  const notObservedCount = allActions.filter((a) => a.status === "not_observed").length;
+  const currentScenarioBookmarkedCount = allActions.filter((a) => bookmarkedIds.has(a.id)).length;
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-16">
@@ -98,8 +106,8 @@ export function BenchmarkGallery({
             シナリオ分析＆エキスパート検証戦略
           </h1>
           <p className="text-slate-400 text-sm max-w-3xl leading-relaxed">
-            AIが仕掛けた欺瞞トリックの解剖、上位者が採用した複数の攻略ルート、そして動的コンピテンシー領域ごとのメタ行動を自己点検します。
-            個人の生ログではなく、<strong className="text-slate-300">観測された客観的行動データ（テレメトリ）</strong>に基づいて次のアクション指針を獲得します。
+            AIが仕掛けた欺瞞トリックの解剖、上位者が採用した複数の攻略ルート、そして観測された客観的行動ログ（テレメトリ）を対比します。
+            限られたターン数の中でどのアプローチを選択するかは受講者の自律的判断です。説教や行動の強制を行わず、上位者のアプローチを客観的な選択肢・引き出しとして提供します。
           </p>
         </div>
       </div>
@@ -164,23 +172,25 @@ export function BenchmarkGallery({
           </div>
         </div>
 
-        {/* あなたのセッション照合ステータス */}
-        <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+        {/* 今回のセッションログ照合結果 */}
+        <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 text-slate-300">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-medium">現在のセッション結果と照合中:</span>
-            <span className="text-slate-400">観測されたテレメトリ（プロンプト・テスト実行・差分確認）と上位者アクションを自動突合</span>
+            <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            <span className="font-medium text-slate-200">今回のセッションログ照合結果:</span>
+            <span className="text-slate-400">観測された事実のみを客観的に照合表示しています</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-300 font-medium border border-emerald-500/20">
-              <Check className="w-3.5 h-3.5" /> 達成済: {executedCount}件
-            </span>
+          <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-blue-500/10 text-blue-300 font-medium border border-blue-500/20">
-              <Info className="w-3.5 h-3.5" /> 部分的: {partialCount}件
+              <Eye className="w-3.5 h-3.5" /> 該当（観測あり）: {observedCount}件
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/10 text-amber-300 font-medium border border-amber-500/20">
-              <Lightbulb className="w-3.5 h-3.5" /> 伸び代: {missedCount}件
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-800 text-slate-400 font-medium border border-slate-700">
+              未観測（非該当）: {notObservedCount}件
             </span>
+            {currentScenarioBookmarkedCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/10 text-amber-300 font-medium border border-amber-500/20">
+                <BookmarkCheck className="w-3.5 h-3.5" /> 参考になった: {currentScenarioBookmarkedCount}件
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -316,17 +326,17 @@ export function BenchmarkGallery({
       <section className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 relative">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
               <Target className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-[11px] font-bold tracking-wider text-emerald-400 uppercase">Layer 03</div>
-              <h3 className="text-base font-bold text-slate-100">動的コンピテンシー別・上位者メタ行動と自己ハイライト</h3>
+              <div className="text-[11px] font-bold tracking-wider text-indigo-400 uppercase">Layer 03</div>
+              <h3 className="text-base font-bold text-slate-100">動的コンピテンシー別・上位者アクションと観測事実</h3>
             </div>
           </div>
 
           {/* フィルターボタン */}
-          <div className="flex items-center gap-1.5 bg-slate-950/60 p-1 rounded-lg border border-slate-800 text-xs">
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-950/60 p-1 rounded-lg border border-slate-800 text-xs">
             <Filter className="w-3.5 h-3.5 text-slate-400 ml-1.5" />
             <button
               onClick={() => setStatusFilter("all")}
@@ -337,26 +347,36 @@ export function BenchmarkGallery({
               すべて表示
             </button>
             <button
-              onClick={() => setStatusFilter("missed")}
+              onClick={() => setStatusFilter("observed")}
               className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                statusFilter === "missed" ? "bg-amber-600 text-white" : "text-slate-400 hover:text-slate-200"
+                statusFilter === "observed" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              伸び代のみ（{missedCount + partialCount}）
+              観測あり（{observedCount}）
             </button>
             <button
-              onClick={() => setStatusFilter("executed")}
+              onClick={() => setStatusFilter("not_observed")}
               className={`px-2.5 py-1 rounded font-medium transition-colors ${
-                statusFilter === "executed" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-slate-200"
+                statusFilter === "not_observed" ? "bg-slate-700 text-white" : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              達成済のみ（{executedCount}）
+              未観測（{notObservedCount}）
+            </button>
+            <button
+              onClick={() => setStatusFilter("bookmarked")}
+              className={`px-2.5 py-1 rounded font-medium transition-colors flex items-center gap-1 ${
+                statusFilter === "bookmarked" ? "bg-amber-600 text-white" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <BookmarkCheck className="w-3 h-3" />
+              参考になった（{currentScenarioBookmarkedCount}）
             </button>
           </div>
         </div>
 
         <p className="text-xs text-slate-400 mb-6">
-          上位者が各コンピテンシー領域で実際に取った行動を客観的に抽出しています。あなたのセッションログと照合し、次回への具体的なアクション指針を確認できます。
+          上位者が各コンピテンシー領域で実際に取った行動を客観的に抽出しています。
+          限られたターン数の中での選択を尊重し、未観測の項目は「参考になった」ボタンでピン留めして自身の引き出しとしてストックできます。
         </p>
 
         <div className="space-y-8">
@@ -373,36 +393,27 @@ export function BenchmarkGallery({
 
                 <div className="space-y-3">
                   {filteredActions.map((action) => {
-                    const isExecuted = action.userStatus === "executed";
-                    const isPartial = action.userStatus === "partial";
-                    const isMissed = action.userStatus === "missed";
+                    const isObserved = action.status === "observed";
+                    const isBookmarked = bookmarkedIds.has(action.id);
 
                     return (
                       <div
                         key={action.id}
                         className={`border rounded-xl p-4 transition-all ${
-                          isExecuted
-                            ? "bg-slate-950/40 border-emerald-500/30 hover:border-emerald-500/50"
-                            : isPartial
+                          isObserved
                             ? "bg-slate-950/40 border-blue-500/30 hover:border-blue-500/50"
-                            : "bg-slate-950/40 border-amber-500/30 hover:border-amber-500/50"
+                            : "bg-slate-950/30 border-slate-800 hover:border-slate-700"
                         }`}
                       >
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-2">
                           <div className="flex items-start gap-2.5">
-                            {isExecuted && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 mt-0.5">
-                                <Check className="w-3.5 h-3.5" /> 達成済
-                              </span>
-                            )}
-                            {isPartial && (
+                            {isObserved ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0 mt-0.5">
-                                <Info className="w-3.5 h-3.5" /> 部分的
+                                <Eye className="w-3.5 h-3.5" /> ログ観測あり
                               </span>
-                            )}
-                            {isMissed && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 mt-0.5">
-                                <Lightbulb className="w-3.5 h-3.5" /> 伸び代
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700 shrink-0 mt-0.5">
+                                未観測
                               </span>
                             )}
                             <div>
@@ -415,7 +426,7 @@ export function BenchmarkGallery({
                           <div className="flex items-center gap-4 bg-slate-900/90 px-3 py-2 rounded-lg border border-slate-800 shrink-0 text-xs">
                             <div>
                               <div className="text-[10px] text-slate-400">上位者実施率</div>
-                              <div className="font-bold text-emerald-400 text-sm">{action.topPerformerRate}%</div>
+                              <div className="font-bold text-indigo-400 text-sm">{action.topPerformerRate}%</div>
                             </div>
                             <div className="w-px h-6 bg-slate-800" />
                             <div>
@@ -425,16 +436,78 @@ export function BenchmarkGallery({
                           </div>
                         </div>
 
-                        {/* セッション観測ログと次回のアクション指針 */}
-                        <div className="mt-3 pt-3 border-t border-slate-800/60 space-y-2 text-xs">
-                          <div className="bg-slate-900/50 p-2.5 rounded-lg border border-slate-800/80 text-slate-300">
-                            <span className="font-semibold text-slate-400 mr-1.5">🔍 あなたのセッションでの観測:</span>
-                            {action.userObservation}
-                          </div>
+                        {/* 詳細コンテンツ */}
+                        <div className="mt-3 pt-3 border-t border-slate-800/60 space-y-3 text-xs">
+                          {isObserved ? (
+                            <>
+                              {/* 該当：観測されたあなたのアプローチ */}
+                              <div className="bg-blue-950/20 border border-blue-500/20 p-3 rounded-lg text-slate-200">
+                                <div className="text-[11px] font-semibold text-blue-300 mb-1 flex items-center gap-1.5">
+                                  <CheckCircle className="w-3.5 h-3.5 text-blue-400" />
+                                  今回のセッションで観測されたあなたの切り口:
+                                </div>
+                                <p className="text-slate-300">{action.userApproach}</p>
+                              </div>
 
-                          <div className="bg-amber-950/20 border border-amber-500/30 p-2.5 rounded-lg text-amber-200">
-                            {action.coachingTakeaway}
-                          </div>
+                              {/* 該当：上位者の切り口バリエーション */}
+                              <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-lg space-y-1.5">
+                                <div className="text-[11px] font-semibold text-slate-300">
+                                  📊 上位者に多く見られたアプローチ（切り口のバリエーション）:
+                                </div>
+                                <ul className="list-disc list-inside space-y-1 text-slate-400 pl-1">
+                                  {action.topPerformerApproaches.map((approach, idx) => (
+                                    <li key={idx} className="leading-relaxed">
+                                      <span className="text-slate-300">{approach}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {/* 非該当：未観測の説明と上位者アプローチ */}
+                              <div className="bg-slate-900/40 p-2.5 rounded-lg border border-slate-800 text-slate-400">
+                                ※ 今回の時間制限・ターン数配分の中では、このアプローチは観測されませんでした。
+                              </div>
+
+                              <div className="bg-slate-900/60 border border-slate-800/80 p-3 rounded-lg space-y-1.5">
+                                <div className="text-[11px] font-semibold text-slate-300">
+                                  📊 上位者のアプローチ例（別解としての引き出し）:
+                                </div>
+                                <ul className="list-disc list-inside space-y-1 text-slate-400 pl-1">
+                                  {action.topPerformerApproaches.map((approach, idx) => (
+                                    <li key={idx} className="leading-relaxed">
+                                      <span className="text-slate-300">{approach}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+
+                              {/* 自律的な「参考になった」ピン留めボタン */}
+                              <div className="flex justify-end pt-1">
+                                <button
+                                  onClick={() => toggleBookmark(action.id)}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                    isBookmarked
+                                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+                                      : "bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                                  }`}
+                                >
+                                  {isBookmarked ? (
+                                    <>
+                                      <BookmarkCheck className="w-3.5 h-3.5 text-amber-400" />
+                                      <span>参考になった（ピン留め中）</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Bookmark className="w-3.5 h-3.5 text-slate-400" />
+                                      <span>💡 参考になった（ピン留めして保存）</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -449,9 +522,9 @@ export function BenchmarkGallery({
       {/* フッターCTA */}
       <div className="bg-gradient-to-r from-indigo-950/40 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
         <div>
-          <h4 className="text-base font-bold text-slate-100">この課題で学んだ視点を実践してみませんか？</h4>
+          <h4 className="text-base font-bold text-slate-100">別の角度・アプローチで課題を試してみますか？</h4>
           <p className="text-xs text-slate-400 mt-1">
-            上位者のアプローチや反例提示を意識して、もう一度演習セッションに挑むことができます。
+            上位者の攻略ルートや新しい切り口を意識して、演習セッションを自由に再実行できます。
           </p>
         </div>
         <button
