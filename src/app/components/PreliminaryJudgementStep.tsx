@@ -95,7 +95,7 @@ export function PreliminaryJudgementStep({
       <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
         AIによる自動採点およびXAIレポートを開示する前に、受講者自身の最終判定をコミットさせます（Force Decision First）。
         <strong>白紙textareaへの長文再作文は恒久的に廃止されました（[D-80]）。</strong>
-        進行役が対話ログから整理した以下の論点要約を確認し、GitHub PRレビュー形式で［承認］［条件付き承認］［差し戻し］の意思決定をワンクリックで確定してください。
+        進行役が対話ログから整理した以下の論点要約を確認し、GitHub PRレビュー形式で［承認］［条件付き承認］［修正要求］の意思決定をワンクリックで確定してください。
       </p>
 
       {prelimError && (

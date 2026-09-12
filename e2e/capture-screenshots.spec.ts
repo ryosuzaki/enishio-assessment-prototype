@@ -280,7 +280,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     await expect(page.getByText("CFF: Force Decision First & Mandatory Justification")).toBeVisible();
     await page.locator("input[value='remand']").check();
     const justificationTextarea = page.getByPlaceholder(
-      /承認または差し戻しと判断した具体的な根拠・理由を記述/
+      /進行役の要約に補足や微調整がある場合のみ入力/
     );
     await justificationTextarea.fill(
       "Redis障害時の単一障害点リスクおよびPCI DSS第3条・第6条の暗号化・監査要件への適合性において重大な懸念が残るため、フォールバック機構とログ出力の拡充を指示し差し戻しと判定する。"
