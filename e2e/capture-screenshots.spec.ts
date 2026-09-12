@@ -333,10 +333,10 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       fullPage: true,
     });
 
-    // 09. シナリオ別行動比較ギャラリー（専門家・他受講者ベンチマーク）
-    const galleryTabBtn = page.getByRole("button", { name: /③ 行動比較ギャラリー/ });
+    // 09. シナリオ分析＆エキスパート事後講評（デブリーフィング）
+    const galleryTabBtn = page.getByRole("button", { name: /③ エキスパート事後講評/ });
     await galleryTabBtn.click();
-    await expect(page.locator("h1")).toContainText("シナリオ別行動比較ギャラリー");
+    await expect(page.locator("h1")).toContainText("シナリオ分析＆エキスパート検証戦略");
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: path.join(screenshotsDir, "09-benchmark-gallery.png"),

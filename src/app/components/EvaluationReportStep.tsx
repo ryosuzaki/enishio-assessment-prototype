@@ -542,10 +542,10 @@ export function EvaluationReportStep({
             <Award className="w-5 h-5 text-amber-400 shrink-0" />
             <div>
               <div className="text-xs font-bold text-slate-100">
-                このシナリオの専門家（テックリード）のお手本と他受講者の行動を見る
+                このシナリオのエキスパート事後講評（デブリーフィング）を見る
               </div>
               <div className="text-[11px] text-slate-400">
-                意思決定の分岐点や典型的な失敗・停滞パターン（Level 1〜5）を対比して復習できます。
+                AIトラップ構造の解剖、上位者の攻略ルート、動的コンピテンシー別の客観的行動と自身の伸び代を振り返ることができます。
               </div>
             </div>
           </div>
@@ -553,7 +553,7 @@ export function EvaluationReportStep({
             onClick={onViewBenchmarkGallery}
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/30 flex items-center gap-1.5 shrink-0"
           >
-            <span>行動比較ギャラリーを開く</span>
+            <span>事後講評を開く</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>

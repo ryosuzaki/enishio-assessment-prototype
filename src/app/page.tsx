@@ -733,7 +733,7 @@ export default function AssessmentPrototypePage() {
             }`}
           >
             <Award className="w-3.5 h-3.5 text-amber-400" />
-            <span>③ 行動比較ギャラリー（専門家・他受講者）</span>
+            <span>③ エキスパート事後講評（デブリーフィング）</span>
           </button>
         </div>
 

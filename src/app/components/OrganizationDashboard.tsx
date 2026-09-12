@@ -306,7 +306,7 @@ export function OrganizationDashboard({
               className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-700/60 text-indigo-200 text-xs font-semibold transition-all"
             >
               <Award className="w-3.5 h-3.5 text-amber-400" />
-              <span>行動比較ギャラリー</span>
+              <span>エキスパート事後講評</span>
             </button>
           )}
           <button

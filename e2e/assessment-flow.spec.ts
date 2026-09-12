@@ -716,35 +716,37 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" })).toBeVisible();
   });
 
-  test("③ シナリオ別行動比較ギャラリーの表示・シナリオ切替・ペルソナ切替・演習遷移が動作する", async ({ page }) => {
+  test("③ エキスパート事後講評の表示・トラップ解剖・攻略ルート・コンピテンシー突合・演習遷移が動作する", async ({ page }) => {
     await page.goto("/");
 
-    // 行動比較ギャラリータブへの切替
-    const galleryTabBtn = page.getByRole("button", { name: /③ 行動比較ギャラリー/ });
-    await expect(galleryTabBtn).toBeVisible();
-    await galleryTabBtn.click();
+    // エキスパート事後講評タブへの切替
+    const debriefingTabBtn = page.getByRole("button", { name: /③ エキスパート事後講評/ });
+    await expect(debriefingTabBtn).toBeVisible();
+    await debriefingTabBtn.click();
 
-    // ギャラリーヘッダーとインサイトの確認
-    await expect(page.locator("h1")).toContainText("シナリオ別行動比較ギャラリー");
-    await expect(page.getByText("【急所インサイト】")).toBeVisible();
-    await expect(page.getByText("受講者の評価バンド分布")).toBeVisible();
+    // 画面ヘッダーと各レイヤーの確認
+    await expect(page.locator("h1")).toContainText("シナリオ分析＆エキスパート検証戦略");
+    await expect(page.getByText("課題トラップ構造の解剖")).toBeVisible();
+    await expect(page.getByText("上位者の攻略ルート分岐図")).toBeVisible();
+    await expect(page.getByText("動的コンピテンシー別・上位者メタ行動と自己ハイライト")).toBeVisible();
 
-    // 専門家のお手本ペルソナが表示されていることを確認
-    await expect(page.getByText("👑 専門家のお手本").first()).toBeVisible();
-    await expect(page.getByText("実際の対話ログ（Dialogue Transcript）")).toBeVisible();
-    await expect(page.getByText("最終成果物のコード差分")).toBeVisible();
-    await expect(page.getByText("AutoSCORE 採点根拠 & エキスパート講評")).toBeVisible();
+    // 攻略ルートの表示確認
+    await expect(page.getByText("ルートA").first()).toBeVisible();
+    await expect(page.getByText("ルートB").first()).toBeVisible();
+    await expect(page.getByText("ルートC").first()).toBeVisible();
 
-    // ペルソナの切替（AI過信者）
-    const blindPersonaBtn = page.getByRole("button", { name: /❌ AI過信者/ });
-    await expect(blindPersonaBtn).toBeVisible();
-    await blindPersonaBtn.click();
+    // 動的コンピテンシー別アクションと達成状況の確認
+    await expect(page.getByText("評価的判断力").first()).toBeVisible();
+    await expect(page.getByText("達成済").first()).toBeVisible();
+    await expect(page.getByText("伸び代").first()).toBeVisible();
 
-    await expect(page.getByText("山本 大樹").first()).toBeVisible();
-    await expect(page.getByText("Level 1: 盲目的追従").first()).toBeVisible();
+    // フィルター操作（伸び代のみ表示）
+    const missedFilterBtn = page.getByRole("button", { name: /伸び代のみ/ });
+    await expect(missedFilterBtn).toBeVisible();
+    await missedFilterBtn.click();
 
     // 課題の演習開始ボタンを押してセッション画面へ遷移
-    const startExerciseBtn = page.getByRole("button", { name: "この課題の演習を解いてみる" });
+    const startExerciseBtn = page.getByRole("button", { name: "この課題を解いてみる" });
     await expect(startExerciseBtn).toBeVisible();
     await startExerciseBtn.click();
 
