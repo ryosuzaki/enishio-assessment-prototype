@@ -85,8 +85,9 @@ function Stimulus({ anchor }: { anchor: AnchorItem }) {
   return (
     <>
       <div>
-        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-          導入文
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+          <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+          状況（シチュエーション）
         </h2>
         <p className="text-sm text-slate-200 bg-slate-950/50 p-3.5 rounded-lg border border-slate-800/80 whitespace-pre-wrap leading-relaxed">
           {anchor.intro}
