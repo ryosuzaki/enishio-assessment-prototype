@@ -6,6 +6,9 @@
 
 > 📌 **ドキュメント案内**:
 > 本書は本プロトタイプの全体像、画面構成、設計上の判断、動作手順を網羅したドキュメントです。
+> - **開発者向け仕様書駆動開発（SDD）ガイド**: [`docs/開発者向け仕様書駆動開発ガイド.md`](docs/開発者向け仕様書駆動開発ガイド.md) （GitHub Spec Kit × Matt Pocock Skills を使った人間用運用マニュアル）
+> - **正本仕様書群**: [`.specs/`](.specs/) （アーキテクチャ、全APIエンドポイント、AutoSCORE・メディエーション、UIモック境界）
+> - **プロジェクト憲法**: [`.specify/memory/constitution.md`](.specify/memory/constitution.md) （不変原則・制約）
 > 本格開発フェーズで構築する本番SaaS全体の仕様は `products/enishio-education/docs/AIアセスメントMVP定義書.md`、設計決定の経緯は `products/enishio-education/docs/設計決定記録.md` を参照してください。
 
 ---

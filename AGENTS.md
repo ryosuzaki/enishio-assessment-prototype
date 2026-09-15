@@ -1,18 +1,41 @@
 # このリポジトリの位置づけ
 
-**コード専用リポジトリである。**仕様・設計・調査は隣の `enishio-education` リポジトリが持つ。
-両者は親リポジトリ `enishio-business` の `products/` 配下にサブモジュールとして並んで
-チェックアウトされるため、相対パスで参照できる。
+**コード実装および実証プロトタイプリポジトリである。**
+仕様・設計・調査の事業的背景は隣の `enishio-education` リポジトリが持ち、本リポジトリの実装仕様は `.specify/memory/constitution.md` および `.specs/` に正本（Single Source of Truth）として整備されている。
+
+両者は親リポジトリ `enishio-business` の `products/` 配下にサブモジュールとして並んでチェックアウトされるため、相対パスで参照できる。
 
 | 探すもの | 場所 |
 | :--- | :--- |
-| 実装指示（W0〜W6の作業単位・退役済み（実行記録）） | `../enishio-education/docs/退役/` |
+| **プロジェクト憲法（不可侵原則）** | [`.specify/memory/constitution.md`](.specify/memory/constitution.md) |
+| **システム構成・データモデル仕様** | [`.specs/00-system-architecture.md`](.specs/00-system-architecture.md) |
+| **セッション・全APIエンドポイント仕様** | [`.specs/01-session-lifecycle-and-apis.md`](.specs/01-session-lifecycle-and-apis.md) |
+| **AutoSCORE・採点・メディエーション仕様** | [`.specs/02-engine-algorithms.md`](.specs/02-engine-algorithms.md) |
+| **画面コンポーネント・モック境界仕様** | [`.specs/03-ui-component-map.md`](.specs/03-ui-component-map.md) |
+| **開発者向け仕様書駆動開発ガイド（人間用マニュアル）** | [`docs/開発者向け仕様書駆動開発ガイド.md`](docs/開発者向け仕様書駆動開発ガイド.md) |
 | 動作確認・検証手順書 | `docs/プロトタイプ動作確認手順書.md` |
 | ログスキーマの正本（4.1・4.1.1・4.4・4.5） | `../enishio-education/docs/AIアセスメントMVP定義書.md` |
 | 採点軸・アンカーの設計根拠 | `../enishio-education/docs/設計決定記録.md` |
 | アンカー項目バンク（20項目の本文） | `../enishio-education/docs/共通アンカー項目バンク初版_T-05.md` |
 
-## 守ること
+---
+
+## 仕様書駆動開発（SDD）の進め方
+
+本リポジトリでは、**GitHub Spec Kit** と **Matt Pocock Skills** を組み合わせた仕様書駆動開発を採用している。新機能の追加や改修を行う際は、以下のサイクルを厳守すること。
+
+```
+1. 仕様策定 (Spec) ──> 2. 逆質問 (Grill) ──> 3. 縦切り計画 (Plan) ──> 4. TDD実装 & 検証
+```
+
+1. **Spec（要求仕様の明確化）**: `.specify/templates/spec-template.md` に基づき、What（ユーザー価値・受入基準）と実稼働/モック区分を明確にする。
+2. **Grill（逆質問・前提の解消）**: AIエージェントはイエスマンにならず、エッジケース、セキュリティ、2層分離境界について開発者へ徹底的に逆質問（Grilling）し、仕様の穴を埋める。
+3. **Plan（垂直スライス計画）**: `.specify/templates/plan-template.md` に基づき、UI・API・DB・テストを含む動く最小単位（Vertical Slice）にチケット分割する。
+4. **Implement（テスト駆動実装）**: 失敗するテスト（Vitest / Playwright）を作成してから実装コードを書き、リファクタリングと機密非漏洩検査を行う。
+
+---
+
+## 守ること（プロジェクト憲法に基づく最重要規律）
 
 1. **`prisma/schema.prisma` のフィールド名を勝手に変えない。**MVP定義書4.1.1の写しである。
    後から追加したフィールドは過去セッションのデータを永久に失う。
