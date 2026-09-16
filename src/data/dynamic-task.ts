@@ -31,6 +31,15 @@ export interface PrDescription {
   changes: string[];
 }
 
+export interface PremiseShift {
+  id: string;
+  title: string;
+  trigger_turn?: number;
+  announcement: string;
+  new_requirement: string;
+  context_doc: ContextDocument;
+}
+
 export interface DynamicTaskScenario {
   task_id: string;
   title: string;
@@ -42,6 +51,7 @@ export interface DynamicTaskScenario {
   constraints: string[];
   pr_description?: PrDescription;
   context_documents?: ContextDocument[];
+  premise_shift?: PremiseShift;
   initial_ai_draft: string;
   test_code?: string;
   /** D-24: EIRM較正の入力となる特徴量ベクトル X */
@@ -107,6 +117,24 @@ export const DYNAMIC_TASKS: DynamicTaskScenario[] = [
           "【事象概要】ElastiCache (Redis) の定期フェイルオーバー時、決済APIインスタンス群が接続エラー例外を適切にハンドリングできず、未捕捉エラーとして全リクエストに HTTP 500 を返却。約3分間にわたり全加盟店の決済が完全停止した。\n【根本原因】レートリミットやキャッシュ等の周辺サービス呼び出しを共通try-catchで一括処理しており、周辺障害と決済本体の異常を区別していなかった。\n【恒久是正策】周辺サービス障害時は、可用性を最優先とし、エラーログ記録の上でレート制限をバイパス（フェイルオープン）またはローカル制限へフォールバックすること。",
       },
     ],
+    premise_shift: {
+      id: "shift-fintech-vip-fallback",
+      title: "【緊急仕様変更】セール時の最優先（VIP）加盟店フォールバック特例とレイテンシ要件の厳格化",
+      trigger_turn: 2,
+      announcement:
+        "【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知：『来週の大型セールにおいて、特定の大手加盟店（VIP）については決済全停止を避けるため、Redis障害時でもローカルキャッシュによる最大30秒のフォールバックを許容する例外ポリシーが承認されました。同時に、全体APIのp99レイテンシ目標は10ms以内への短縮が求められます』",
+      new_requirement:
+        "4. 【緊急追加要件】VIP加盟店（ヘッダー x-merchant-vip: true）に限り、Redis瞬断・障害時でもローカルインメモリキャッシュによる最大30秒の縮退運転（フォールバック）を許可し決済受付を継続すること。ただし一般加盟店はPCI DSS監査に従いフェイルクローズを維持すること。",
+      context_doc: {
+        id: "slack-urgent-vip-fallback",
+        title: "🚨 【緊急】#biz-dev-announce 仕様変更通知",
+        type: "slack",
+        source: "Slack (経営企画・SRE緊急会議)",
+        timestamp: "たった今 16:20",
+        content:
+          "事業責任者・SRE合同: 【緊急仕様変更】来週のセールで数億円規模の取扱高を持つトップ10社（VIP加盟店）について、万一のRedisフェイルオーバーによる決済停止は許容できないとの役員判断が下りました。\nVIP加盟店ヘッダーが付与されたリクエストに限り、Redis接続不可時でも最長30秒のローカルキャッシュによるフォールバックを特別に許容してください。\nただし一般加盟店の失効即時遮断（PCI DSS要件）は厳格に維持し、全体のp99レイテンシは10ms以内を維持してください！",
+      },
+    },
     initial_ai_draft: `// AI同僚が作成した決済API認証・レート制限ミドルウェア（初版ドラフト）
 import { Request, Response, NextFunction } from "express";
 import Redis from "ioredis";
@@ -248,6 +276,24 @@ describe("paymentSecurityMiddleware", () => {
           "経理佐藤: お疲れ様です！決済プロバイダとの月次照合で返金残高に差異が出ると決算監査上の大問題になります。キューに投入した返金が万が一ワーカ障害やAPIエラーで落ちた場合、誰にも気づかれないサイレントロストだけは絶対に避けてください（リトライ・デッドレター・アラートの完備）。\n\nAI同僚: 了解です！非同期キューで高速に応答を返す設計にしています！",
       },
     ],
+    premise_shift: {
+      id: "shift-ecommerce-retry-timeout",
+      title: "【緊急仕様変更】決済プロバイダ遅延に伴うタイムアウト補償処理の追加要求",
+      trigger_turn: 2,
+      announcement:
+        "【🚨 緊急仕様変更の発生】決済基盤チームより連絡が入りました：『決済プロバイダ側のセール負荷試験において、返金確定Webhookが最大10分遅延する事例が確認されました。キュー投入後5分経過しても応答がない場合の自動リトライおよび監査アラートが必須要件として追加されました』",
+      new_requirement:
+        "4. 【緊急追加要件】返金キュー投入から5分経過しても決済プロバイダから応答がない場合、サイレントロストを防ぐための自動再試行および監視デッドレター通知（経理アラート）を行うこと。",
+      context_doc: {
+        id: "slack-urgent-refund-timeout",
+        title: "🚨 【緊急】#dev-order 決済プロバイダ仕様変更",
+        type: "slack",
+        source: "Slack (決済連携基盤チーム)",
+        timestamp: "たった今 15:45",
+        content:
+          "決済PF担当: 【緊急】決済プロバイダ側から、セール時の負荷により返金完了通知Webhookの送信に数分〜10分の遅延が生じる可能性があるとの通知がありました。\n現在の『キューに入れて待つだけ』の実装では、タイムアウト時の再送や経理アラートが無いためサイレントロストのリスクがあります。5分経過時のリトライおよびデッドレター通知の設計を急ぎ盛り込んでください！",
+      },
+    },
     initial_ai_draft: `// AI同僚が生成した注文キャンセル・返金処理API（初版ドラフト）
 import { Request, Response } from "express";
 import { db } from "./db";
@@ -405,6 +451,24 @@ describe("Order Cancellation & Refund Pipeline", () => {
           "【第4条 ログ記録とプライバシー】\n業務ログを永続化する際は、社員番号・氏名・連絡先などの個人情報が含まれないよう配慮（マスキングや暗号化）すること。また、ログストアの保存期間ポリシー（最長90日等）に適合しない無制限な蓄積は是正対象となる。",
       },
     ],
+    premise_shift: {
+      id: "shift-helpdesk-pii-masking",
+      title: "【緊急仕様変更】セキュリティ監査による個人機微情報（PII）の即時マスキング義務化",
+      trigger_turn: 2,
+      announcement:
+        "【🚨 緊急仕様変更の発生】コンプライアンス委員会より緊急通達が入りました：『社内AIボットの問い合わせログに社員番号・氏名が含まれている場合、ログストアへの保存前に即時不可逆ハッシュ化またはマスキングすることが義務付けられました。エラーログにも生データを含めてはなりません』",
+      new_requirement:
+        "4. 【緊急追加要件】ログストアへの記録前に、メッセージ本文中の社員番号・氏名・メールアドレス等の個人機微情報（PII）を検知し、即座にマスク（[REDACTED]）またはSHA-256ハッシュ化すること。",
+      context_doc: {
+        id: "memo-urgent-pii-audit",
+        title: "🚨 【緊急】コンプライアンス委員会 通達",
+        type: "memo",
+        source: "法務・コンプライアンス委員会",
+        timestamp: "たった今 14:00",
+        content:
+          "【緊急通達：社内ツールの個人情報保護の即時強化】\n本日開催の監査役会において、社内ヘルプデスクAIツールのログに社員のプライベートな問い合わせや個人情報が生テキストで保存されていることが指摘されました。直ちにログ永続化前のPIIマスキング処理を必須化し、監査対応を完了させてください。",
+      },
+    },
     initial_ai_draft: `// AI同僚が生成した問い合わせロギングミドルウェア（初版ドラフト）
 import { Request, Response, NextFunction } from "express";
 import { logStore } from "./log-store";

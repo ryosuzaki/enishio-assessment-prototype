@@ -178,5 +178,13 @@ export type StepType =
   | "preliminary_judgement"
   | "evaluation_report";
 
-export type AppTab = "session" | "org_dashboard" | "learner_profile" | "benchmark_gallery";
+export type AppTab = "session" | "anchor" | "org_dashboard" | "learner_profile" | "benchmark_gallery";
+
+export interface PremiseShiftState {
+  isInjected: boolean;
+  injectedAtTurn?: number;
+  title?: string;
+  announcement?: string;
+  newRequirement?: string;
+}
 

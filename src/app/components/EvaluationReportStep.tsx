@@ -312,7 +312,7 @@ export function EvaluationReportStep({
                 {prelimAction === "approve"
                   ? "承認 (Approve)"
                   : prelimAction === "remand"
-                  ? "差し戻し (Remand)"
+                  ? "修正要求 (Request Changes)"
                   : prelimAction === "comment"
                   ? "条件付き承認 (Comment)"
                   : "未選択"}
@@ -329,16 +329,58 @@ export function EvaluationReportStep({
               {prelimAction === "approve" && matchedFlaws.length > 0
                 ? `受講者はドラフトを「承認」と判断しましたが、対話ログからは仕込み不備（${matchedFlaws.join(", ")}）に対応する検証行動が抽出されています。`
                 : prelimAction === "remand" && matchedFlaws.length > 0
-                ? `受講者の「差し戻し」判断と、AI採点器が抽出した仕込み不備（${matchedFlaws.join(", ")}）への検証行動が対応しています。`
+                ? `受講者の「修正要求」判断と、AI採点器が抽出した仕込み不備（${matchedFlaws.join(", ")}）への検証行動が対応しています。`
                 : prelimAction === "comment" && matchedFlaws.length > 0
                 ? `受講者は「条件付き承認」と判断し、不備（${matchedFlaws.join(", ")}）への検証行動を踏まえて追加条件付きでのリリースを指示しています。`
                 : prelimAction === "comment" && matchedFlaws.length === 0
                 ? "受講者は「条件付き承認」と判断しましたが、仕込み不備に対する直接の検証行動は抽出されませんでした。"
                 : prelimAction === "remand" && matchedFlaws.length === 0
-                ? "受講者は「差し戻し」と判断しましたが、仕込み不備に対する直接の検証行動は抽出されませんでした。"
+                ? "受講者は「修正要求」と判断しましたが、仕込み不備に対する直接の検証行動は抽出されませんでした。"
                 : "受講者の「承認」判断と、不備指摘の非抽出状態が一致しています。"}
             </p>
           </div>
+
+        {/* 動的コンピテンシー4領域の観測サマリー */}
+        <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+          <div className="text-[11px] font-bold text-slate-300">
+            動的コンピテンシー 4領域の観測サマリー（提案書準拠）
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 space-y-1">
+              <span className="text-[10px] font-semibold text-emerald-400 block">
+                ① 評価的判断力 (Evaluative Judgement)
+              </span>
+              <p className="text-[11px] text-slate-300">
+                仕込み不備検出: <span className="font-mono text-emerald-300 font-bold">{matchedFlaws.length}件</span>
+                {matchedFlaws.length > 0 ? ` (${matchedFlaws.join(", ")})` : " (検出なし)"}
+              </p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 space-y-1">
+              <span className="text-[10px] font-semibold text-indigo-400 block">
+                ② 高次認知・動的思考 (Higher-Order Reasoning)
+              </span>
+              <p className="text-[11px] text-slate-300">
+                前提トレードオフ言語化 &bull; 過剰指摘の回避（正常箇所の正当な弁別）
+              </p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 space-y-1">
+              <span className="text-[10px] font-semibold text-sky-400 block">
+                ③ 対話的共創力 (Collaborative Co-Creation)
+              </span>
+              <p className="text-[11px] text-slate-300">
+                AI同僚への建設的指示 &bull; 対話ターン数: <span className="font-mono text-sky-300 font-bold">{chatHistory.filter(m => m.role === "user").length}ターン</span>
+              </p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 space-y-1">
+              <span className="text-[10px] font-semibold text-purple-400 block">
+                ④ メタ認知・適応力 (Metacognition & Adaptability)
+              </span>
+              <p className="text-[11px] text-slate-300">
+                緊急仕様変更（前提変化）への適応 &bull; 反論への応答（迎合回避）
+              </p>
+            </div>
+          </div>
+        </div>
 
         {prelimJustification && (
           <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-300 space-y-1" data-testid="prelim-justification-display">

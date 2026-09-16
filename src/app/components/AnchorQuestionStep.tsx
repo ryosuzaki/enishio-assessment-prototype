@@ -10,6 +10,10 @@ import {
   RefreshCw,
   AlertTriangle,
   FlaskConical,
+  RotateCcw,
+  BookOpen,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 import type { AnchorItem, StepType } from "../types";
 
@@ -31,6 +35,11 @@ interface AnchorQuestionStepProps {
   currentStep: StepType;
   currentAnchor: AnchorItem | null;
   bankSource: string | null;
+  anchorList?: { anchor_id: string; title: string; family: string }[];
+  selectedAnchorId?: string;
+  onSelectAnchorId?: (id: string) => void;
+  onStartAnchorFlow?: () => void;
+  onResetAnchorFlow?: () => void;
   stage1Choice: string;
   setStage1Choice: (choice: string) => void;
   stage2Choice: string;
@@ -133,6 +142,11 @@ export function AnchorQuestionStep({
   currentStep,
   currentAnchor,
   bankSource,
+  anchorList = [],
+  selectedAnchorId,
+  onSelectAnchorId,
+  onStartAnchorFlow,
+  onResetAnchorFlow,
   stage1Choice,
   setStage1Choice,
   stage2Choice,
@@ -429,19 +443,28 @@ export function AnchorQuestionStep({
         </div>
 
         <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-sm text-slate-300 space-y-2">
-          <p className="font-semibold text-slate-200">🚀 続いて動的課題の対話セッションへ進みます:</p>
+          <p className="font-semibold text-slate-200">🚀 次のステップへの案内:</p>
           <p className="text-xs text-slate-400 leading-relaxed">
-            次はAI同僚が作成した実際の業務コード（決済セキュリティミドルウェア）をレビューする3ペイン対話セッションです。
-            AI同僚のコードに含まれる前提の隠蔽や不備を対話で指摘し、修正指示を出してください。
+            共通アンカー項目は、全員に共通する「固定のものさし」として測定精度を担保する仕組みです。
+            続けて別のアンカー項目を試すか、3ペイン画面による動的実務演習セッションへ進んでください。
           </p>
         </div>
 
-        <div className="pt-2 flex justify-end">
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+          {onResetAnchorFlow && (
+            <button
+              onClick={onResetAnchorFlow}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-200 text-xs font-semibold transition-all"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+              <span>別のアンカー項目を試す</span>
+            </button>
+          )}
           <button
             onClick={onStartDialogueSession}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/25"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/25 ml-auto text-xs"
           >
-            動的対話セッションへ進む
+            実務演習セッションを体験する
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -449,5 +472,117 @@ export function AnchorQuestionStep({
     );
   }
 
-  return null;
+  // --- スタンドアロン表示: アンカー項目選択 & 概念解説（未着手またはリセット時） ---
+  return (
+    <div className={PANEL}>
+      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20 text-blue-400">
+            <BookOpen className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-xs font-mono text-blue-400 uppercase tracking-wider">
+              IRT 項目応答理論 / 尺度等化モジュール
+            </span>
+            <h1 className="text-lg font-bold text-white">
+              共通アンカー項目評価（Standard Benchmark Anchor）
+            </h1>
+          </div>
+        </div>
+        <div className="text-right">
+          <span
+            data-testid="anchor-bank-source-badge"
+            className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/40"
+          >
+            {bankSource === "operational_v2"
+              ? "運用バンク"
+              : bankSource === "demo_sample_v2"
+              ? "公開デモ用サンプル"
+              : "バンク読込済"}
+          </span>
+        </div>
+      </div>
+
+      {bankSource === "demo_sample_v2" && (
+        <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-800/50 text-xs text-amber-200/90 leading-relaxed space-y-1">
+          <div className="font-semibold text-amber-300 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            <span>出題する共通アンカー項目（全{anchorList.length}項目から選択）</span>
+          </div>
+          <p>
+            運用中の共通アンカー項目バンクは、受検者への事前露出を避けるため公開していません。
+            ここではリポジトリ同梱の公開デモ用サンプルを表示しています。
+            （※類型C（仕込んだ不備が無い項目）が含まれます）
+          </p>
+        </div>
+      )}
+
+      <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-900/30 text-xs text-slate-300 space-y-2 leading-relaxed">
+        <div className="font-semibold text-blue-300 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-blue-400" />
+          <span>共通アンカー項目とは何か（審査員・受講者向け解説）</span>
+        </div>
+        <p>
+          動的対話セッションでは受講者ごとに異なる会話が展開されるため、全員が同じ条件で答える<strong>「固定のものさし（共通アンカー）」</strong>を組み合わせて測定することで、異なる課題や評価回の間で公平に実力を比較（等化）します。
+        </p>
+        <p className="text-slate-400 text-[11px]">
+          本プロトタイプでは、医学教育の臨床推論評価で確立された<strong>SCT形式（Script Concordance Test）4段階構成</strong>を採用し、「全体判断（採用可否）&rarr; 懸念の所在 &rarr; 前提変化への適応（判断更新）&rarr; 反論への応答（迎合測定）」を段階的に開示して動的コンピテンシーを測定します。
+        </p>
+      </div>
+
+      <div className="space-y-3 pt-1">
+        <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+          <Layers className="w-3.5 h-3.5 text-blue-400" />
+          体験するアンカー項目を選択してください
+        </label>
+        <div className="space-y-2">
+          {anchorList.map((item) => (
+            <label
+              key={item.anchor_id}
+              className={`${OPTION_BASE} ${
+                selectedAnchorId === item.anchor_id ? OPTION_ON : OPTION_OFF
+              }`}
+            >
+              <input
+                type="radio"
+                name="anchorItem"
+                value={item.anchor_id}
+                checked={selectedAnchorId === item.anchor_id}
+                onChange={() => onSelectAnchorId?.(item.anchor_id)}
+                className="mt-1 accent-blue-500"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="text-xs font-mono font-bold text-blue-400">
+                    {item.anchor_id}
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                    {item.family}
+                  </span>
+                </div>
+                <div className="text-sm font-medium text-slate-200">{item.title}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="pt-4 flex justify-end">
+        <button
+          onClick={onStartAnchorFlow}
+          disabled={!selectedAnchorId || isSubmitting}
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed text-xs"
+        >
+          {isSubmitting ? (
+            <RefreshCw className="w-4 h-4 animate-spin" />
+          ) : (
+            <>
+              このアンカー項目を体験する（4段階疑似対話を開始）
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
 }

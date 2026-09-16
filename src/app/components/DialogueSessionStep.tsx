@@ -15,9 +15,12 @@ import {
   Send,
   GitPullRequest,
   FlaskConical,
+  Zap,
+  AlertTriangle,
+  Flame,
 } from "lucide-react";
 import type { DynamicTaskScenario } from "@/data/dynamic-task";
-import type { ChatMessage, EvidenceTargetState, FocusItem, ProbeMove } from "../types";
+import type { ChatMessage, EvidenceTargetState, FocusItem, ProbeMove, PremiseShiftState } from "../types";
 import { MAX_PROBES_PER_SESSION } from "../types";
 import { MediationStatePanel } from "./MediationStatePanel";
 
@@ -39,6 +42,8 @@ interface DialogueSessionStepProps {
   lastSelectionRationale: string | null;
   probesIssued: number;
   isProbing: boolean;
+  premiseShiftState?: PremiseShiftState;
+  onTriggerPremiseShift?: () => void;
   onProceedToPreliminaryJudgement: () => void;
   onAddFocusItem: (textSnippet?: string, noteText?: string) => void;
   onRemoveFocusItem: (seq: number) => void;
@@ -63,6 +68,8 @@ export function DialogueSessionStep({
   lastSelectionRationale,
   probesIssued,
   isProbing,
+  premiseShiftState,
+  onTriggerPremiseShift,
   onProceedToPreliminaryJudgement,
   onAddFocusItem,
   onRemoveFocusItem,
@@ -89,6 +96,57 @@ export function DialogueSessionStep({
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
+
+      {/* 場面3：前提変化（緊急仕様変更）コントロール ＆ バナー */}
+      {premiseShiftState?.isInjected ? (
+        <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-500/50 shadow-lg shadow-rose-950/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="p-1.5 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30 shrink-0 mt-0.5">
+              <AlertTriangle className="w-4 h-4" />
+            </span>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  場面3：前提変化（緊急仕様変更 発生中）
+                </span>
+                <span className="text-xs text-rose-300 font-semibold">
+                  緊急仕様変更・追加要件が通知されました
+                </span>
+                <span className="text-[10px] text-rose-400/80">Turn #{premiseShiftState.injectedAtTurn ?? 2} 注入</span>
+              </div>
+              <h3 className="text-xs font-bold text-white mt-1">{premiseShiftState.title}</h3>
+              <p className="text-[11px] text-rose-200/90 leading-relaxed mt-0.5">{premiseShiftState.announcement}</p>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-rose-900/40 text-rose-300 border border-rose-700/40 shrink-0 whitespace-nowrap">
+            適応行動・方針更新を観測中
+          </span>
+        </div>
+      ) : selectedTask.premise_shift ? (
+        <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+              <Zap className="w-4 h-4" />
+            </span>
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 font-mono">
+                場面3：前提変化（動的適応力の検証）
+              </span>
+              <p className="text-xs text-slate-300">
+                実務で頻発する「要件の急な変更・監査指摘」への適応力を検証できます。
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onTriggerPremiseShift}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600/90 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-md shadow-amber-950/40 shrink-0 whitespace-nowrap"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            ⚡ 緊急仕様変更を発生させる
+          </button>
+        </div>
+      ) : null}
 
       {/* 3-Pane Layout Grid (Left: Requirements / Middle: Artifact / Right: Verification Panel) */}
       <div className="flex flex-col lg:flex-row gap-4 items-stretch">
@@ -126,7 +184,7 @@ export function DialogueSessionStep({
               運用コンテキスト
               {selectedTask.context_documents && (
                 <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 font-mono">
-                  {selectedTask.context_documents.length}
+                  {selectedTask.context_documents.length + (premiseShiftState?.isInjected ? 1 : 0)}
                 </span>
               )}
             </button>
@@ -144,6 +202,11 @@ export function DialogueSessionStep({
                     {req}
                   </div>
                 ))}
+                {premiseShiftState?.isInjected && selectedTask.premise_shift && (
+                  <div className="text-xs text-rose-200 bg-rose-950/60 p-2.5 rounded-lg border border-rose-500/60 leading-relaxed font-semibold animate-pulse">
+                    {selectedTask.premise_shift.new_requirement}
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5 pt-1">
                 <span className="text-[11px] font-bold text-slate-400">非機能・運用目標:</span>
@@ -159,6 +222,19 @@ export function DialogueSessionStep({
               <div className="text-[10px] text-slate-400 italic">
                 ※ チーム内Slack、過去の障害報告書、社内規程メモです。散らばった情報から運用環境の前提を読み解いてください。
               </div>
+              {premiseShiftState?.isInjected && selectedTask.premise_shift && (
+                <div className="p-2.5 rounded-lg bg-rose-950/80 border border-rose-500/60 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between border-b border-rose-800/80 pb-1">
+                    <span className="font-bold text-rose-300 text-[11px] flex items-center gap-1">
+                      🚨 {selectedTask.premise_shift.context_doc.title}
+                    </span>
+                    <span className="text-[10px] text-rose-400 font-mono">{selectedTask.premise_shift.context_doc.timestamp}</span>
+                  </div>
+                  <p className="text-rose-100 text-[11px] leading-relaxed whitespace-pre-wrap">
+                    {selectedTask.premise_shift.context_doc.content}
+                  </p>
+                </div>
+              )}
               {selectedTask.context_documents?.map((doc) => (
                 <div key={doc.id} className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1.5 text-xs">
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-1">

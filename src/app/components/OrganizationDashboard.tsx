@@ -898,7 +898,7 @@ export function OrganizationDashboard({
             中核評価エンジンによる実務ロールプレイング演習を体験
           </h3>
           <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-            AI同僚との動的対話、ソクラテス型深掘り・What-if注入、CFF事前暫定判断、およびAutoSCOREによる2段階根拠抽出＆軸4採点を実際に動かせます。
+            AI同僚との動的対話、ソクラテス型深掘り・What-if注入、CFF事前暫定判断、およびAutoSCOREによる2段階根拠抽出＆動的コンピテンシー解析を実際に動かせます。
           </p>
         </div>
 

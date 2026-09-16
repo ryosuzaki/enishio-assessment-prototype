@@ -14,9 +14,10 @@ import type {
   ProbeMove,
   StepType,
   AppTab,
+  PremiseShiftState,
 } from "./types";
 import { MAX_PROBES_PER_SESSION } from "./types";
-import { Play, Building2, UserCheck, Award, Zap, PanelRightOpen } from "lucide-react";
+import { Play, Anchor, Building2, UserCheck, Award, Zap, PanelRightOpen } from "lucide-react";
 import { InitStep } from "./components/InitStep";
 import { AnchorQuestionStep } from "./components/AnchorQuestionStep";
 import { DialogueSessionStep } from "./components/DialogueSessionStep";
@@ -43,6 +44,7 @@ export default function AssessmentPrototypePage() {
   const [sessionSeq, setSessionSeq] = useState<number>(1);
   const [learnerId, setLearnerId] = useState<string>("");
   const [currentStep, setCurrentStep] = useState<StepType>("init");
+  const [anchorStep, setAnchorStep] = useState<StepType>("init");
 
   // Anchor State (W2)
   const [anchorList, setAnchorList] = useState<{ anchor_id: string; title: string; family: string }[]>([]);
@@ -77,6 +79,8 @@ export default function AssessmentPrototypePage() {
   const [cffActiveWarning, setCffActiveWarning] = useState<string | null>(null);
   // 直近に記録した成果物。次ターンの編集距離をこれとの差分で測る（MVP 4.4）
   const [lastLoggedArtifact, setLastLoggedArtifact] = useState<string>(DYNAMIC_TASKS[0].initial_ai_draft);
+  // 前提変化（場面3: 緊急仕様変更・追加要件）の注入状態
+  const [premiseShiftState, setPremiseShiftState] = useState<PremiseShiftState>({ isInjected: false });
 
   // Mediation State (MVP 2.1 ステップ7・8: ソクラテス型深掘り・What-if注入)
   const [mediationStateEstimate, setMediationStateEstimate] = useState<EvidenceTargetState[] | null>(null);
@@ -144,6 +148,8 @@ export default function AssessmentPrototypePage() {
         if (task) setGalleryTaskId(task);
       } else if (tab === "session") {
         setActiveTab("session");
+      } else if (tab === "anchor") {
+        setActiveTab("anchor");
       }
     }
   }, []);
@@ -195,12 +201,8 @@ export default function AssessmentPrototypePage() {
     setTelemetryLog((prev) => [`[${time}] ${msg}`, ...prev.slice(0, 24)]);
   };
 
-  // Start Session
+  // Start Dynamic Exercise Session Directly (Bypasses Anchor)
   const handleStartSession = async () => {
-    if (!selectedAnchorId) {
-      setErrorMessage("出題するアンカー項目が読み込めていません。ページを再読み込みしてください。");
-      return;
-    }
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
@@ -213,37 +215,118 @@ export default function AssessmentPrototypePage() {
         }),
       });
       const data = await res.json();
-      if (data.success) {
-        setSessionId(data.sessionId);
-        setSessionSeq(data.sessionSeq);
-        setLearnerId(data.learnerId);
-        addTelemetry(`Session initialized (Seq #${data.sessionSeq}, ID: ${data.sessionId.slice(0, 8)}...)`);
-
-        // Load chosen anchor item
-        const anchorRes = await fetch(`/api/anchor?id=${selectedAnchorId}`);
-        const anchorData = await anchorRes.json();
-        if (anchorData.success) {
-          setCurrentAnchor(anchorData.anchor);
-          setCurrentStep("anchor_stage1");
-          setStageStartTime(Date.now());
-          addTelemetry(
-            `Anchor stimulus loaded (${selectedAnchorId}, ${anchorData.anchor.format_version}) - pretest mode`
-          );
-          if (anchorData.retiredWarning) {
-            addTelemetry(`WARN ${anchorData.retiredWarning}`);
-          }
-        } else {
-          // ここを黙って通すと、セッションだけ作られて画面が無反応になる。
-          setErrorMessage(anchorData.error ?? "アンカー項目の読み込みに失敗しました。");
-        }
-      } else {
+      if (!data.success) {
         setErrorMessage(data.error ?? "セッションを開始できませんでした。");
+        return;
       }
+      const newSessionId = data.sessionId;
+      setSessionId(newSessionId);
+      setSessionSeq(data.sessionSeq);
+      setLearnerId(data.learnerId);
+      addTelemetry(`Session initialized (Seq #${data.sessionSeq}, ID: ${newSessionId.slice(0, 8)}...)`);
+
+      // 仕込み不備と「正常箇所」のラベルをこのセッションに対して確定させる [P-15]
+      const diagRes = await fetch("/api/dialogue/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: newSessionId, taskId: selectedTaskId }),
+      });
+      const diagData = await diagRes.json();
+      if (diagData.success) {
+        addTelemetry(
+          `injected_flaw_map recorded (不備 ${diagData.flawCount} 件 + 正常箇所 ${diagData.normalSpanCount} 件)`
+        );
+      } else {
+        setErrorMessage("課題開始エラー: " + diagData.error);
+        return;
+      }
+
+      setCurrentStep("dialogue_session");
+      setArtifactCode(selectedTask.initial_ai_draft);
+      setChatHistory([
+        {
+          turnSeq: 1,
+          role: "assistant",
+          content: `${selectedTask.title}に関する成果物を作成しました。右側のコードを確認いただき、本番リリースに向けたレビューをお願いします！`,
+        },
+      ]);
+      setTurnCounter(2);
+      setLastLoggedArtifact(selectedTask.initial_ai_draft);
+      setMediationStateEstimate(null);
+      setLastProbeMove(null);
+      setLastSelectionRationale(null);
+      setProbesIssued(0);
+      setPremiseShiftState({ isInjected: false });
+      addTelemetry(`Dynamic Task initiated (${selectedTask.task_id})`);
     } catch (e: unknown) {
       setErrorMessage("セッション開始エラー: " + messageOf(e));
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Standalone Anchor Flow Handlers (W2 / IRT Equalization Benchmark)
+  const handleStartAnchorFlow = async () => {
+    if (!selectedAnchorId) {
+      setErrorMessage("体験するアンカー項目を選択してください。");
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      let activeSessionId = sessionId;
+      if (!activeSessionId) {
+        const res = await fetch("/api/session/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tenantNamespace: "tenant-jaist-demo",
+            userId: "examiner-preview-user",
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          activeSessionId = data.sessionId;
+          setSessionId(data.sessionId);
+          setSessionSeq(data.sessionSeq);
+          setLearnerId(data.learnerId);
+        }
+      }
+
+      const anchorRes = await fetch(`/api/anchor?id=${selectedAnchorId}`);
+      const anchorData = await anchorRes.json();
+      if (anchorData.success) {
+        setCurrentAnchor(anchorData.anchor);
+        setStage1Choice("");
+        setStage2Choice("");
+        setStage3Choice(null);
+        setStage3bChoice(null);
+        setConfidence(3);
+        setAnchorStep("anchor_stage1");
+        setStageStartTime(Date.now());
+        addTelemetry(
+          `Anchor stimulus loaded (${selectedAnchorId}, ${anchorData.anchor.format_version}) - benchmark mode`
+        );
+        if (anchorData.retiredWarning) {
+          addTelemetry(`WARN ${anchorData.retiredWarning}`);
+        }
+      } else {
+        setErrorMessage(anchorData.error ?? "アンカー項目の読み込みに失敗しました。");
+      }
+    } catch (e: unknown) {
+      setErrorMessage("アンカー開始エラー: " + messageOf(e));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResetAnchorFlow = () => {
+    setAnchorStep("init");
+    setStage1Choice("");
+    setStage2Choice("");
+    setStage3Choice(null);
+    setStage3bChoice(null);
+    setConfidence(3);
   };
 
   // Anchor Flow Step Handlers [D-83]
@@ -255,8 +338,8 @@ export default function AssessmentPrototypePage() {
     const duration = Date.now() - stageStartTime;
     setStage1DurationMs(duration);
     // 類型C（不備なし）の項目は段階2を持たないため飛ばす。
-    const next = currentAnchor.stage2 ? "anchor_stage2" : "anchor_stage3";
-    setCurrentStep(next);
+    const next: StepType = currentAnchor.stage2 ? "anchor_stage2" : "anchor_stage3";
+    setAnchorStep(next);
     setStageStartTime(Date.now());
     addTelemetry(
       `段階1（採用可否）を確定: ${stage1Choice} / ${(duration / 1000).toFixed(1)}s` +
@@ -268,7 +351,7 @@ export default function AssessmentPrototypePage() {
     if (!stage2Choice) return;
     const duration = Date.now() - stageStartTime;
     setStage2DurationMs(duration);
-    setCurrentStep("anchor_stage3");
+    setAnchorStep("anchor_stage3");
     setStageStartTime(Date.now());
     addTelemetry(
       `段階2（懸念領域）: ${stage2Choice} / 提示順 ${currentAnchor?.stage2_order ?? "—"} / ` +
@@ -281,8 +364,8 @@ export default function AssessmentPrototypePage() {
     const duration = Date.now() - stageStartTime;
     setStage3DurationMs(duration);
     // 段階3' はすべての項目には付かない。付く項目を読まれると測れなくなるためである [D-83]。
-    const next = currentAnchor.stage3b ? "anchor_stage3b" : "anchor_conf";
-    setCurrentStep(next);
+    const next: StepType = currentAnchor.stage3b ? "anchor_stage3b" : "anchor_conf";
+    setAnchorStep(next);
     setStageStartTime(Date.now());
     addTelemetry(
       `段階3（前提変化への判断更新）: ${stage3Choice > 0 ? "+" : ""}${stage3Choice} / ` +
@@ -295,7 +378,7 @@ export default function AssessmentPrototypePage() {
     if (stage3bChoice === null || stage3Choice === null) return;
     const duration = Date.now() - stageStartTime;
     setStage3bDurationMs(duration);
-    setCurrentStep("anchor_conf");
+    setAnchorStep("anchor_conf");
     const delta = stage3bChoice - stage3Choice;
     addTelemetry(
       `段階3'（反論への応答）: ${stage3bChoice > 0 ? "+" : ""}${stage3bChoice} / ` +
@@ -316,7 +399,7 @@ export default function AssessmentPrototypePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sessionId,
+          sessionId: sessionId || "anchor-standalone-demo",
           anchorId: currentAnchor.anchor_id,
           formatVersion: currentAnchor.format_version,
           stage1Selection: stage1Choice,
@@ -339,7 +422,7 @@ export default function AssessmentPrototypePage() {
         addTelemetry(
           `Anchor recorded (Response ID: ${data.responseId.slice(0, 8)}..., ${data.anchorStatus} / 無得点)`
         );
-        setCurrentStep("anchor_complete");
+        setAnchorStep("anchor_complete");
       } else {
         setErrorMessage("アンカー記録エラー: " + data.error);
       }
@@ -348,6 +431,31 @@ export default function AssessmentPrototypePage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Premise Shift Trigger Handler (場面3: 緊急仕様変更・追加要件の発生)
+  const handleTriggerPremiseShift = () => {
+    if (premiseShiftState.isInjected) return;
+    const shift = selectedTask.premise_shift;
+    if (!shift) return;
+    setPremiseShiftState({
+      isInjected: true,
+      injectedAtTurn: turnCounter,
+      title: shift.title,
+      announcement: shift.announcement,
+      newRequirement: shift.new_requirement,
+    });
+    const urgentTurn = turnCounter;
+    setChatHistory((prev) => [
+      ...prev,
+      {
+        turnSeq: urgentTurn,
+        role: "assistant",
+        content: `【⚡ 緊急仕様変更・追加要件の通知】\n${shift.announcement}\n\nこれに伴い、以下の追加要件を満たす必要があります：\n「${shift.new_requirement}」\n\n現在の設計やコードで問題がないか、確認と修正方針の指示をお願いします！`,
+      },
+    ]);
+    setTurnCounter((t) => t + 1);
+    addTelemetry(`⚡ 緊急仕様変更（前提変化）を発生させました: ${shift.title}`);
   };
 
   // Transition to Dynamic Dialogue Session (W3)
@@ -698,7 +806,19 @@ export default function AssessmentPrototypePage() {
             }`}
           >
             <Play className="w-3.5 h-3.5" />
-            <span>実務演習セッション（Feasibility・中核評価エンジン稼働）</span>
+            <span>実務演習セッション（3ペイン動的対話）</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("anchor")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+              activeTab === "anchor"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+            }`}
+          >
+            <Anchor className="w-3.5 h-3.5 text-blue-400" />
+            <span>共通アンカー評価（固定尺度・SCT型）</span>
           </button>
           <button
             type="button"
@@ -710,7 +830,7 @@ export default function AssessmentPrototypePage() {
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>① 組織・受講管理ダッシュボード（Viability・モックUI）</span>
+            <span>① 組織・受講管理ダッシュボード</span>
           </button>
           <button
             type="button"
@@ -722,7 +842,7 @@ export default function AssessmentPrototypePage() {
             }`}
           >
             <UserCheck className="w-3.5 h-3.5" />
-            <span>② 受講者スキルカルテ（Viability・モックUI）</span>
+            <span>② 受講者スキルカルテ</span>
           </button>
           <button
             type="button"
@@ -734,7 +854,7 @@ export default function AssessmentPrototypePage() {
             }`}
           >
             <Award className="w-3.5 h-3.5 text-amber-400" />
-            <span>③ エキスパート事後講評（デブリーフィング）</span>
+            <span>③ エキスパート事後講評</span>
           </button>
         </div>
 
@@ -784,7 +904,41 @@ export default function AssessmentPrototypePage() {
         />
       )}
 
-      {/* Tab 4: Core Evaluation Session (Vertical Cut) */}
+      {/* Tab: Standard Benchmark Anchor */}
+      {activeTab === "anchor" && (
+        <div className="space-y-4">
+          <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
+          <AnchorQuestionStep
+            currentStep={anchorStep}
+            currentAnchor={currentAnchor}
+            bankSource={bankSource}
+            anchorList={anchorList}
+            selectedAnchorId={selectedAnchorId}
+            onSelectAnchorId={(id) => setSelectedAnchorId(id)}
+            onStartAnchorFlow={handleStartAnchorFlow}
+            onResetAnchorFlow={handleResetAnchorFlow}
+            stage1Choice={stage1Choice}
+            setStage1Choice={setStage1Choice}
+            stage2Choice={stage2Choice}
+            setStage2Choice={setStage2Choice}
+            stage3Choice={stage3Choice}
+            setStage3Choice={setStage3Choice}
+            stage3bChoice={stage3bChoice}
+            setStage3bChoice={setStage3bChoice}
+            confidence={confidence}
+            setConfidence={setConfidence}
+            isSubmitting={isSubmitting}
+            onStage1Next={handleStage1Next}
+            onStage2Next={handleStage2Next}
+            onStage3Next={handleStage3Next}
+            onStage3bNext={handleStage3bNext}
+            onAnchorSubmit={handleAnchorSubmit}
+            onStartDialogueSession={() => setActiveTab("session")}
+          />
+        </div>
+      )}
+
+      {/* Tab: Core Evaluation Session (Vertical Cut) */}
       {activeTab === "session" && (
         <div className="space-y-4">
           {!showTelemetry && (
@@ -817,50 +971,16 @@ export default function AssessmentPrototypePage() {
               {/* STEP 0: Initialization */}
               {currentStep === "init" && (
                 <InitStep
-                  selectedAnchorId={selectedAnchorId}
-                  setSelectedAnchorId={setSelectedAnchorId}
-                  anchorList={anchorList}
-                  bankSource={bankSource}
                   selectedTaskId={selectedTaskId}
                   setSelectedTaskId={setSelectedTaskId}
                   selectedTask={selectedTask}
                   isSubmitting={isSubmitting}
                   onStartSession={handleStartSession}
+                  onGoToAnchorTab={() => setActiveTab("anchor")}
                 />
               )}
 
-              {/* STEP 1〜5: Anchor Flow（4段構成 + 完了）[D-83] */}
-              {(currentStep === "anchor_stage1" ||
-                currentStep === "anchor_stage2" ||
-                currentStep === "anchor_stage3" ||
-                currentStep === "anchor_stage3b" ||
-                currentStep === "anchor_conf" ||
-                currentStep === "anchor_complete") && (
-                <AnchorQuestionStep
-                  currentStep={currentStep}
-                  currentAnchor={currentAnchor}
-                  bankSource={bankSource}
-                  stage1Choice={stage1Choice}
-                  setStage1Choice={setStage1Choice}
-                  stage2Choice={stage2Choice}
-                  setStage2Choice={setStage2Choice}
-                  stage3Choice={stage3Choice}
-                  setStage3Choice={setStage3Choice}
-                  stage3bChoice={stage3bChoice}
-                  setStage3bChoice={setStage3bChoice}
-                  confidence={confidence}
-                  setConfidence={setConfidence}
-                  isSubmitting={isSubmitting}
-                  onStage1Next={handleStage1Next}
-                  onStage2Next={handleStage2Next}
-                  onStage3Next={handleStage3Next}
-                  onStage3bNext={handleStage3bNext}
-                  onAnchorSubmit={handleAnchorSubmit}
-                  onStartDialogueSession={handleStartDialogueSession}
-                />
-              )}
-
-              {/* STEP 5: Dynamic 3-Pane Dialogue Session (W3) */}
+              {/* STEP 1: Dynamic 3-Pane Dialogue Session (W3) */}
               {currentStep === "dialogue_session" && (
                 <DialogueSessionStep
                   selectedTask={selectedTask}
@@ -880,6 +1000,8 @@ export default function AssessmentPrototypePage() {
                   lastSelectionRationale={lastSelectionRationale}
                   probesIssued={probesIssued}
                   isProbing={isProbing}
+                  premiseShiftState={premiseShiftState}
+                  onTriggerPremiseShift={handleTriggerPremiseShift}
                   onProceedToPreliminaryJudgement={handleProceedToPreliminaryJudgement}
                   onAddFocusItem={handleAddFocusItem}
                   onRemoveFocusItem={handleRemoveFocusItem}
