@@ -14,7 +14,9 @@ import {
   resolveSessionContext,
   recordEvidenceComponents,
   recordRelianceMetrics,
+  recordLlmCall,
 } from "@/lib/telemetry";
+import type { LlmUsage } from "@/lib/llm";
 import { getDynamicTask } from "@/data/dynamic-task";
 import { getInjectedFlaws } from "@/data/dynamic-task.server";
 
@@ -37,11 +39,22 @@ export async function POST(req: Request) {
     // learner_id / session_seq はセッションから引く（リクエストボディを信用しない）
     const session = await resolveSessionContext(sessionId);
 
-    // 1. Stage 1: Evidence extraction (structured output)
-    const evidence = await extractEvidence(transcript, finalArtifact || "", taskId);
+    // 採点2回ぶんのトークン使用量とレイテンシを溜めておき、採点が通ってから記録する。
+    // **採点が落ちた場合も記録する**——失敗した呼び出しにも課金は発生している。
+    const usages: LlmUsage[] = [];
+    const collectUsage = (usage: LlmUsage) => usages.push(usage);
 
-    // 2. Stage 2: Band scoring (0..5 band) strictly on extracted evidence
-    const scoring = await computeBandScore(evidence, taskId);
+    let evidence: Awaited<ReturnType<typeof extractEvidence>>;
+    let scoring: Awaited<ReturnType<typeof computeBandScore>>;
+    try {
+      // 1. Stage 1: Evidence extraction (structured output)
+      evidence = await extractEvidence(transcript, finalArtifact || "", taskId, collectUsage);
+
+      // 2. Stage 2: Band scoring (0..5 band) strictly on extracted evidence
+      scoring = await computeBandScore(evidence, taskId, collectUsage);
+    } finally {
+      for (const usage of usages) await recordLlmCall(sessionId, usage);
+    }
 
     // 3. 確信度が閾値を下回る判定はスコアを確定させず、人間の確認待ちとして記録する（W4-3）。
     //    画面は作らない（S0-5 はスコープ外）。記録だけ行う。

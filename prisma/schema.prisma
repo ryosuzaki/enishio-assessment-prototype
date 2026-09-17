@@ -10,12 +10,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Learner {
-  learner_id String    @id
-  created_at DateTime  @default(now())
-  sessions   Session[]
-  ratings    Rating[]
+/// 受講者が属する組織（テナント）。
+///
+/// **認証・権限・課金は本プロトタイプのスコープ外だが、所属だけはログ側に置く。**
+/// `learner_id` は `uuidv5(tenant_namespace + ":" + raw_user_id)` で採番しており
+/// （`generateLearnerId`・`[D-28]` `[D-42]`）、**テナントは既に識別子の中へ織り込まれている。**
+/// にもかかわらず受け皿の表が無いと、どの組織の受講者かを後から復元できない。
+/// 「ログスキーマだけは本番仕様で作る——後から足したフィールドは過去セッション分を
+/// 永久に失う」という方針（README §3）に、ここだけが従っていなかった。
+model Tenant {
+  tenant_id        String   @id @default(uuid())
+  /// `generateLearnerId` に渡す名前空間。learner_id の採番根拠そのものなので一意にする。
+  tenant_namespace String   @unique
+  display_name     String?
+  created_at       DateTime @default(now())
 
+  learners Learner[]
+
+  @@map("tenants")
+}
+
+model Learner {
+  learner_id String   @id
+  tenant_id  String
+  created_at DateTime @default(now())
+
+  /// **Cascade にしない。**記録の帰属先は個人であり、顧客企業が持つのは契約期間中の
+  /// 閲覧・分析権にとどまる（`[D-67]` 決定2）。テナントを消したら受講者の記録も消える
+  /// 設計は、その決定と正面から矛盾する。
+  tenant   Tenant    @relation(fields: [tenant_id], references: [tenant_id], onDelete: Restrict)
+  sessions Session[]
+  ratings  Rating[]
+
+  @@index([tenant_id])
   @@map("learners")
 }
 
@@ -41,6 +68,7 @@ model Session {
   evidence_components    EvidenceComponent[]
   reliance_metrics       RelianceMetrics[]
   mediation_probes       MediationProbe[]
+  llm_calls              LlmCall[]
 
   @@unique([learner_id, session_seq])
   @@index([learner_id, session_seq])
@@ -99,15 +127,15 @@ model AnchorItem {
 }
 
 model AnchorResponse {
-  response_id    String   @id @default(uuid())
+  response_id    String  @id @default(uuid())
   session_id     String
   anchor_id      String
   // 応答時点の anchor_status を凍結して持つ。anchor_items 側は昇格で書き換わるため、
   // ここに残さないと「この応答が pretest 期のものか」を後から復元できない（MVP 4.1.1）。
   // [D-67] "pretest" | "operational" | "verification" | "retired"
-  anchor_status  String   @default("pretest")
+  anchor_status  String  @default("pretest")
   // [D-67] 決定2：応答時の用途。Rating.stakes_context と同じ列挙。
-  stakes_context String   @default("formative")
+  stakes_context String  @default("formative")
   // --- v1（静的選択式・[D-83] で退役）---
   // 新規応答は v2 側の列へ入る。旧行を保持するため nullable にしてある。
   q1_selection   String?
@@ -118,27 +146,27 @@ model AnchorResponse {
   // --- v2（4段構成の疑似対話形式・[D-83]）---
   // "v1-static" | "v2-sct"。どちらの形式で答えた応答かを応答側にも凍結して持つ
   // （項目側は改版されうるため、ここに無いと後から復元できない。MVP 4.1.1 と同じ理由）。
-  format_version     String  @default("v1-static")
+  format_version      String  @default("v1-static")
   // 段階1: 選択肢に答えを含めない「採用可否」の3択。ここが「言われずに気づいたか」の測定点。
-  stage1_selection   String?
+  stage1_selection    String?
   // 段階2: 懸念領域の粗い分類。段階1で「そのまま採用してよい」を選んだ場合は null。
-  stage2_selection   String?
+  stage2_selection    String?
   // 段階3: 新情報を受けた判断の移動（-2..+2）。正答鍵ではなく専門家パネル分布で採点する。
-  stage3_selection   Int?
+  stage3_selection    Int?
   // 段階3': 新情報を含まない反論（社会的圧力のみ）を受けた後の再回答（-2..+2）。
   // 採点は stage3 との差分のみで、専門家パネルを必要としない。差が出れば迎合である [D-83]。
   // 全項目には付けない（付く項目を読まれると測れなくなる）ため nullable。
   stage3b_selection   Int?
   stage3b_duration_ms Int?
   // 提示順（例 "C,A,D,B"）。サーバ側でシャッフルして出すため、記録しないと応答を解釈できない。
-  stage1_order       String?
-  stage2_order       String?
-  stage1_duration_ms Int?
-  stage2_duration_ms Int?
-  stage3_duration_ms Int?
+  stage1_order        String?
+  stage2_order        String?
+  stage1_duration_ms  Int?
+  stage2_duration_ms  Int?
+  stage3_duration_ms  Int?
 
-  confidence     Int // 1..5
-  created_at     DateTime @default(now())
+  confidence Int // 1..5
+  created_at DateTime @default(now())
 
   session     Session    @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
   anchor_item AnchorItem @relation(fields: [anchor_id], references: [anchor_id], onDelete: Cascade)
@@ -340,4 +368,37 @@ model MediationProbe {
 
   @@index([session_id, turn_seq])
   @@map("mediation_probes")
+}
+
+/// LLM 呼び出し1回ぶんの使用量とレイテンシ。
+///
+/// **原価をログから答えられるようにするための表である。**`scorer_model_version` で
+/// 「どのモデルで採点したか」は追えたが、「そのセッションにいくらかかったか」は
+/// どこにも残っていなかった。申請書の費用計画も公開デモの上限設計も、ここが無いと
+/// 推測でしか書けない。
+///
+/// 採点（extract / score）だけでなく**AI同僚の応答（dialogue）と深掘り（probe）も記録する。**
+/// 毎ターン全対話ログを再送する対話側が、実際には最大の費目である。
+model LlmCall {
+  call_id    String @id @default(uuid())
+  session_id String
+  /// "dialogue" | "probe" | "extract" | "score"
+  purpose    String
+  model      String
+
+  prompt_tokens     Int?
+  completion_tokens Int?
+  /// completion_tokens の内数。**別立てで持つ**——見える出力が短いのに請求が膨らむ
+  /// 原因はここであり、合算すると後から切り分けられない。
+  reasoning_tokens  Int?
+  total_tokens      Int?
+  latency_ms        Int
+
+  created_at DateTime @default(now())
+
+  session Session @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
+
+  @@index([session_id])
+  @@index([session_id, purpose])
+  @@map("llm_calls")
 }

@@ -7,13 +7,19 @@ const { extractEvidence, computeBandScore } = vi.hoisted(() => ({
   computeBandScore: vi.fn(),
 }));
 
-const { recordRating, resolveSessionContext, recordEvidenceComponents, recordRelianceMetrics } =
-  vi.hoisted(() => ({
-    recordRating: vi.fn(),
-    resolveSessionContext: vi.fn(),
-    recordEvidenceComponents: vi.fn(),
-    recordRelianceMetrics: vi.fn(),
-  }));
+const {
+  recordRating,
+  resolveSessionContext,
+  recordEvidenceComponents,
+  recordRelianceMetrics,
+  recordLlmCall,
+} = vi.hoisted(() => ({
+  recordRating: vi.fn(),
+  resolveSessionContext: vi.fn(),
+  recordEvidenceComponents: vi.fn(),
+  recordRelianceMetrics: vi.fn(),
+  recordLlmCall: vi.fn(),
+}));
 
 vi.mock("@/lib/evaluator", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/evaluator")>()),
@@ -26,6 +32,7 @@ vi.mock("@/lib/telemetry", () => ({
   resolveSessionContext,
   recordEvidenceComponents,
   recordRelianceMetrics,
+  recordLlmCall,
 }));
 
 import { SCORER_MODEL_VERSION, ScoringUnavailableError } from "@/lib/evaluator";
@@ -102,6 +109,7 @@ beforeEach(() => {
   recordRating.mockResolvedValue({ rating_id: "rating-1" });
   recordEvidenceComponents.mockResolvedValue(1);
   recordRelianceMetrics.mockResolvedValue({});
+  recordLlmCall.mockResolvedValue({});
   extractEvidence.mockResolvedValue(EVIDENCE);
   computeBandScore.mockResolvedValue(scoring(0.82));
 });
@@ -242,7 +250,7 @@ describe("2段階分離と正答鍵の扱い", () => {
   it("第2段階には第1段階の構造化出力だけを渡す（対話ログを回さない）", async () => {
     await post(validBody());
 
-    expect(computeBandScore).toHaveBeenCalledWith(EVIDENCE, TASK_ID);
+    expect(computeBandScore).toHaveBeenCalledWith(EVIDENCE, TASK_ID, expect.any(Function));
     expect(JSON.stringify(computeBandScore.mock.calls[0])).not.toContain(
       "この署名検証は失効を見ていないのでは"
     );
@@ -301,6 +309,50 @@ describe("2段階分離と正答鍵の扱い", () => {
     await post(validBody());
 
     expect(recordedRating().probeConsistencyScore).toBe(0.75);
+  });
+});
+
+describe("トークン使用量の記録", () => {
+  /** 採点器が実際に onUsage を呼ぶ挙動を模す */
+  function withUsage(stage: "extract" | "score", tokens: number) {
+    return async (...args: unknown[]) => {
+      const onUsage = args[args.length - 1] as ((u: unknown) => void) | undefined;
+      onUsage?.({
+        purpose: stage,
+        model: "model-x",
+        promptTokens: tokens,
+        completionTokens: 100,
+        reasoningTokens: 400,
+        totalTokens: tokens + 100,
+        latencyMs: 1234,
+      });
+      return stage === "extract" ? EVIDENCE : scoring(0.82);
+    };
+  }
+
+  it("2段階ぶんの使用量をセッションへ記録する", async () => {
+    extractEvidence.mockImplementation(withUsage("extract", 4000));
+    computeBandScore.mockImplementation(withUsage("score", 1500));
+
+    await post(validBody());
+
+    expect(recordLlmCall).toHaveBeenCalledTimes(2);
+    expect(recordLlmCall.mock.calls[0][0]).toBe("session-1");
+    expect(recordLlmCall.mock.calls.map((c) => c[1].purpose)).toEqual(["extract", "score"]);
+    expect(recordLlmCall.mock.calls[0][1].promptTokens).toBe(4000);
+    // 推論トークンは completion とは別立てで残す
+    expect(recordLlmCall.mock.calls[0][1].reasoningTokens).toBe(400);
+  });
+
+  it("第2段階が落ちても、第1段階ぶんの使用量は記録する（失敗にも課金は発生している）", async () => {
+    extractEvidence.mockImplementation(withUsage("extract", 4000));
+    computeBandScore.mockRejectedValue(new ScoringUnavailableError("score", "落ちた"));
+
+    const res = await post(validBody());
+
+    expect(res.status).toBe(503);
+    expect(recordLlmCall).toHaveBeenCalledOnce();
+    expect(recordLlmCall.mock.calls[0][1].purpose).toBe("extract");
   });
 });
 

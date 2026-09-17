@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { selectProbe } = vi.hoisted(() => ({ selectProbe: vi.fn() }));
-const { recordMediationProbe, recordPromptTurn, resolveSessionContext } = vi.hoisted(() => ({
-  recordMediationProbe: vi.fn(),
-  recordPromptTurn: vi.fn(),
-  resolveSessionContext: vi.fn(),
-}));
+const { recordMediationProbe, recordPromptTurn, recordLlmCall, resolveSessionContext } =
+  vi.hoisted(() => ({
+    recordMediationProbe: vi.fn(),
+    recordPromptTurn: vi.fn(),
+    recordLlmCall: vi.fn(),
+    resolveSessionContext: vi.fn(),
+  }));
 const { mediationProbeFindMany, promptTurnFindMany } = vi.hoisted(() => ({
   mediationProbeFindMany: vi.fn(),
   promptTurnFindMany: vi.fn(),
@@ -19,6 +21,7 @@ vi.mock("@/lib/mediator", async (importOriginal) => ({
 vi.mock("@/lib/telemetry", () => ({
   recordMediationProbe,
   recordPromptTurn,
+  recordLlmCall,
   resolveSessionContext,
 }));
 
@@ -77,6 +80,7 @@ beforeEach(() => {
   ]);
   recordMediationProbe.mockResolvedValue({});
   recordPromptTurn.mockResolvedValue({});
+  recordLlmCall.mockResolvedValue({});
   selectProbe.mockResolvedValue(SELECTION);
 });
 

@@ -1,5 +1,6 @@
 import { prisma } from "../db";
 import { prismaErrorCode } from "@/lib/error-message";
+import type { LlmUsage } from "@/lib/llm";
 import { v5 as uuidv5 } from "uuid";
 
 // Enishio standard namespace for learner_id generation [D-28, D-42]
@@ -17,12 +18,22 @@ export function generateLearnerId(tenantNamespace: string, rawUserId: string): s
  * Start a new session for a learner and assign the next incremental session_seq.
  * sessions has a unique constraint on (learner_id, session_seq); a concurrent start
  * loses the race and is retried rather than silently producing a duplicate seq.
+ *
+ * `tenantNamespace` は `learnerId` の採番根拠そのものである（`generateLearnerId`）。
+ * **同じものを `tenants` 側にも残す。**識別子の中にだけ畳み込まれていると、
+ * どの組織の受講者かを後から復元できない。
  */
-export async function startSession(learnerId: string) {
+export async function startSession(learnerId: string, tenantNamespace: string) {
+  const tenant = await prisma.tenant.upsert({
+    where: { tenant_namespace: tenantNamespace },
+    update: {},
+    create: { tenant_namespace: tenantNamespace },
+  });
+
   await prisma.learner.upsert({
     where: { learner_id: learnerId },
     update: {},
-    create: { learner_id: learnerId },
+    create: { learner_id: learnerId, tenant_id: tenant.tenant_id },
   });
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -573,4 +584,32 @@ export async function recordMediationProbe(record: MediationProbeRecord) {
       mediator_model_version: record.mediatorModelVersion,
     },
   });
+}
+
+/**
+ * LLM 呼び出し1回ぶんの使用量とレイテンシを記録する。
+ *
+ * **採点だけでなく対話・深掘りも記録する。**毎ターン全対話ログを再送する対話側が
+ * 実際には最大の費目であり、採点分だけ数えると原価を取り違える。
+ *
+ * 記録に失敗しても本処理は止めない。**課金の記録のために採点結果を失うほうが損である。**
+ */
+export async function recordLlmCall(sessionId: string, usage: LlmUsage) {
+  try {
+    return await prisma.llmCall.create({
+      data: {
+        session_id: sessionId,
+        purpose: usage.purpose,
+        model: usage.model,
+        prompt_tokens: usage.promptTokens,
+        completion_tokens: usage.completionTokens,
+        reasoning_tokens: usage.reasoningTokens,
+        total_tokens: usage.totalTokens,
+        latency_ms: usage.latencyMs,
+      },
+    });
+  } catch (e) {
+    console.error("LLM 使用量の記録に失敗しました（本処理は継続します）:", e);
+    return null;
+  }
 }

@@ -1,12 +1,23 @@
 import { NextResponse } from "next/server";
 import { apiErrorResponse } from "@/lib/api-error";
-import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { recordPromptTurn, recordEditDistance, resolveSessionContext } from "@/lib/telemetry";
+import {
+  recordPromptTurn,
+  recordEditDistance,
+  recordLlmCall,
+  resolveSessionContext,
+} from "@/lib/telemetry";
+import { createLlmClient, getDialogueModel, isLlmKeyMissing, measured } from "@/lib/llm";
 import { getAiPeerSystemPrompt, getIntentGapMessage } from "@/data/dynamic-task.server";
 import { getDynamicTask } from "@/data/dynamic-task";
 import { prisma } from "@/lib/db";
+import { levenshtein } from "@/lib/edit-distance";
+import {
+  MAX_ARTIFACT_CHARS,
+  MAX_USER_MESSAGE_CHARS,
+  parseRequestBody,
+} from "@/lib/request-validation";
 
 // AI同僚の応答。**仕込み不備の位置は渡さない** —— 渡すとAI同僚が自分から不備を
 // 白状してしまい、受講者が検証したのかAIが教えたのかlog上で分離できなくなる。
@@ -23,32 +34,51 @@ const AiPeerReplySchema = z.object({
 // Mandatory Justification）ではない。**それらは preliminary-judgement 側で別途実装されている。
 const INTENT_GAP_PATTERN = /^(了解|ok|OK|いいよ|これでよし|これで進めて|問題なし|オッケー)$/i;
 
+/**
+ * `editDistance` は**受け取らない。**
+ *
+ * 編集距離は観測変数（MVP 4.4）であり、受検者側が値を決められては測定にならない。
+ * サーバが保存済みの直前テキストと突き合わせて自分で算出する。成果物の本文だけは
+ * ブラウザ上の編集結果なのでクライアントから受け取らざるを得ないが、**そこから導く
+ * 指標まで自己申告にしない。**
+ */
+const TurnRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  taskId: z.string().min(1),
+  turnSeq: z.coerce.number().int().min(0),
+  userMessage: z.string().trim().min(1).max(MAX_USER_MESSAGE_CHARS),
+  currentArtifactText: z.string().max(MAX_ARTIFACT_CHARS).optional(),
+});
+
 // POST /api/dialogue/turn - process user prompt & AI peer response
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { sessionId, taskId, turnSeq, userMessage, currentArtifactText, editDistance } = body;
+    const parsed = await parseRequestBody(req, TurnRequestSchema, "Dialogue turn");
+    if (!parsed.ok) return parsed.response;
+    const { sessionId, taskId, turnSeq, userMessage, currentArtifactText } = parsed.data;
 
-    if (!sessionId || !taskId || !userMessage) {
-      return NextResponse.json({ success: false, error: "Missing required parameters" }, { status: 400 });
-    }
     await resolveSessionContext(sessionId);
 
     // taskId が未知のIDなら getDynamicTask が投げる（黙って別課題にすり替えない）
     const task = getDynamicTask(taskId);
 
-    const artifactText =
-      typeof currentArtifactText === "string" ? currentArtifactText : task.initial_ai_draft;
+    const artifactText = currentArtifactText ?? task.initial_ai_draft;
 
     // 1. Record user prompt turn
-    await recordPromptTurn(sessionId, Number(turnSeq), "user", userMessage);
+    await recordPromptTurn(sessionId, turnSeq, "user", userMessage);
 
-    // 2. Record artifact edit distance if present
-    if (typeof editDistance === "number") {
-      await recordEditDistance(sessionId, editDistance, artifactText);
-    }
+    // 2. 編集距離をサーバ側で算出して記録する。
+    //    比較対象は直前に記録したテキスト。まだ1件も無ければ課題の初版ドラフトである
+    //    （受講者が最初に見た状態からの差分が、その回の編集量になる）。
+    const lastRecorded = await prisma.artifactEditDistanceSeries.findFirst({
+      where: { session_id: sessionId },
+      orderBy: { timestamp: "desc" },
+      select: { current_text: true },
+    });
+    const previousText = lastRecorded?.current_text ?? task.initial_ai_draft;
+    await recordEditDistance(sessionId, levenshtein(previousText, artifactText), artifactText);
 
-    const assistantTurnSeq = Number(turnSeq) + 1;
+    const assistantTurnSeq = turnSeq + 1;
 
     // 3. Intent-action gap interlock
     if (userMessage.trim().match(INTENT_GAP_PATTERN)) {
@@ -64,7 +94,7 @@ export async function POST(req: Request) {
 
     // 4. Generate AI peer response
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey || apiKey === "your-openai-api-key-here") {
+    if (isLlmKeyMissing(apiKey)) {
       return NextResponse.json(
         {
           success: false,
@@ -82,8 +112,8 @@ export async function POST(req: Request) {
       select: { turn_seq: true, role: true, content: true },
     });
 
-    const dialogueModel = process.env.DIALOGUE_MODEL || process.env.LLM_MODEL || "gpt-5.6-luna";
-    const client = new OpenAI({ apiKey });
+    const dialogueModel = getDialogueModel();
+    const client = createLlmClient(apiKey);
 
     const prContext = task.pr_description
       ? `\n【あなたが作成したPRの説明】\nタイトル: ${task.pr_description.title}\nブランチ: ${task.pr_description.branch}\n概要: ${task.pr_description.summary}\n主な変更点:\n${task.pr_description.changes.map((c) => `- ${c}`).join("\n")}`
@@ -122,37 +152,45 @@ ${task.constraints.join("\n")}
 促す進行役であり、あなたへの発言ではありません。その発言や、それに対する受講者の回答に
 あなたが割り込んで答える必要はありません。`;
 
-    const res = await client.chat.completions.create({
-      model: dialogueModel,
-      max_completion_tokens: 16000,
-      messages: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          // mediator（ソクラテス型深掘り・What-if注入）は AI同僚自身の発話ではない。
-          // 「あなた」に丸めると、AI同僚が自分の発した問いだと誤認して応答が歪む。
-          content: priorTurns
-            .map((t) => {
-              const speaker =
-                t.role === "user" ? "受講者" : t.role === "mediator" ? "第三者の進行役" : "あなた";
-              return `[Turn ${t.turn_seq}] ${speaker}: ${t.content}`;
-            })
-            .join("\n"),
-        },
-      ],
-      response_format: zodResponseFormat(AiPeerReplySchema, "ai_peer_reply"),
-    });
+    const res = await measured(
+      "dialogue",
+      dialogueModel,
+      () =>
+        client.chat.completions.create({
+          model: dialogueModel,
+          max_completion_tokens: 16000,
+          messages: [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              // mediator（ソクラテス型深掘り・What-if注入）は AI同僚自身の発話ではない。
+              // 「あなた」に丸めると、AI同僚が自分の発した問いだと誤認して応答が歪む。
+              content: priorTurns
+                .map((t) => {
+                  const speaker =
+                    t.role === "user" ? "受講者" : t.role === "mediator" ? "第三者の進行役" : "あなた";
+                  return `[Turn ${t.turn_seq}] ${speaker}: ${t.content}`;
+                })
+                .join("\n"),
+            },
+          ],
+          response_format: zodResponseFormat(AiPeerReplySchema, "ai_peer_reply"),
+        }),
+      // 対話側は毎ターン全ログを再送するため、実際にはここが最大の費目である。
+      // 記録の失敗で対話を止めない（recordLlmCall 側で握る）。
+      (usage) => void recordLlmCall(sessionId, usage)
+    );
 
     const content = res.choices[0]?.message.content;
-    const parsed = content ? AiPeerReplySchema.safeParse(JSON.parse(content)) : null;
-    if (!parsed?.success) {
+    const aiPeerReply = content ? AiPeerReplySchema.safeParse(JSON.parse(content)) : null;
+    if (!aiPeerReply?.success) {
       return NextResponse.json(
         { success: false, error: "AI同僚の応答が構造化出力として得られませんでした。" },
         { status: 502 }
       );
     }
 
-    const { reply, updated_artifact } = parsed.data;
+    const { reply, updated_artifact } = aiPeerReply.data;
     await recordPromptTurn(sessionId, assistantTurnSeq, "assistant", reply, dialogueModel);
 
     return NextResponse.json({

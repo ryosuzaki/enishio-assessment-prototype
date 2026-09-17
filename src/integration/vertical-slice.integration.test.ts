@@ -32,6 +32,8 @@ vi.mock("openai", () => ({
 import { prisma } from "@/lib/db";
 import { generateLearnerId } from "@/lib/telemetry";
 import { getInjectedFlaws } from "@/data/dynamic-task.server";
+import { getDynamicTask } from "@/data/dynamic-task";
+import { levenshtein } from "@/lib/edit-distance";
 import { EVIDENCE_TARGETS } from "@/lib/mediator";
 
 import { POST as sessionStart } from "@/app/api/session/start/route";
@@ -49,6 +51,9 @@ const TASK_ID = "TASK-FINTECH-AUTH-01";
 const STEP_ID = `step-dynamic-${TASK_ID}`;
 const TEST_ANCHOR_ID = "ANCHOR-INTEGRATION-TEST";
 const TENANT = "integration-test-tenant";
+
+/** 受講者が編集した後の成果物。編集距離の算出対象になる。 */
+const EDITED_ARTIFACT = "const a = 1;";
 
 /** 実行ごとに別の受講者を作る。並行実行や再実行で前回の行とぶつからないようにする。 */
 const RAW_USER_ID = `integration-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -151,8 +156,10 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // learners からのカスケードで、このテストが作った行はすべて消える
+  // learners からのカスケードで、このテストが作った行はすべて消える。
+  // tenants は Restrict なので learners を消した後でしか消せない（[D-67] 決定2）。
   await prisma.learner.deleteMany({ where: { learner_id: LEARNER_ID } });
+  await prisma.tenant.deleteMany({ where: { tenant_namespace: TENANT } });
   await prisma.anchorItem.deleteMany({ where: { anchor_id: TEST_ANCHOR_ID } });
   await prisma.$disconnect();
 });
@@ -172,6 +179,28 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     expect(session.learner_id).toBe(LEARNER_ID);
     expect(session.session_seq).toBe(1);
     expect(session.window_blur_duration_sec).toBe(0);
+  });
+
+  it("1b. 受講者がテナントへ紐づく（learner_id の採番根拠が表としても残る）", async () => {
+    const tenant = await prisma.tenant.findUniqueOrThrow({
+      where: { tenant_namespace: TENANT },
+    });
+    const learner = await prisma.learner.findUniqueOrThrow({ where: { learner_id: LEARNER_ID } });
+
+    expect(learner.tenant_id).toBe(tenant.tenant_id);
+  });
+
+  it("1c. 受講者が残っているテナントは削除できない（記録の帰属先は個人・[D-67] 決定2）", async () => {
+    const tenant = await prisma.tenant.findUniqueOrThrow({
+      where: { tenant_namespace: TENANT },
+    });
+
+    await expect(
+      prisma.tenant.delete({ where: { tenant_id: tenant.tenant_id } })
+    ).rejects.toThrow();
+
+    // 受講者も消えていない
+    expect(await prisma.learner.count({ where: { learner_id: LEARNER_ID } })).toBe(1);
   });
 
   it("2. 課題開始で、仕込み不備と『正常箇所』の両方が injected_flaw_map へ確定する", async () => {
@@ -195,7 +224,7 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     }
   });
 
-  it("3. 対話1往復で prompt_turns と編集距離の時系列が残る", async () => {
+  it("3. 対話1往復で prompt_turns が残り、編集距離はサーバ側の算出値になる", async () => {
     createMock.mockResolvedValueOnce(llmResponse(AI_PEER_REPLY));
 
     const res = await post(dialogueTurn, {
@@ -203,8 +232,9 @@ describe("縦切り: セッション開始から評価レポート・異議申�
       taskId: TASK_ID,
       turnSeq: 1,
       userMessage: "失効したトークンが24時間通ってしまうのでは",
-      currentArtifactText: "const a = 1;",
-      editDistance: 12,
+      currentArtifactText: EDITED_ARTIFACT,
+      // クライアントが申告してきた値。**採用してはならない。**
+      editDistance: 999999,
     });
     const body = await json(res);
 
@@ -224,13 +254,38 @@ describe("縦切り: セッション開始から評価レポート・異議申�
       where: { session_id: sessionId },
     });
     expect(series).toHaveLength(1);
-    expect(series[0].edit_distance).toBe(12);
+    // 初回の比較対象は課題の初版ドラフト（受講者が最初に見た状態）
+    const task = getDynamicTask(TASK_ID);
+    expect(series[0].edit_distance).toBe(levenshtein(task.initial_ai_draft, EDITED_ARTIFACT));
+    expect(series[0].edit_distance).not.toBe(999999);
+    expect(series[0].current_text).toBe(EDITED_ARTIFACT);
+  });
+
+  it("3b. 2回目以降は直前に記録したテキストとの差分になる", async () => {
+    createMock.mockResolvedValueOnce(llmResponse(AI_PEER_REPLY));
+
+    const secondArtifact = `${EDITED_ARTIFACT}\n// 失効チェックを追加`;
+    await post(dialogueTurn, {
+      sessionId,
+      taskId: TASK_ID,
+      turnSeq: 3,
+      userMessage: "失効チェックを足してください",
+      currentArtifactText: secondArtifact,
+    });
+
+    const series = await prisma.artifactEditDistanceSeries.findMany({
+      where: { session_id: sessionId },
+      orderBy: { timestamp: "asc" },
+    });
+    expect(series).toHaveLength(2);
+    // 初版ドラフトではなく、1回目に記録したテキストからの差分であること
+    expect(series[1].edit_distance).toBe(levenshtein(EDITED_ARTIFACT, secondArtifact));
   });
 
   it("4. 深掘りは mediator ロールで対話ログへ入り、状態推定と選定理由も残る", async () => {
     createMock.mockResolvedValueOnce(llmResponse(PROBE_SELECTION));
 
-    const res = await post(dialogueProbe, { sessionId, taskId: TASK_ID, turnSeq: 3 });
+    const res = await post(dialogueProbe, { sessionId, taskId: TASK_ID, turnSeq: 5 });
     const body = await json(res);
 
     expect(res.status).toBe(200);
@@ -244,7 +299,7 @@ describe("縦切り: セッション開始から評価レポート・異議申�
 
     // AI同僚と同じ role にまとめると、受講者が検証したのか問われたのかが分離できなくなる
     const mediatorTurn = await prisma.promptTurn.findUniqueOrThrow({
-      where: { session_id_turn_seq: { session_id: sessionId, turn_seq: 3 } },
+      where: { session_id_turn_seq: { session_id: sessionId, turn_seq: 5 } },
     });
     expect(mediatorTurn.role).toBe("mediator");
     expect(mediatorTurn.content).toBe(PROBE_SELECTION.probe_text);
@@ -354,6 +409,28 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     expect(metrics.flaw_span_count).toBe(2);
     expect(metrics.valid_span_count).toBe(1);
     expect(metrics.operationalization).toContain("独立ではない");
+  });
+
+  it("8b. LLM 呼び出しの使用量とレイテンシがセッション単位で残る（原価をログから答えられる）", async () => {
+    const calls = await prisma.llmCall.findMany({
+      where: { session_id: sessionId },
+      orderBy: { created_at: "asc" },
+    });
+
+    // 対話・深掘り・採点2段の4種すべてが記録されている（採点分だけ数えると原価を取り違える）
+    const purposes = new Set(calls.map((c) => c.purpose));
+    expect(purposes).toContain("dialogue");
+    expect(purposes).toContain("probe");
+    expect(purposes).toContain("extract");
+    expect(purposes).toContain("score");
+
+    for (const call of calls) {
+      expect(call.model).toBeTruthy();
+      expect(call.latency_ms).toBeGreaterThanOrEqual(0);
+    }
+
+    // モックのレスポンスに usage を積んでいないので値は null。**列と経路があることを確かめる。**
+    expect(calls.length).toBeGreaterThanOrEqual(4);
   });
 
   it("9. 異議申立が評点へ紐づいて残る", async () => {

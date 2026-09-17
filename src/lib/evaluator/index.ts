@@ -3,6 +3,13 @@ import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { getInjectedFlaws, getRubricHint } from "@/data/dynamic-task.server";
 import { getDynamicTask } from "@/data/dynamic-task";
+import {
+  createLlmClient,
+  isLlmKeyMissing,
+  measured,
+  resolveModel,
+  type LlmUsage,
+} from "@/lib/llm";
 
 // Stage 1 Schema: Evidence Components Extraction [MVP 2.6, W4]
 export const EvidenceComponentSchema = z.object({
@@ -102,7 +109,7 @@ export function levelLabelFor(ratingCategory: number): string {
 // 採点モデルの選定設定（設定ファイル / 環境変数から動的取得）
 // 最先端水準の性能帯の中から費用対効果（コストパフォーマンス）の高いモデルを選定可能
 export function getScorerModel(): string {
-  return process.env.EVALUATOR_MODEL || process.env.LLM_MODEL || "gpt-5.6-luna";
+  return resolveModel(process.env.EVALUATOR_MODEL);
 }
 
 // v5: component_type に alternative_design_proposal を追加し、grounding（none/asserted/tied_to_requirement）を追加してルーブリック各バンドとの観測対応を整備（T-29）。
@@ -165,13 +172,14 @@ export class ScoringUnavailableError extends Error {
 
 function getClient(stage: "extract" | "score"): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey || apiKey === "your-openai-api-key-here") {
+  if (isLlmKeyMissing(apiKey)) {
     throw new ScoringUnavailableError(
       stage,
       "OPENAI_API_KEY が設定されていないため採点できません。.env を設定してください。"
     );
   }
-  return new OpenAI({ apiKey });
+  // タイムアウトとリトライは既定任せにしない（`src/lib/llm.ts`）。採点は受講者を待たせる経路である。
+  return createLlmClient(apiKey);
 }
 
 /**
@@ -203,7 +211,8 @@ function parseStructured<T extends z.ZodTypeAny>(
 export async function extractEvidence(
   transcript: { turnSeq: number; role: string; content: string }[],
   finalArtifact: string,
-  taskId: string
+  taskId: string,
+  onUsage?: (usage: LlmUsage) => void
 ): Promise<EvidenceExtractionOutput> {
   const client = getClient("extract");
   const injectedFlaws = getInjectedFlaws(taskId);
@@ -232,12 +241,19 @@ ${transcript.map((t) => `[Turn ${t.turnSeq}] ${t.role.toUpperCase()}: ${t.conten
 ${finalArtifact}
 `;
 
-  const res = await client.chat.completions.create({
-    model: getScorerModel(),
-    max_completion_tokens: MAX_TOKENS,
-    messages: [{ role: "user", content: promptText }],
-    response_format: zodResponseFormat(EvidenceExtractionOutputSchema, "evidence_extraction"),
-  });
+  const model = getScorerModel();
+  const res = await measured(
+    "extract",
+    model,
+    () =>
+      client.chat.completions.create({
+        model,
+        max_completion_tokens: MAX_TOKENS,
+        messages: [{ role: "user", content: promptText }],
+        response_format: zodResponseFormat(EvidenceExtractionOutputSchema, "evidence_extraction"),
+      }),
+    onUsage
+  );
 
   return parseStructured(
     res.choices[0]?.message.content,
@@ -254,7 +270,8 @@ ${finalArtifact}
  */
 export async function computeBandScore(
   evidence: EvidenceExtractionOutput,
-  taskId: string
+  taskId: string,
+  onUsage?: (usage: LlmUsage) => void
 ): Promise<ScoringOutput> {
   const client = getClient("score");
   const rubricHint = getRubricHint(taskId);
@@ -282,12 +299,19 @@ ${rubricHint}
 - 判定に迷う場合は scoring_confidence を低く申告してください。低確信度の判定は人間の確認へ回されます。推測でバンドを確定させないでください。
 `;
 
-  const res = await client.chat.completions.create({
-    model: getScorerModel(),
-    max_completion_tokens: MAX_TOKENS,
-    messages: [{ role: "user", content: promptText }],
-    response_format: zodResponseFormat(ScoringOutputSchema, "band_scoring"),
-  });
+  const model = getScorerModel();
+  const res = await measured(
+    "score",
+    model,
+    () =>
+      client.chat.completions.create({
+        model,
+        max_completion_tokens: MAX_TOKENS,
+        messages: [{ role: "user", content: promptText }],
+        response_format: zodResponseFormat(ScoringOutputSchema, "band_scoring"),
+      }),
+    onUsage
+  );
 
   return parseStructured(
     res.choices[0]?.message.content,

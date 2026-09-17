@@ -7,7 +7,12 @@ import {
   MAX_PROBES_PER_SESSION,
   type ProbeMove,
 } from "@/lib/mediator";
-import { recordMediationProbe, recordPromptTurn, resolveSessionContext } from "@/lib/telemetry";
+import {
+  recordMediationProbe,
+  recordPromptTurn,
+  recordLlmCall,
+  resolveSessionContext,
+} from "@/lib/telemetry";
 import { getDynamicTask } from "@/data/dynamic-task";
 import { prisma } from "@/lib/db";
 
@@ -75,6 +80,10 @@ export async function POST(req: Request) {
         type: d.type,
       })),
       probesSoFar,
+      onUsage: (usage) => {
+        // 記録の失敗で深掘りを止めない（recordLlmCall 側で握る）
+        void recordLlmCall(sessionId, usage);
+      },
     });
 
     // 状態推定は「問わない」と判断した場合も残す。**打たなかったことも媒介方針の一部であり、
