@@ -1,861 +1,132 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { messageOf } from "@/lib/error-message";
-import { DYNAMIC_TASKS, getDynamicTask } from "@/data/dynamic-task";
-import { levenshtein } from "@/lib/edit-distance";
-import type {
-  AnchorItem,
-  AnchorBankSourceView,
-  ChatMessage,
-  FocusItem,
-  EvaluationResult,
-  EvidenceTargetState,
-  ProbeMove,
-  StepType,
-  AppTab,
-  PremiseShiftState,
-} from "./types";
-import { MAX_PROBES_PER_SESSION } from "./types";
+import React, { useEffect, useState } from "react";
+import { DYNAMIC_TASKS } from "@/data/dynamic-task";
+import type { AppTab } from "./types";
 import { Play, Anchor, Building2, UserCheck, Award, Zap, PanelRightOpen } from "lucide-react";
 import { InitStep } from "./components/InitStep";
 import { AnchorQuestionStep } from "./components/AnchorQuestionStep";
 import { DialogueSessionStep } from "./components/DialogueSessionStep";
-import {
-  PreliminaryJudgementStep,
-  getDefaultMirroringSummary,
-} from "./components/PreliminaryJudgementStep";
+import { PreliminaryJudgementStep } from "./components/PreliminaryJudgementStep";
 import { EvaluationReportStep } from "./components/EvaluationReportStep";
-import { MediationStatePanel } from "./components/MediationStatePanel";
 import { TelemetryPanel } from "./components/TelemetryPanel";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { OrganizationDashboard } from "./components/OrganizationDashboard";
 import { LearnerProfile } from "./components/LearnerProfile";
 import { BenchmarkGallery } from "./components/BenchmarkGallery";
+import { useTelemetryLog } from "./hooks/useTelemetryLog";
+import { useLearnerSession } from "./hooks/useLearnerSession";
+import { useWindowBlurTelemetry } from "./hooks/useWindowBlurTelemetry";
+import { useAnchorFlow } from "./hooks/useAnchorFlow";
+import { useDialogueFlow } from "./hooks/useDialogueFlow";
 
+/**
+ * 2層構造プロトタイプの入口（`[D-79]`: Viability / Feasibility）。
+ *
+ * **この関数が持つのはタブの選択状態と画面の組み立てだけである。**
+ * 各フローの状態と手続きは `hooks/` 側にある——アンカー評価（`useAnchorFlow`）、
+ * 実務演習セッション（`useDialogueFlow`）、セッションの確保（`useLearnerSession`）、
+ * テレメトリ（`useTelemetryLog` / `useWindowBlurTelemetry`）。
+ */
 export default function AssessmentPrototypePage() {
   // Navigation & Tab State ([D-79]: 2-layer Viability & Feasibility)
   const [activeTab, setActiveTab] = useState<AppTab>("session");
   const [galleryTaskId, setGalleryTaskId] = useState<string>(DYNAMIC_TASKS[0].task_id);
   const [showTelemetry, setShowTelemetry] = useState<boolean>(true);
 
-  // Session & Phase State
-  const [sessionId, setSessionId] = useState<string>("");
-  const [sessionSeq, setSessionSeq] = useState<number>(1);
-  const [learnerId, setLearnerId] = useState<string>("");
-  const [currentStep, setCurrentStep] = useState<StepType>("init");
-  const [anchorStep, setAnchorStep] = useState<StepType>("init");
-
-  // Anchor State (W2)
-  const [anchorList, setAnchorList] = useState<{ anchor_id: string; title: string; family: string }[]>([]);
-  // 読み込めたバンクが運用20項目か同梱サンプル2項目かを画面に明示する。
-  // 供給源が確定するまでは null（未取得）にしておき、断定的な表示をしない。
-  const [bankSource, setBankSource] = useState<AnchorBankSourceView | null>(null);
-  const [selectedAnchorId, setSelectedAnchorId] = useState<string>("");
-  const [anchorStatus, setAnchorStatus] = useState<string>("pretest");
-  const [currentAnchor, setCurrentAnchor] = useState<AnchorItem | null>(null);
-  // 4段構成 [D-83]: 段階1 採用可否 → 段階2 懸念領域 → 段階3 前提変化への判断更新 → 確信度
-  const [stage1Choice, setStage1Choice] = useState<string>("");
-  const [stage2Choice, setStage2Choice] = useState<string>("");
-  const [stage3Choice, setStage3Choice] = useState<number | null>(null);
-  // 段階3': 新情報を含まない反論への再回答。項目によっては存在しない [D-83]
-  const [stage3bChoice, setStage3bChoice] = useState<number | null>(null);
-  const [confidence, setConfidence] = useState<number>(3);
-  const [stageStartTime, setStageStartTime] = useState<number>(0);
-  const [stage1DurationMs, setStage1DurationMs] = useState<number>(0);
-  const [stage2DurationMs, setStage2DurationMs] = useState<number>(0);
-  const [stage3DurationMs, setStage3DurationMs] = useState<number>(0);
-  const [stage3bDurationMs, setStage3bDurationMs] = useState<number>(0);
-
   // Dynamic Task Selection (T-06a) — 取り組む動的課題をレジストリから選択する
   const [selectedTaskId, setSelectedTaskId] = useState<string>(DYNAMIC_TASKS[0].task_id);
-  const selectedTask = getDynamicTask(selectedTaskId);
 
-  // Dynamic Session State (W3)
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [userPromptInput, setUserPromptInput] = useState<string>("");
-  const [artifactCode, setArtifactCode] = useState<string>(DYNAMIC_TASKS[0].initial_ai_draft);
-  const [turnCounter, setTurnCounter] = useState<number>(1);
-  const [cffActiveWarning, setCffActiveWarning] = useState<string | null>(null);
-  // 直近に記録した成果物。次ターンの編集距離をこれとの差分で測る（MVP 4.4）
-  const [lastLoggedArtifact, setLastLoggedArtifact] = useState<string>(DYNAMIC_TASKS[0].initial_ai_draft);
-  // 前提変化（場面3: 緊急仕様変更・追加要件）の注入状態
-  const [premiseShiftState, setPremiseShiftState] = useState<PremiseShiftState>({ isInjected: false });
+  const { telemetryLog, addTelemetry, errorMessage, setErrorMessage } = useTelemetryLog();
+  const { sessionId, sessionSeq, learnerId, ensureSession } = useLearnerSession(setErrorMessage);
 
-  // Mediation State (MVP 2.1 ステップ7・8: ソクラテス型深掘り・What-if注入)
-  const [mediationStateEstimate, setMediationStateEstimate] = useState<EvidenceTargetState[] | null>(null);
-  const [lastProbeMove, setLastProbeMove] = useState<ProbeMove | null>(null);
-  const [lastSelectionRationale, setLastSelectionRationale] = useState<string | null>(null);
-  const [probesIssued, setProbesIssued] = useState<number>(0);
-  const [isProbing, setIsProbing] = useState<boolean>(false);
+  useWindowBlurTelemetry(sessionId);
 
-  // Verification Focus Panel State (W3 3rd-Pane) [MVP 4.4, T-17b]
-  const [focusItems, setFocusItems] = useState<FocusItem[]>([]);
-  const [focusInputText, setFocusInputText] = useState<string>("");
-  const [focusInputNote, setFocusInputNote] = useState<string>("");
-
-  // CFF: Force Decision First & Mandatory Justification State [MVP 2.5, T-17b, D-80]
-  const [prelimAction, setPrelimAction] = useState<"approve" | "remand" | "comment" | "">("");
-  const [prelimJustification, setPrelimJustification] = useState<string>("");
-  const [prelimError, setPrelimError] = useState<string | null>(null);
-
-  // Evaluation & XAI State (W4, W5)
-  const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
-  const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
-  const [disputeReason, setDisputeReason] = useState<string>("");
-  const [disputeDirection, setDisputeDirection] = useState<string>("");
-  const [disputeSubmitted, setDisputeSubmitted] = useState<boolean>(false);
-
-  // Telemetry Monitor
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [telemetryLog, setTelemetryLog] = useState<string[]>([]);
-  // 画面内エラー表示。window.alert() は使わない（ErrorBanner の注記を参照）
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Load anchor list on mount
-  useEffect(() => {
-    fetch("/api/anchor")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.anchors?.length) {
-          setAnchorList(data.anchors);
-          setBankSource(data.bankSource ?? null);
-          // 既定の出題項目は先頭に合わせる。特定IDを決め打ちすると、
-          // 運用バンクと同梱サンプルでID体系が違うため片方で必ず404になる。
-          setSelectedAnchorId(data.anchors[0].anchor_id);
-        } else {
-          setErrorMessage(
-            data.error ??
-              "アンカー項目バンクを読み込めませんでした。'npm run seed:anchors' が済んでいるか確認してください。"
-          );
-        }
-      })
-      .catch((e) => setErrorMessage("アンカー項目の取得に失敗しました: " + messageOf(e)));
-  }, []);
+  const anchor = useAnchorFlow({ sessionId, ensureSession, addTelemetry, setErrorMessage });
+  const dialogue = useDialogueFlow({
+    selectedTaskId,
+    ensureSession,
+    addTelemetry,
+    setErrorMessage,
+  });
 
   // URLクエリによる初期タブの反映（?tab=dashboard / ?tab=learner / ?tab=session）
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const tab = params.get("tab");
-      if (tab === "dashboard" || tab === "org") {
-        setActiveTab("org_dashboard");
-      } else if (tab === "profile" || tab === "learner") {
-        setActiveTab("learner_profile");
-      } else if (tab === "gallery" || tab === "benchmark") {
-        setActiveTab("benchmark_gallery");
-        const task = params.get("task");
-        if (task) setGalleryTaskId(task);
-      } else if (tab === "session") {
-        setActiveTab("session");
-      } else if (tab === "anchor") {
-        setActiveTab("anchor");
-      }
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab === "dashboard" || tab === "org") {
+      setActiveTab("org_dashboard");
+    } else if (tab === "profile" || tab === "learner") {
+      setActiveTab("learner_profile");
+    } else if (tab === "gallery" || tab === "benchmark") {
+      setActiveTab("benchmark_gallery");
+      const task = params.get("task");
+      if (task) setGalleryTaskId(task);
+    } else if (tab === "session") {
+      setActiveTab("session");
+    } else if (tab === "anchor") {
+      setActiveTab("anchor");
     }
   }, []);
 
-  // 画面外滞在時間の記録（MVP 4.4 `window_blur_duration_sec`）。
-  // **判定には一切用いない。**Phase 3の多層防衛の資産として貯めるだけであり、
-  // このプロトタイプの採点・保留判定・レポート表示のどこからも参照しない。
-  const sessionIdRef = useRef(sessionId);
-  sessionIdRef.current = sessionId;
-  useEffect(() => {
-    let hiddenSince: number | null = null;
-
-    const flush = () => {
-      if (hiddenSince === null) return;
-      const deltaSec = (Date.now() - hiddenSince) / 1000;
-      hiddenSince = null;
-      const currentSessionId = sessionIdRef.current;
-      if (!currentSessionId || deltaSec < 1) return;
-      fetch("/api/session/blur", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: currentSessionId, deltaSec }),
-      }).catch(() => {
-        // 記録専用の副次的テレメトリである。失敗してもセッションは続行する。
-      });
-    };
-
-    const onHide = () => {
-      if (hiddenSince === null) hiddenSince = Date.now();
-    };
-    const onShow = () => flush();
-
-    const onVisibilityChange = () => (document.hidden ? onHide() : onShow());
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("blur", onHide);
-    window.addEventListener("focus", onShow);
-
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("blur", onHide);
-      window.removeEventListener("focus", onShow);
-      flush();
-    };
-  }, []);
-
-  const addTelemetry = (msg: string) => {
-    const time = new Date().toLocaleTimeString();
-    setTelemetryLog((prev) => [`[${time}] ${msg}`, ...prev.slice(0, 24)]);
-  };
-
-  // Start Dynamic Exercise Session Directly (Bypasses Anchor)
-  const handleStartSession = async () => {
-    setIsSubmitting(true);
-    setErrorMessage(null);
-    try {
-      const res = await fetch("/api/session/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenantNamespace: "tenant-jaist-demo",
-          userId: "examiner-preview-user",
-        }),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        setErrorMessage(data.error ?? "セッションを開始できませんでした。");
-        return;
-      }
-      const newSessionId = data.sessionId;
-      setSessionId(newSessionId);
-      setSessionSeq(data.sessionSeq);
-      setLearnerId(data.learnerId);
-      addTelemetry(`Session initialized (Seq #${data.sessionSeq}, ID: ${newSessionId.slice(0, 8)}...)`);
-
-      // 仕込み不備と「正常箇所」のラベルをこのセッションに対して確定させる [P-15]
-      const diagRes = await fetch("/api/dialogue/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: newSessionId, taskId: selectedTaskId }),
-      });
-      const diagData = await diagRes.json();
-      if (diagData.success) {
-        addTelemetry(
-          `injected_flaw_map recorded (不備 ${diagData.flawCount} 件 + 正常箇所 ${diagData.normalSpanCount} 件)`
-        );
-      } else {
-        setErrorMessage("課題開始エラー: " + diagData.error);
-        return;
-      }
-
-      setCurrentStep("dialogue_session");
-      setArtifactCode(selectedTask.initial_ai_draft);
-      setChatHistory([
-        {
-          turnSeq: 1,
-          role: "assistant",
-          content: `${selectedTask.title}に関する成果物を作成しました。右側のコードを確認いただき、本番リリースに向けたレビューをお願いします！`,
-        },
-      ]);
-      setTurnCounter(2);
-      setLastLoggedArtifact(selectedTask.initial_ai_draft);
-      setMediationStateEstimate(null);
-      setLastProbeMove(null);
-      setLastSelectionRationale(null);
-      setProbesIssued(0);
-      setPremiseShiftState({ isInjected: false });
-      addTelemetry(`Dynamic Task initiated (${selectedTask.task_id})`);
-    } catch (e: unknown) {
-      setErrorMessage("セッション開始エラー: " + messageOf(e));
-    } finally {
-      setIsSubmitting(false);
+  /** 別タブの「この課題を演習する」から演習タブへ移る */
+  const goToSessionWithTask = (taskId?: string) => {
+    if (taskId) {
+      const matched = DYNAMIC_TASKS.find((t) => t.task_id === taskId);
+      if (matched) setSelectedTaskId(matched.task_id);
     }
+    setActiveTab("session");
   };
 
-  // Standalone Anchor Flow Handlers (W2 / IRT Equalization Benchmark)
-  const handleStartAnchorFlow = async () => {
-    if (!selectedAnchorId) {
-      setErrorMessage("体験するアンカー項目を選択してください。");
-      return;
-    }
-    setIsSubmitting(true);
-    setErrorMessage(null);
-    try {
-      let activeSessionId = sessionId;
-      if (!activeSessionId) {
-        const res = await fetch("/api/session/start", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tenantNamespace: "tenant-jaist-demo",
-            userId: "examiner-preview-user",
-          }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          activeSessionId = data.sessionId;
-          setSessionId(data.sessionId);
-          setSessionSeq(data.sessionSeq);
-          setLearnerId(data.learnerId);
-        }
-      }
-
-      const anchorRes = await fetch(`/api/anchor?id=${selectedAnchorId}`);
-      const anchorData = await anchorRes.json();
-      if (anchorData.success) {
-        setCurrentAnchor(anchorData.anchor);
-        setStage1Choice("");
-        setStage2Choice("");
-        setStage3Choice(null);
-        setStage3bChoice(null);
-        setConfidence(3);
-        setAnchorStep("anchor_stage1");
-        setStageStartTime(Date.now());
-        addTelemetry(
-          `Anchor stimulus loaded (${selectedAnchorId}, ${anchorData.anchor.format_version}) - benchmark mode`
-        );
-        if (anchorData.retiredWarning) {
-          addTelemetry(`WARN ${anchorData.retiredWarning}`);
-        }
-      } else {
-        setErrorMessage(anchorData.error ?? "アンカー項目の読み込みに失敗しました。");
-      }
-    } catch (e: unknown) {
-      setErrorMessage("アンカー開始エラー: " + messageOf(e));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleResetAnchorFlow = () => {
-    setAnchorStep("init");
-    setStage1Choice("");
-    setStage2Choice("");
-    setStage3Choice(null);
-    setStage3bChoice(null);
-    setConfidence(3);
-  };
-
-  // Anchor Flow Step Handlers [D-83]
-  //
-  // 段階1で確定した判断には戻れない。選択肢を見てから遡って書き換えられると、
-  // 「言われずに気づいたか」という段階1の測定が意味を失う。
-  const handleStage1Next = () => {
-    if (!stage1Choice || !currentAnchor) return;
-    const duration = Date.now() - stageStartTime;
-    setStage1DurationMs(duration);
-    // 類型C（不備なし）の項目は段階2を持たないため飛ばす。
-    const next: StepType = currentAnchor.stage2 ? "anchor_stage2" : "anchor_stage3";
-    setAnchorStep(next);
-    setStageStartTime(Date.now());
-    addTelemetry(
-      `段階1（採用可否）を確定: ${stage1Choice} / ${(duration / 1000).toFixed(1)}s` +
-        (currentAnchor.stage2 ? "" : " — 段階2なし（類型C）")
-    );
-  };
-
-  const handleStage2Next = () => {
-    if (!stage2Choice) return;
-    const duration = Date.now() - stageStartTime;
-    setStage2DurationMs(duration);
-    setAnchorStep("anchor_stage3");
-    setStageStartTime(Date.now());
-    addTelemetry(
-      `段階2（懸念領域）: ${stage2Choice} / 提示順 ${currentAnchor?.stage2_order ?? "—"} / ` +
-        `${(duration / 1000).toFixed(1)}s`
-    );
-  };
-
-  const handleStage3Next = () => {
-    if (stage3Choice === null || !currentAnchor) return;
-    const duration = Date.now() - stageStartTime;
-    setStage3DurationMs(duration);
-    // 段階3' はすべての項目には付かない。付く項目を読まれると測れなくなるためである [D-83]。
-    const next: StepType = currentAnchor.stage3b ? "anchor_stage3b" : "anchor_conf";
-    setAnchorStep(next);
-    setStageStartTime(Date.now());
-    addTelemetry(
-      `段階3（前提変化への判断更新）: ${stage3Choice > 0 ? "+" : ""}${stage3Choice} / ` +
-        `${(duration / 1000).toFixed(1)}s — 採点は専門家パネル分布（正答鍵なし）`
-    );
-  };
-
-  // 段階3': 新情報を含まない反論への応答。段階3との差分だけが指標であり、パネルを要さない。
-  const handleStage3bNext = () => {
-    if (stage3bChoice === null || stage3Choice === null) return;
-    const duration = Date.now() - stageStartTime;
-    setStage3bDurationMs(duration);
-    setAnchorStep("anchor_conf");
-    const delta = stage3bChoice - stage3Choice;
-    addTelemetry(
-      `段階3'（反論への応答）: ${stage3bChoice > 0 ? "+" : ""}${stage3bChoice} / ` +
-        `差分 ${delta > 0 ? "+" : ""}${delta} — ` +
-        (delta === 0
-          ? "保持（新情報のない圧力に対して立場を維持）"
-          : "迎合（新情報なしに判断が移動）") +
-        ` / ${(duration / 1000).toFixed(1)}s`
-    );
-  };
-
-  const handleAnchorSubmit = async () => {
-    if (!currentAnchor) return;
-    setIsSubmitting(true);
-    setErrorMessage(null);
-    try {
-      const res = await fetch("/api/anchor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: sessionId || "anchor-standalone-demo",
-          anchorId: currentAnchor.anchor_id,
-          formatVersion: currentAnchor.format_version,
-          stage1Selection: stage1Choice,
-          stage2Selection: stage2Choice || null,
-          stage3Selection: stage3Choice,
-          stage3bSelection: stage3bChoice,
-          stage2Order: currentAnchor.stage2_order,
-          stage1DurationMs,
-          stage2DurationMs,
-          stage3DurationMs,
-          stage3bDurationMs,
-          confidence,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (data.anchorStatus) {
-          setAnchorStatus(data.anchorStatus);
-        }
-        addTelemetry(
-          `Anchor recorded (Response ID: ${data.responseId.slice(0, 8)}..., ${data.anchorStatus} / 無得点)`
-        );
-        setAnchorStep("anchor_complete");
-      } else {
-        setErrorMessage("アンカー記録エラー: " + data.error);
-      }
-    } catch (e: unknown) {
-      setErrorMessage("送信エラー: " + messageOf(e));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Premise Shift Trigger Handler (場面3: 緊急仕様変更・追加要件の発生)
-  const handleTriggerPremiseShift = () => {
-    if (premiseShiftState.isInjected) return;
-    const shift = selectedTask.premise_shift;
-    if (!shift) return;
-    setPremiseShiftState({
-      isInjected: true,
-      injectedAtTurn: turnCounter,
-      title: shift.title,
-      announcement: shift.announcement,
-      newRequirement: shift.new_requirement,
-    });
-    const urgentTurn = turnCounter;
-    setChatHistory((prev) => [
-      ...prev,
-      {
-        turnSeq: urgentTurn,
-        role: "assistant",
-        content: `【⚡ 緊急仕様変更・追加要件の通知】\n${shift.announcement}\n\nこれに伴い、以下の追加要件を満たす必要があります：\n「${shift.new_requirement}」\n\n現在の設計やコードで問題がないか、確認と修正方針の指示をお願いします！`,
-      },
-    ]);
-    setTurnCounter((t) => t + 1);
-    addTelemetry(`⚡ 緊急仕様変更（前提変化）を発生させました: ${shift.title}`);
-  };
-
-  // Transition to Dynamic Dialogue Session (W3)
-  const handleStartDialogueSession = async () => {
-    setErrorMessage(null);
-    // 仕込み不備と「正常箇所」のラベルをこのセッションに対して確定させる [P-15]
-    try {
-      const res = await fetch("/api/dialogue/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, taskId: selectedTaskId }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        addTelemetry(
-          `injected_flaw_map recorded (不備 ${data.flawCount} 件 + 正常箇所 ${data.normalSpanCount} 件)`
-        );
-      } else {
-        setErrorMessage("課題開始エラー: " + data.error);
-        return;
-      }
-    } catch (e: unknown) {
-      setErrorMessage("課題開始エラー: " + messageOf(e));
-      return;
-    }
-
-    setCurrentStep("dialogue_session");
-    setArtifactCode(selectedTask.initial_ai_draft);
-    setChatHistory([
-      {
-        turnSeq: 1,
-        role: "assistant",
-        content: `${selectedTask.title}に関する成果物を作成しました。右側のコードを確認いただき、本番リリースに向けたレビューをお願いします！`,
-      },
-    ]);
-    setTurnCounter(2);
-    setLastLoggedArtifact(selectedTask.initial_ai_draft);
-    setMediationStateEstimate(null);
-    setLastProbeMove(null);
-    setLastSelectionRationale(null);
-    setProbesIssued(0);
-    addTelemetry(`Dynamic Task initiated (${selectedTask.task_id})`);
-  };
-
-  // Send User Prompt in Dialogue Session (W3)
-  const handleSendDialogueTurn = async () => {
-    if (!userPromptInput.trim()) return;
-
-    const currentTurn = turnCounter;
-    const userText = userPromptInput;
-    setUserPromptInput("");
-    setCffActiveWarning(null);
-    setErrorMessage(null);
-
-    // Optimistically update chat
-    const updatedHistory: ChatMessage[] = [
-      ...chatHistory,
-      { turnSeq: currentTurn, role: "user", content: userText },
-    ];
-    setChatHistory(updatedHistory);
-    addTelemetry(`Prompt turn #${currentTurn} sent (Length: ${userText.length} chars)`);
-
-    setIsSubmitting(true);
-    try {
-      const res = await fetch("/api/dialogue/turn", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          taskId: selectedTaskId,
-          turnSeq: currentTurn,
-          userMessage: userText,
-          currentArtifactText: artifactCode,
-          // 前回記録時点からの実測 Levenshtein 距離（MVP 4.4）
-          editDistance: levenshtein(lastLoggedArtifact, artifactCode),
-        }),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        setErrorMessage("対話エラー: " + data.error);
-        setChatHistory(chatHistory);
-        setUserPromptInput(userText);
-        return;
-      }
-      setLastLoggedArtifact(artifactCode);
-      if (data.success) {
-        let nextTurn = data.assistantTurnSeq + 1;
-
-        const historyWithAssistant: ChatMessage[] = [
-          ...updatedHistory,
-          {
-            turnSeq: data.assistantTurnSeq,
-            role: "assistant",
-            content: data.assistantMessage,
-          },
-        ];
-        setChatHistory(historyWithAssistant);
-
-        if (data.isInterlockTriggered) {
-          setCffActiveWarning(data.assistantMessage);
-          addTelemetry(`Interlock triggered (Intent-Action Gap)`);
-        } else {
-          addTelemetry(`AI Peer response recorded (Turn #${data.assistantTurnSeq})`);
-        }
-
-        if (data.updatedArtifact) {
-          setArtifactCode(data.updatedArtifact);
-          addTelemetry(`Artifact draft updated by AI Peer`);
-        }
-
-        setTurnCounter(nextTurn);
-
-        // 意図-行動ギャップのインターロック（正規表現ベース。別機構）が発火したターンには
-        // 深掘りを重ねない。上限に達していれば呼ばない。
-        if (!data.isInterlockTriggered && probesIssued < MAX_PROBES_PER_SESSION) {
-          await runMediationProbe(nextTurn, historyWithAssistant);
-        }
-      }
-    } catch (e: unknown) {
-      setErrorMessage("対話送信エラー: " + messageOf(e));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Mediation Probe (MVP 2.1 ステップ7・8: ソクラテス型深掘り・What-if注入)
-  //
-  // AI同僚の応答とは別の手番。**正答鍵（injected_flaw_map）はこの呼び出しに含めない**
-  // ——渡っているのは selectedTaskId のみで、サーバ側で業務要件・制約と対話ログから
-  // 状態推定を行う（src/lib/mediator の注記を参照）。
-  const runMediationProbe = async (turnSeq: number, historySoFar: ChatMessage[]) => {
-    setIsProbing(true);
-    try {
-      const res = await fetch("/api/dialogue/probe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, taskId: selectedTaskId, turnSeq }),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        // 深掘りが打てなくても対話セッション自体は継続させる。ここで止めない。
-        if (!data.mediationUnavailable) {
-          addTelemetry(`Mediation probe error: ${data.error}`);
-        }
-        return;
-      }
-
-      setMediationStateEstimate(data.stateEstimate ?? null);
-      setLastProbeMove(data.probeMove ?? null);
-      setLastSelectionRationale(data.selectionRationale ?? null);
-
-      if (data.probeIssued) {
-        setProbesIssued((n) => n + 1);
-        setTurnCounter(turnSeq + 1);
-        setChatHistory([
-          ...historySoFar,
-          { turnSeq, role: "mediator", content: data.probeText },
-        ]);
-        addTelemetry(`Mediation probe issued (${data.probeMove}, Turn #${turnSeq})`);
-      } else {
-        addTelemetry(`Mediation: no probe needed (${data.reason ?? data.probeMove})`);
-      }
-    } catch (e: unknown) {
-      addTelemetry(`Mediation probe request failed: ${messageOf(e)}`);
-    } finally {
-      setIsProbing(false);
-    }
-  };
-
-  // Verification Focus Panel Handlers [MVP 4.4, T-17b]
-  const handleAddFocusItem = (textSnippet?: string, noteText?: string) => {
-    const text = (textSnippet ?? focusInputText).trim();
-    if (!text) return;
-    const nextSeq = focusItems.length + 1;
-    setFocusItems((prev) => [
-      ...prev,
-      {
-        focusSeq: nextSeq,
-        selectedText: text,
-        note: (noteText ?? focusInputNote).trim() || undefined,
-      },
-    ]);
-    setFocusInputText("");
-    setFocusInputNote("");
-    addTelemetry(`Verification focus item #${nextSeq} added to panel`);
-  };
-
-  const handleRemoveFocusItem = (seq: number) => {
-    setFocusItems((prev) =>
-      prev
-        .filter((item) => item.focusSeq !== seq)
-        .map((item, idx) => ({ ...item, focusSeq: idx + 1 }))
-    );
-    addTelemetry(`Verification focus item #${seq} removed from panel`);
-  };
-
-  // Advance to CFF: Force Decision First & Mandatory Justification Step [MVP 2.5, T-17b]
-  const handleProceedToPreliminaryJudgement = () => {
-    setErrorMessage(null);
-    if (chatHistory.length < 2) {
-      setErrorMessage("最低1回以上AI同僚と対話してから完了してください。");
-      return;
-    }
-    setPrelimError(null);
-    setCurrentStep("preliminary_judgement");
-    addTelemetry(
-      "Review completed. Advancing to Force Decision First (CFF) - Preliminary Judgement"
-    );
-  };
-
-  // Confirm Preliminary Judgement & Execute AutoSCORE Evaluation (W4)
-  const handleConfirmPreliminaryAndEvaluate = async () => {
-    if (!prelimAction) {
-      setPrelimError("成果物の判定（承認または差し戻し）を選択してください。");
-      return;
-    }
-
-    // [D-80]: 白紙再作文の強制撤廃。受講者が微調整を入力しなかった場合は進行役のミラーリング要約を採用する
-    const effectiveJustification =
-      prelimJustification.trim() ||
-      getDefaultMirroringSummary(selectedTaskId, chatHistory);
-
-    setPrelimError(null);
-    setErrorMessage(null);
-    setIsEvaluating(true);
-    addTelemetry("Submitting Preliminary Judgement & Justification (PR-review style)...");
-
-    try {
-      // 1. Record preliminary judgement (CFF)
-      const prelimRes = await fetch("/api/dialogue/preliminary-judgement", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          stepId: `step-dynamic-${selectedTaskId}`,
-          action: prelimAction,
-          justification: effectiveJustification,
-        }),
-      });
-      const prelimData = await prelimRes.json();
-      if (!prelimData.success) {
-        setErrorMessage("暫定判断記録エラー: " + prelimData.error);
-        setIsEvaluating(false);
-        return;
-      }
-      addTelemetry(
-        `Preliminary judgement recorded: ${prelimAction}`
-      );
-
-      // 2. Record verification focus sequence if any items selected
-      if (focusItems.length > 0) {
-        await fetch("/api/dialogue/focus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId,
-            focusItems: focusItems.map((f) => ({
-              focusSeq: f.focusSeq,
-              selectedText: f.selectedText,
-              note: f.note,
-            })),
-          }),
-        });
-        addTelemetry(`Verification focus sequence recorded (${focusItems.length} items)`);
-      }
-
-      // 3. Trigger 2-Stage AutoSCORE Evaluation (W4)
-      addTelemetry(`Triggering AutoSCORE 2-Stage Evaluator (Axis 4)...`);
-      const evalRes = await fetch("/api/dialogue/evaluate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          taskId: selectedTaskId,
-          transcript: chatHistory,
-          finalArtifact: artifactCode,
-        }),
-      });
-
-      const data = await evalRes.json();
-      if (data.success) {
-        setEvaluation(data);
-        setCurrentStep("evaluation_report");
-        addTelemetry(
-          data.isPendingHumanReview
-            ? `Evaluation pending human review (confidence ${data.scoringConfidence.toFixed(2)} < ${data.confidenceThreshold.toFixed(2)}${data.isDemoThresholdOverride ? ", demo override" : ""})`
-            : `Evaluation complete: ${data.levelLabel} (Rating ID: ${data.ratingId.slice(0, 8)}...)`
-        );
-      } else if (data.scoringUnavailable) {
-        // 採点できないときに推測値で埋めない。埋めると ratings に偽の評点が残る。
-        setErrorMessage(
-          `採点を実行できませんでした（${data.stage === "extract" ? "第1段階" : "第2段階"}）。\n\n` +
-            data.error
-        );
-      } else {
-        setErrorMessage("評価エラー: " + data.error);
-      }
-    } catch (e: unknown) {
-      setErrorMessage("評価リクエスト失敗: " + messageOf(e));
-    } finally {
-      setIsEvaluating(false);
-    }
-  };
-
-  // Submit Score Dispute (MVP 4.5 / W5)
-  const handleSubmitDispute = async () => {
-    if (!disputeReason.trim() || !disputeDirection || !evaluation) return;
-
-    setErrorMessage(null);
-    try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ratingId: evaluation.ratingId,
-          sessionId,
-          disagreementDirection: disputeDirection,
-          freeTextReason: disputeReason,
-          scorerModelVersion: evaluation.scorerModelVersion,
-        }),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        setErrorMessage("異議申立エラー: " + data.error);
-        return;
-      }
-      if (data.success) {
-        setDisputeSubmitted(true);
-        addTelemetry(`Score dispute recorded in score_feedback (ID: ${data.feedbackId.slice(0, 8)}...)`);
-      }
-    } catch (e: unknown) {
-      setErrorMessage("異議申立エラー: " + messageOf(e));
-    }
-  };
+  const TABS: { id: AppTab; label: string; icon: React.ReactNode }[] = [
+    {
+      id: "session",
+      label: "実務演習セッション（3ペイン動的対話）",
+      icon: <Play className="w-3.5 h-3.5" />,
+    },
+    {
+      id: "anchor",
+      label: "共通アンカー評価（固定尺度・SCT型）",
+      icon: <Anchor className="w-3.5 h-3.5 text-blue-400" />,
+    },
+    {
+      id: "org_dashboard",
+      label: "① 組織・受講管理ダッシュボード",
+      icon: <Building2 className="w-3.5 h-3.5" />,
+    },
+    {
+      id: "learner_profile",
+      label: "② 受講者スキルカルテ",
+      icon: <UserCheck className="w-3.5 h-3.5" />,
+    },
+    {
+      id: "benchmark_gallery",
+      label: "③ エキスパート事後講評",
+      icon: <Award className="w-3.5 h-3.5 text-amber-400" />,
+    },
+  ];
 
   return (
     <div className="max-w-[1536px] mx-auto px-4 sm:px-6 lg:px-6 py-8 space-y-6">
       {/* 2-Layer Navigation Tab Bar ([D-79]: Viability & Feasibility) */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
         <div className="flex flex-wrap items-center gap-2 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
-          <button
-            type="button"
-            onClick={() => setActiveTab("session")}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-              activeTab === "session"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-            }`}
-          >
-            <Play className="w-3.5 h-3.5" />
-            <span>実務演習セッション（3ペイン動的対話）</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("anchor")}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-              activeTab === "anchor"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-            }`}
-          >
-            <Anchor className="w-3.5 h-3.5 text-blue-400" />
-            <span>共通アンカー評価（固定尺度・SCT型）</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("org_dashboard")}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-              activeTab === "org_dashboard"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>① 組織・受講管理ダッシュボード</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("learner_profile")}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-              activeTab === "learner_profile"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-            }`}
-          >
-            <UserCheck className="w-3.5 h-3.5" />
-            <span>② 受講者スキルカルテ</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("benchmark_gallery")}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-              activeTab === "benchmark_gallery"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-            }`}
-          >
-            <Award className="w-3.5 h-3.5 text-amber-400" />
-            <span>③ エキスパート事後講評</span>
-          </button>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                activeTab === tab.id
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
+                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+              }`}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+            </button>
+          ))}
         </div>
 
         <div className="text-xs text-slate-500 hidden xl:flex items-center gap-2">
@@ -877,29 +148,13 @@ export default function AssessmentPrototypePage() {
       )}
 
       {/* Tab 2: Learner Profile & Skill Card */}
-      {activeTab === "learner_profile" && (
-        <LearnerProfile
-          onStartSession={(taskId) => {
-            if (taskId) {
-              const matched = DYNAMIC_TASKS.find((t) => t.task_id === taskId);
-              if (matched) setSelectedTaskId(matched.task_id);
-            }
-            setActiveTab("session");
-          }}
-        />
-      )}
+      {activeTab === "learner_profile" && <LearnerProfile onStartSession={goToSessionWithTask} />}
 
       {/* Tab 3: Scenario Benchmark & Archetype Gallery */}
       {activeTab === "benchmark_gallery" && (
         <BenchmarkGallery
           initialTaskId={galleryTaskId}
-          onStartSession={(taskId) => {
-            if (taskId) {
-              const matched = DYNAMIC_TASKS.find((t) => t.task_id === taskId);
-              if (matched) setSelectedTaskId(matched.task_id);
-            }
-            setActiveTab("session");
-          }}
+          onStartSession={goToSessionWithTask}
           onBackToDashboard={() => setActiveTab("org_dashboard")}
         />
       )}
@@ -909,30 +164,30 @@ export default function AssessmentPrototypePage() {
         <div className="space-y-4">
           <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
           <AnchorQuestionStep
-            currentStep={anchorStep}
-            currentAnchor={currentAnchor}
-            bankSource={bankSource}
-            anchorList={anchorList}
-            selectedAnchorId={selectedAnchorId}
-            onSelectAnchorId={(id) => setSelectedAnchorId(id)}
-            onStartAnchorFlow={handleStartAnchorFlow}
-            onResetAnchorFlow={handleResetAnchorFlow}
-            stage1Choice={stage1Choice}
-            setStage1Choice={setStage1Choice}
-            stage2Choice={stage2Choice}
-            setStage2Choice={setStage2Choice}
-            stage3Choice={stage3Choice}
-            setStage3Choice={setStage3Choice}
-            stage3bChoice={stage3bChoice}
-            setStage3bChoice={setStage3bChoice}
-            confidence={confidence}
-            setConfidence={setConfidence}
-            isSubmitting={isSubmitting}
-            onStage1Next={handleStage1Next}
-            onStage2Next={handleStage2Next}
-            onStage3Next={handleStage3Next}
-            onStage3bNext={handleStage3bNext}
-            onAnchorSubmit={handleAnchorSubmit}
+            currentStep={anchor.anchorStep}
+            currentAnchor={anchor.currentAnchor}
+            bankSource={anchor.bankSource}
+            anchorList={anchor.anchorList}
+            selectedAnchorId={anchor.selectedAnchorId}
+            onSelectAnchorId={anchor.setSelectedAnchorId}
+            onStartAnchorFlow={anchor.startAnchorFlow}
+            onResetAnchorFlow={anchor.resetAnchorFlow}
+            stage1Choice={anchor.stage1Choice}
+            setStage1Choice={anchor.setStage1Choice}
+            stage2Choice={anchor.stage2Choice}
+            setStage2Choice={anchor.setStage2Choice}
+            stage3Choice={anchor.stage3Choice}
+            setStage3Choice={anchor.setStage3Choice}
+            stage3bChoice={anchor.stage3bChoice}
+            setStage3bChoice={anchor.setStage3bChoice}
+            confidence={anchor.confidence}
+            setConfidence={anchor.setConfidence}
+            isSubmitting={anchor.isSubmitting}
+            onStage1Next={anchor.advanceStage1}
+            onStage2Next={anchor.advanceStage2}
+            onStage3Next={anchor.advanceStage3}
+            onStage3bNext={anchor.advanceStage3b}
+            onAnchorSubmit={anchor.submitAnchor}
             onStartDialogueSession={() => setActiveTab("session")}
           />
         </div>
@@ -969,83 +224,83 @@ export default function AssessmentPrototypePage() {
               <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
 
               {/* STEP 0: Initialization */}
-              {currentStep === "init" && (
+              {dialogue.currentStep === "init" && (
                 <InitStep
                   selectedTaskId={selectedTaskId}
                   setSelectedTaskId={setSelectedTaskId}
-                  selectedTask={selectedTask}
-                  isSubmitting={isSubmitting}
-                  onStartSession={handleStartSession}
+                  selectedTask={dialogue.selectedTask}
+                  isSubmitting={dialogue.isSubmitting}
+                  onStartSession={dialogue.startSession}
                   onGoToAnchorTab={() => setActiveTab("anchor")}
                 />
               )}
 
               {/* STEP 1: Dynamic 3-Pane Dialogue Session (W3) */}
-              {currentStep === "dialogue_session" && (
+              {dialogue.currentStep === "dialogue_session" && (
                 <DialogueSessionStep
-                  selectedTask={selectedTask}
-                  artifactCode={artifactCode}
-                  setArtifactCode={setArtifactCode}
-                  focusItems={focusItems}
-                  focusInputText={focusInputText}
-                  setFocusInputText={setFocusInputText}
-                  chatHistory={chatHistory}
-                  turnCounter={turnCounter}
-                  userPromptInput={userPromptInput}
-                  setUserPromptInput={setUserPromptInput}
-                  cffActiveWarning={cffActiveWarning}
-                  isSubmitting={isSubmitting}
-                  mediationStateEstimate={mediationStateEstimate}
-                  lastProbeMove={lastProbeMove}
-                  lastSelectionRationale={lastSelectionRationale}
-                  probesIssued={probesIssued}
-                  isProbing={isProbing}
-                  premiseShiftState={premiseShiftState}
-                  onTriggerPremiseShift={handleTriggerPremiseShift}
-                  onProceedToPreliminaryJudgement={handleProceedToPreliminaryJudgement}
-                  onAddFocusItem={handleAddFocusItem}
-                  onRemoveFocusItem={handleRemoveFocusItem}
-                  onSendDialogueTurn={handleSendDialogueTurn}
+                  selectedTask={dialogue.selectedTask}
+                  artifactCode={dialogue.artifactCode}
+                  setArtifactCode={dialogue.setArtifactCode}
+                  focusItems={dialogue.focusItems}
+                  focusInputText={dialogue.focusInputText}
+                  setFocusInputText={dialogue.setFocusInputText}
+                  chatHistory={dialogue.chatHistory}
+                  turnCounter={dialogue.turnCounter}
+                  userPromptInput={dialogue.userPromptInput}
+                  setUserPromptInput={dialogue.setUserPromptInput}
+                  cffActiveWarning={dialogue.cffActiveWarning}
+                  isSubmitting={dialogue.isSubmitting}
+                  mediationStateEstimate={dialogue.mediationStateEstimate}
+                  lastProbeMove={dialogue.lastProbeMove}
+                  lastSelectionRationale={dialogue.lastSelectionRationale}
+                  probesIssued={dialogue.probesIssued}
+                  isProbing={dialogue.isProbing}
+                  premiseShiftState={dialogue.premiseShiftState}
+                  onTriggerPremiseShift={dialogue.triggerPremiseShift}
+                  onProceedToPreliminaryJudgement={dialogue.proceedToPreliminaryJudgement}
+                  onAddFocusItem={dialogue.addFocusItem}
+                  onRemoveFocusItem={dialogue.removeFocusItem}
+                  onSendDialogueTurn={dialogue.sendDialogueTurn}
                 />
               )}
 
               {/* STEP 5.5: CFF Force Decision First & Facilitator Mirroring Summary [MVP 2.5, T-17b, D-80] */}
-              {currentStep === "preliminary_judgement" && (
+              {dialogue.currentStep === "preliminary_judgement" && (
                 <PreliminaryJudgementStep
                   taskId={selectedTaskId}
-                  chatHistory={chatHistory}
-                  prelimAction={prelimAction}
-                  setPrelimAction={setPrelimAction}
-                  prelimJustification={prelimJustification}
-                  setPrelimJustification={setPrelimJustification}
-                  prelimError={prelimError}
-                  isEvaluating={isEvaluating}
-                  onBackToDialogue={() => setCurrentStep("dialogue_session")}
-                  onConfirmPreliminaryAndEvaluate={handleConfirmPreliminaryAndEvaluate}
+                  chatHistory={dialogue.chatHistory}
+                  prelimAction={dialogue.prelimAction}
+                  setPrelimAction={dialogue.setPrelimAction}
+                  prelimJustification={dialogue.prelimJustification}
+                  setPrelimJustification={dialogue.setPrelimJustification}
+                  prelimError={dialogue.prelimError}
+                  isEvaluating={dialogue.isEvaluating}
+                  onBackToDialogue={() => dialogue.setCurrentStep("dialogue_session")}
+                  onConfirmPreliminaryAndEvaluate={dialogue.confirmPreliminaryAndEvaluate}
                 />
               )}
 
               {/* STEP 6: XAI Evaluation Report Screen (W5) */}
-              {currentStep === "evaluation_report" && evaluation && (
+              {dialogue.currentStep === "evaluation_report" && dialogue.evaluation && (
                 <EvaluationReportStep
-                  evaluation={evaluation}
-                  chatHistory={chatHistory}
-                  prelimAction={prelimAction}
-                  prelimJustification={prelimJustification}
-                  anchorId={selectedAnchorId}
-                  anchorStatus={anchorStatus}
-                  bankSource={bankSource}
-                  stage1Choice={stage1Choice}
-                  stage2Choice={stage2Choice}
-                  stage3Choice={stage3Choice}
-                  confidence={confidence}
-                  disputeReason={disputeReason}
-                  setDisputeReason={setDisputeReason}
-                  disputeDirection={disputeDirection}
-                  setDisputeDirection={setDisputeDirection}
-                  disputeSubmitted={disputeSubmitted}
-                  onSubmitDispute={handleSubmitDispute}
-                  onResetToInit={() => setCurrentStep("init")}
+                  evaluation={dialogue.evaluation}
+                  chatHistory={dialogue.chatHistory}
+                  prelimAction={dialogue.prelimAction}
+                  prelimJustification={dialogue.prelimJustification}
+                  anchorId={anchor.selectedAnchorId}
+                  anchorStatus={anchor.anchorStatus}
+                  bankSource={anchor.bankSource}
+                  stage1Choice={anchor.stage1Choice}
+                  stage2Choice={anchor.stage2Choice}
+                  stage3Choice={anchor.stage3Choice}
+                  confidence={anchor.confidence}
+                  disputeReason={dialogue.disputeReason}
+                  setDisputeReason={dialogue.setDisputeReason}
+                  disputeDirection={dialogue.disputeDirection}
+                  setDisputeDirection={dialogue.setDisputeDirection}
+                  disputeSubmitted={dialogue.disputeSubmitted}
+                  onSubmitDispute={dialogue.submitDispute}
+                  onResetToInit={() => dialogue.setCurrentStep("init")}
                   onViewBenchmarkGallery={() => {
                     setGalleryTaskId(selectedTaskId);
                     setActiveTab("benchmark_gallery");
@@ -1069,6 +324,6 @@ export default function AssessmentPrototypePage() {
           </div>
         </div>
       )}
-  </div>
-);
+    </div>
+  );
 }
