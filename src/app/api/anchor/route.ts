@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiErrorResponse } from "@/lib/api-error";
+import { prismaErrorCode } from "@/lib/error-message";
 import { recordAnchorResponse, resolveSessionContext } from "@/lib/telemetry";
 import { prisma } from "@/lib/db";
 import {
@@ -231,6 +232,22 @@ export async function POST(req: Request) {
       scored: false,
     });
   } catch (error: unknown) {
+    // P2002 = (session_id, anchor_id) の一意制約違反。同じ項目への2回目の回答である。
+    //
+    // **上書きしない。**1回目の応答こそが「初見で気づいたか」の測定値であり、
+    // 2回目は項目を読んだ後の回答だから別物である。サーバ障害（500）でもないので、
+    // 競合として返して呼び出し側に区別させる。
+    if (prismaErrorCode(error) === "P2002") {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "このアンカー項目にはすでに回答済みです。同一セッション内で同じ項目へ二度回答することはできません。",
+          alreadyAnswered: true,
+        },
+        { status: 409 }
+      );
+    }
     return apiErrorResponse("Anchor response error", error, "Failed to record anchor response");
   }
 }
