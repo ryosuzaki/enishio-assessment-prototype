@@ -61,6 +61,43 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
       });
     });
 
+    // 前提変化（場面3）は受講者ではなくサーバ側が撃つ。1回目は「まだ撃たない」、
+    // 2回目で注入を返し、**発火時点がクライアント操作では動かない**ことを固定する [D-100]。
+    let premiseShiftCalls = 0;
+    await page.route("**/api/dialogue/premise-shift", async (route) => {
+      premiseShiftCalls += 1;
+      if (premiseShiftCalls < 2) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            success: true,
+            injected: false,
+            reason: "trigger_turn_not_reached",
+            userTurnCount: 1,
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          injected: true,
+          injectedAtTurn: 5,
+          forced: false,
+          shiftId: "shift-fintech-vip-fallback",
+          title: "【緊急仕様変更】セール時の最優先（VIP）加盟店フォールバック特例",
+          announcement: "【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知",
+          newRequirement: "VIP加盟店に限り最大30秒の縮退運転を許可すること",
+          notification:
+            "【⚡ 緊急仕様変更・追加要件の通知】\n【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知\n\nこれに伴い、以下の追加要件を満たす必要があります：\n「VIP加盟店に限り最大30秒の縮退運転を許可すること」",
+          userTurnCount: 2,
+        }),
+      });
+    });
+
     await page.route("**/api/dialogue/probe", async (route) => {
       await route.fulfill({
         status: 200,
@@ -381,26 +418,34 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.locator("span.bg-purple-500\\/20", { hasText: "#1" })).toBeVisible();
     await expect(page.getByText("redis.get(merchantId)")).toBeVisible();
 
-    // 場面3 前提変化（緊急仕様変更・追加要件）の注入テスト
-    const shiftBtn = page.getByRole("button", { name: /緊急仕様変更を発生させる/ });
-    await expect(shiftBtn).toBeVisible();
-    await shiftBtn.click();
-    await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toBeVisible();
-    await expect(page.getByText(/【⚡ 緊急仕様変更・追加要件の通知】/)).toBeVisible();
+    // 場面3 前提変化：**受講者が発生させるボタンは存在しない** [D-100]
+    await expect(page.getByRole("button", { name: /緊急仕様変更を発生させる/ })).toHaveCount(0);
 
-    // AI同僚へメッセージ送信
+    // AI同僚へメッセージ送信（1回目）
     const promptInput = page.getByPlaceholder(/AI同僚に指示・指摘を入力/);
     await promptInput.fill("Redisの単一障害点について考慮が必要です");
     await page.getByRole("button", { name: "送信" }).click();
 
     // AI同僚の返答が表示されたことを確認
-    await expect(page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時")).toBeVisible();
+    await expect(
+      page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時").first()
+    ).toBeVisible();
 
     // 媒介プローブの確認
     await expect(page.getByTestId("mediation-state-panel")).toBeVisible();
     await expect(page.getByText("その指摘は業務要件のどの部分から来ていますか？")).toBeVisible();
     await expect(page.getByText("進行役（媒介プローブ）")).toBeVisible();
     await expect(page.getByText(/この推定を踏まえて選んだ手/)).toBeVisible();
+
+    // この時点ではまだ前提変化は撃たれていない（サーバ側がしきい値未達と判定した）
+    await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toHaveCount(0);
+
+    // 2回目の発話で、進行役側の判定により前提変化が自動注入される
+    await promptInput.fill("フェイルクローズの方針で修正してください。PCI DSS要件を優先します");
+    await page.getByRole("button", { name: "送信" }).click();
+
+    await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toBeVisible();
+    await expect(page.getByText(/【⚡ 緊急仕様変更・追加要件の通知】/)).toBeVisible();
 
     // 2. レビュー完了 ➔ 暫定判断（CFF）へ進む
     await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();

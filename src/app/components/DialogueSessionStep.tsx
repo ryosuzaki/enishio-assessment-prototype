@@ -24,6 +24,13 @@ import type { ChatMessage, EvidenceTargetState, FocusItem, ProbeMove, PremiseShi
 import { MAX_PROBES_PER_SESSION } from "../types";
 import { MediationStatePanel } from "./MediationStatePanel";
 
+/**
+ * 手動での前提変化注入を出してよいビルドか。`next build` 済みの本番ビルドでは false になり、
+ * このフラグを見ているブロックはバンドルから落ちる。サーバ側（/api/dialogue/premise-shift）も
+ * 同じ条件で force を無視するため、受講者が撃てないという保証は片側だけでは破れない `[D-100]`。
+ */
+const IS_DEV_BUILD = process.env.NODE_ENV !== "production";
+
 interface DialogueSessionStepProps {
   selectedTask: DynamicTaskScenario;
   artifactCode: string;
@@ -43,7 +50,12 @@ interface DialogueSessionStepProps {
   probesIssued: number;
   isProbing: boolean;
   premiseShiftState?: PremiseShiftState;
-  onTriggerPremiseShift?: () => void;
+  /**
+   * 開発ビルド限定の手動発火。**受講者UIには出さない** `[D-100]` ——
+   * 前提変化は進行役側が対話ログから決定論的に撃つものであり、受講者が撃つ時点を
+   * 選べるなら「不意の前提変化への適応」を測っていることにならない。
+   */
+  onForcePremiseShiftForDebug?: () => void;
   onProceedToPreliminaryJudgement: () => void;
   onAddFocusItem: (textSnippet?: string, noteText?: string) => void;
   onRemoveFocusItem: (seq: number) => void;
@@ -69,7 +81,7 @@ export function DialogueSessionStep({
   probesIssued,
   isProbing,
   premiseShiftState,
-  onTriggerPremiseShift,
+  onForcePremiseShiftForDebug,
   onProceedToPreliminaryJudgement,
   onAddFocusItem,
   onRemoveFocusItem,
@@ -97,7 +109,7 @@ export function DialogueSessionStep({
         </button>
       </div>
 
-      {/* 場面3：前提変化（緊急仕様変更）コントロール ＆ バナー */}
+      {/* 場面3：前提変化（緊急仕様変更）バナー。発火は進行役側（/api/dialogue/premise-shift） */}
       {premiseShiftState?.isInjected ? (
         <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-500/50 shadow-lg shadow-rose-950/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-start gap-3">
@@ -122,28 +134,35 @@ export function DialogueSessionStep({
             適応行動・方針更新を観測中
           </span>
         </div>
-      ) : selectedTask.premise_shift ? (
-        <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      ) : IS_DEV_BUILD && selectedTask.premise_shift ? (
+        /*
+         * 開発ビルドにだけ出る手動発火。**受講者の画面に出してはならない** `[D-100]`。
+         * 「これから前提が変わる」と予告した時点で不意打ちではなくなり、撃たない自由が
+         * あれば領域4の証拠が取れたセッションと取れないセッションが混在する。
+         * 本番ビルドではこのブロックごと出ず、サーバ側も force を無視する。
+         */
+        <div className="p-3 rounded-xl bg-slate-900/60 border border-dashed border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+            <span className="p-1.5 rounded-lg bg-slate-500/10 text-slate-400 border border-slate-500/20 shrink-0">
               <Zap className="w-4 h-4" />
             </span>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 font-mono">
-                場面3：前提変化（動的適応力の検証）
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+                DEV ONLY — 本番ビルドでは表示されない
               </span>
-              <p className="text-xs text-slate-300">
-                実務で頻発する「要件の急な変更・監査指摘」への適応力を検証できます。
+              <p className="text-xs text-slate-400">
+                場面3の前提変化は通常、進行役が対話ログから自動で注入する。これは開発・E2E用の手動発火。
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={onTriggerPremiseShift}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600/90 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-md shadow-amber-950/40 shrink-0 whitespace-nowrap"
+            onClick={onForcePremiseShiftForDebug}
+            data-testid="debug-force-premise-shift"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold transition-all shrink-0 whitespace-nowrap"
           >
             <Zap className="w-3.5 h-3.5" />
-            ⚡ 緊急仕様変更を発生させる
+            [dev] 前提変化を手動注入
           </button>
         </div>
       ) : null}

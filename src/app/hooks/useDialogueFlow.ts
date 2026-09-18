@@ -129,30 +129,65 @@ export function useDialogueFlow({
     }
   };
 
-  // Premise Shift Trigger (場面3: 緊急仕様変更・追加要件の発生)
-  const triggerPremiseShift = () => {
-    if (premiseShiftState.isInjected) return;
-    const shift = selectedTask.premise_shift;
-    if (!shift) return;
-    setPremiseShiftState({
-      isInjected: true,
-      injectedAtTurn: turnCounter,
-      title: shift.title,
-      announcement: shift.announcement,
-      newRequirement: shift.new_requirement,
-    });
-    const urgentTurn = turnCounter;
-    setChatHistory((prev) => [
-      ...prev,
-      {
-        turnSeq: urgentTurn,
-        role: "assistant",
-        content: `【⚡ 緊急仕様変更・追加要件の通知】\n${shift.announcement}\n\nこれに伴い、以下の追加要件を満たす必要があります：\n「${shift.new_requirement}」\n\n現在の設計やコードで問題がないか、確認と修正方針の指示をお願いします！`,
-      },
-    ]);
-    setTurnCounter((t) => t + 1);
-    addTelemetry(`⚡ 緊急仕様変更（前提変化）を発生させました: ${shift.title}`);
+  /**
+   * 前提変化（場面3: 緊急仕様変更・追加要件）の注入。
+   *
+   * **受講者は撃たない。**発火するかどうかはサーバ側が対話ログだけを見て決定論的に判定する
+   * `[D-100]`。ここから渡せるのは「どのセッションの何ターン目か」だけで、
+   * クライアントは注入するか否かを決められない。
+   *
+   * `force` は開発ビルド限定の手動発火（E2E・デバッグ用）。本番ビルドではサーバ側が無視する。
+   */
+  const maybeInjectPremiseShift = async (
+    turnSeq: number,
+    historySoFar: ChatMessage[],
+    options?: { force?: boolean }
+  ): Promise<boolean> => {
+    if (premiseShiftState.isInjected) return false;
+    try {
+      const res = await fetch("/api/dialogue/premise-shift", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sessionIdInUse,
+          taskId: selectedTaskId,
+          turnSeq,
+          ...(options?.force ? { force: true } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        // 前提変化が撃てなくても対話セッション自体は継続させる。ここで止めない。
+        addTelemetry(`Premise shift check failed: ${data.error}`);
+        return false;
+      }
+      if (!data.injected) return false;
+
+      setPremiseShiftState({
+        isInjected: true,
+        injectedAtTurn: data.injectedAtTurn,
+        title: data.title,
+        announcement: data.announcement,
+        newRequirement: data.newRequirement,
+      });
+      setChatHistory([
+        ...historySoFar,
+        { turnSeq: data.injectedAtTurn, role: "assistant", content: data.notification },
+      ]);
+      setTurnCounter(data.injectedAtTurn + 1);
+      addTelemetry(
+        `⚡ 前提変化を注入${data.forced ? "（手動 / dev）" : "（進行役判定）"}: Turn #${data.injectedAtTurn} / ${data.title}`
+      );
+      return true;
+    } catch (e: unknown) {
+      addTelemetry(`Premise shift request failed: ${messageOf(e)}`);
+      return false;
+    }
   };
+
+  /** 開発ビルド限定の手動発火。受講者UIからは呼ばれない（DialogueSessionStep 側で隠す）。 */
+  const forcePremiseShiftForDebug = () =>
+    maybeInjectPremiseShift(turnCounter, chatHistory, { force: true });
 
   /**
    * ソクラテス型深掘り（MVP 2.1 ステップ7・8）。
@@ -263,9 +298,16 @@ export function useDialogueFlow({
       setTurnCounter(nextTurn);
 
       // 意図-行動ギャップのインターロック（正規表現ベース。別機構）が発火したターンには
-      // 深掘りを重ねない。上限に達していれば呼ばない。
-      if (!data.isInterlockTriggered && probesIssued < MAX_PROBES_PER_SESSION) {
-        await runMediationProbe(nextTurn, historyWithAssistant);
+      // 前提変化も深掘りも重ねない。受講者が中身のある発話をしていない手番である。
+      if (!data.isInterlockTriggered) {
+        // 前提変化と深掘りは同じ手番に並べない。深掘りの状態推定は注入前のログに
+        // 基づいており、前提が変わった直後に投げても噛み合わない。
+        const shiftInjected = await maybeInjectPremiseShift(nextTurn, historyWithAssistant);
+
+        // 上限に達していれば深掘りは呼ばない。
+        if (!shiftInjected && probesIssued < MAX_PROBES_PER_SESSION) {
+          await runMediationProbe(nextTurn, historyWithAssistant);
+        }
       }
     } catch (e: unknown) {
       setErrorMessage("対話送信エラー: " + messageOf(e));
@@ -469,7 +511,7 @@ export function useDialogueFlow({
     disputeSubmitted,
     isSubmitting,
     startSession,
-    triggerPremiseShift,
+    forcePremiseShiftForDebug,
     sendDialogueTurn,
     addFocusItem,
     removeFocusItem,

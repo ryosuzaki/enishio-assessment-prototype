@@ -79,6 +79,46 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
 
     // probe / blur は未モックのままだと DB へ抜けて例外になる（スクリーンショットが
     // 崩れる原因になるため塞ぐ）。
+    // 前提変化は進行役側が撃つ [D-100]。スクリーンショットには注入後の状態（緊急要件バナー）を
+    // 写す。**モックしないと dev ビルド限定の手動発火ボタンが提案書用の画像に写り込む。**
+    let premiseShiftCalls = 0;
+    await page.route("**/api/dialogue/premise-shift", async (route) => {
+      premiseShiftCalls += 1;
+      if (premiseShiftCalls < 2) {
+        // 1発話目では撃たない。深掘りと前提変化バナーの両方を1枚に収めるため
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            success: true,
+            injected: false,
+            reason: "trigger_turn_not_reached",
+            userTurnCount: 1,
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          injected: true,
+          injectedAtTurn: 4,
+          forced: false,
+          shiftId: "shift-fintech-vip-fallback",
+          title: "【緊急仕様変更】セール時の最優先（VIP）加盟店フォールバック特例とレイテンシ要件の厳格化",
+          announcement:
+            "【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知：『来週の大型セールにおいて、特定の大手加盟店（VIP）については決済全停止を避けるため、Redis障害時でもローカルキャッシュによる最大30秒のフォールバックを許容する例外ポリシーが承認されました』",
+          newRequirement:
+            "4. 【緊急追加要件】VIP加盟店（ヘッダー x-merchant-vip: true）に限り、Redis瞬断・障害時でもローカルインメモリキャッシュによる最大30秒の縮退運転を許可し決済受付を継続すること。",
+          notification:
+            "【⚡ 緊急仕様変更・追加要件の通知】\n【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知：『来週の大型セールにおいて、特定の大手加盟店（VIP）については決済全停止を避けるため、Redis障害時でもローカルキャッシュによる最大30秒のフォールバックを許容する例外ポリシーが承認されました』\n\nこれに伴い、以下の追加要件を満たす必要があります：\n「4. 【緊急追加要件】VIP加盟店（ヘッダー x-merchant-vip: true）に限り、Redis瞬断・障害時でもローカルインメモリキャッシュによる最大30秒の縮退運転を許可し決済受付を継続すること。」\n\n現在の設計やコードで問題がないか、確認と修正方針の指示をお願いします！",
+          userTurnCount: 2,
+        }),
+      });
+    });
+
     await page.route("**/api/dialogue/probe", async (route) => {
       await route.fulfill({
         status: 200,
@@ -176,7 +216,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
   test("全STEPのUIスクリーンショットをdocs/screenshots/へ高解像度出力する", async ({ page }) => {
     // 01. 初期画面 (Init Step)
     await page.goto("/");
-    await expect(page.locator("h1")).toContainText("評価的判断力 動的アセスメント＆テレメトリ基盤");
+    await expect(page.locator("h1")).toContainText("動的実務演習セッション（AI同僚協働・レビュー対話）");
     await expect(page.getByText("Live Telemetry Monitor")).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
@@ -185,11 +225,15 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     });
 
     // 02. アンカー出題・段階1（採用可否）[D-83]
-    // 出題項目IDは供給源（運用バンク / 同梱サンプル）で変わるため決め打ちしない
-    const anchorSelect = page.locator("select").first();
-    await expect(anchorSelect).toBeEnabled();
-    const selectedAnchorId = await anchorSelect.inputValue();
-    await page.getByRole("button", { name: "セッションを開始する（アンカー出題へ）" }).click();
+    // 共通アンカー評価は独立タブ。出題項目IDは供給源（運用バンク / 同梱サンプル）で
+    // 変わるため決め打ちせず、選択済みラジオの value から拾う
+    await page.getByRole("button", { name: /共通アンカー評価/ }).click();
+    const anchorRadio = page.locator("input[name='anchorItem']:checked");
+    await expect(anchorRadio).toBeAttached();
+    const selectedAnchorId = await anchorRadio.inputValue();
+    await page
+      .getByRole("button", { name: "このアンカー項目を体験する（4段階疑似対話を開始）" })
+      .click();
     await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
     await expect(page.getByText(new RegExp(`共通アンカー項目: ${selectedAnchorId}`))).toBeVisible();
     await page.locator("input[name='stage1']").nth(1).check();
@@ -242,7 +286,12 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     // アンカー送信 ➔ 動的3ペイン対話セッション (Dynamic 3-Pane Dialogue)
     await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
     await expect(page.getByText("共通アンカー項目の記録が完了しました")).toBeVisible();
-    await page.getByRole("button", { name: "動的対話セッションへ進む" }).click();
+    await page.getByRole("button", { name: "実務演習セッションを体験する" }).click();
+
+    // 実務演習セッションタブの初期画面から課題提示へ進む
+    await page
+      .getByRole("button", { name: "実務演習セッションを開始する（課題提示へ）" })
+      .click();
 
     // 3ペインの表示確認
     await expect(page.getByText("【第1ペイン】開発Issue ＆ チーム情報")).toBeVisible();
@@ -265,8 +314,17 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       "Redisの単一障害点（SPOF）およびPCI DSS要件に対する耐障害性について考慮が必要です。フォールバック処理の実装を検討してください。"
     );
     await page.getByRole("button", { name: "送信" }).click();
-    await expect(page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時")).toBeVisible();
+    await expect(
+      page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時").first()
+    ).toBeVisible();
     await expect(page.getByText("その判断の前提（SPOFリスク）を、仕様のどの記述")).toBeVisible();
+
+    // 2発話目で進行役側が前提変化を撃つ [D-100]。撃たれた手番には深掘りを重ねない
+    await promptInput.fill(
+      "一般加盟店はPCI DSS監査に従いフェイルクローズを維持する方針で修正してください。"
+    );
+    await page.getByRole("button", { name: "送信" }).click();
+    await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toBeVisible();
 
     // 04. 3ペイン対話画面 (3-Pane Dialogue)
     await page.evaluate(() => window.scrollTo(0, 0));

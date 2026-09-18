@@ -256,7 +256,7 @@ export default function AssessmentPrototypePage() {
                   probesIssued={dialogue.probesIssued}
                   isProbing={dialogue.isProbing}
                   premiseShiftState={dialogue.premiseShiftState}
-                  onTriggerPremiseShift={dialogue.triggerPremiseShift}
+                  onForcePremiseShiftForDebug={dialogue.forcePremiseShiftForDebug}
                   onProceedToPreliminaryJudgement={dialogue.proceedToPreliminaryJudgement}
                   onAddFocusItem={dialogue.addFocusItem}
                   onRemoveFocusItem={dialogue.removeFocusItem}
