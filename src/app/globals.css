@@ -1,25 +1,177 @@
 @import "tailwindcss";
 
-:root {
-  --background: #090d16;
-  --foreground: #f1f5f9;
-  --card: #111827;
-  --card-border: #1e293b;
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --accent: #8b5cf6;
+/*
+ * デザイントークン（`[D-101]` 計測レポート系ライトテーマ、`[D-102]` 階層の規範化）
+ *
+ * **ここにある名前だけを使う。**`text-xs` や `p-3` のような素の値をコンポーネントへ直接
+ * 書かない——素の値で書くと、書くたびに判断が発生し、画面ごとに 12px と 13px が混ざる。
+ * 役割の名前で書けば、階層はこのファイルを直すだけで一斉に揃う。
+ *
+ * Tailwind 既定のパレットは無効化してある。`bg-slate-900` は存在しないので書いても効かない。
+ */
+@theme {
+  /* 既定パレットの無効化。これ以降で定義した役割名だけが色として存在する */
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-inherit: inherit;
+
+  /*
+   * 面。純グレーは「選ばなかった色」に見えるため、アクセントの濃紺へわずかに寄せた
+   * 青みのある灰を使う。差は数値にすれば小さいが、白と並べたときの印象は変わる。
+   */
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f3f5f8;
+  --color-surface-page: #f8f9fb;
+
+  /* 罫線。階層は影ではなく線で作る */
+  --color-line: #e2e6ec;
+  --color-line-strong: #c2cad5;
+
+  /* 文字。3 段。これ以上増やすと階層が読めない */
+  --color-ink: #131822;
+  --color-ink-2: #4a5462;
+  --color-ink-3: #79838f;
+
+  /* アクセント。1 色のみ。強調は色数ではなく面積と太さで作る */
+  --color-accent: #1d4a8a;
+  --color-accent-hover: #163a6e;
+  --color-accent-wash: #edf2f9;
+
+  /*
+   * 意味色。**装飾や分類には使わないが、状態には使う。**
+   *
+   * 絞りすぎると情報量の多い画面で「どこを見るべきか」が消える——一覧の数字が全部同じ濃さの
+   * 黒で並ぶと、走査ではなく精読を強いることになる。状態を色で示すのは飾りではなく情報である。
+   *
+   * **暗く落とすとハイライトとして働かない。**本文の黒（`--color-ink`）と明度が近い色は、
+   * 小さな数値に当ててもパッと見では黒に紛れる。白地に対する読みやすさ（4.5:1）を保ったまま、
+   * 黒から離れるところまで彩度を上げてある。地色も、面として認識できる濃さまで上げた。
+   */
+  --color-positive: #0b7a44;
+  --color-positive-wash: #e0f1e7;
+  --color-caution: #9c5c00;
+  --color-caution-wash: #fbebcd;
+  --color-critical: #c22f2f;
+  --color-critical-wash: #fbe2e2;
+
+  /*
+   * 文字の階層。サイズだけを指定すると行間とウェイトが場当たりになるため、
+   * **3 つを 1 組で持たせる。**使う側は `text-body` と書くだけでよい。
+   */
+  --text-display: 1.75rem; /* 28px 画面名 */
+  --text-display--line-height: 1.3;
+  --text-display--font-weight: 600;
+  --text-display--letter-spacing: -0.02em;
+
+  --text-title: 1.1875rem; /* 19px 大きな区画の見出し */
+  --text-title--line-height: 1.45;
+  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.01em;
+
+  --text-section: 0.9375rem; /* 15px 枠の見出し */
+  --text-section--line-height: 1.5;
+  --text-section--font-weight: 600;
+
+  --text-body: 0.875rem; /* 14px 読ませる文章 */
+  --text-body--line-height: 1.8;
+  --text-body--font-weight: 400;
+
+  --text-caption: 0.8125rem; /* 13px 補足・注記 */
+  --text-caption--line-height: 1.7;
+  --text-caption--font-weight: 400;
+
+  --text-label: 0.75rem; /* 12px 項目名・メタ */
+  --text-label--line-height: 1.5;
+  --text-label--font-weight: 500;
+  --text-label--letter-spacing: 0.01em;
+
+  --text-data: 0.8125rem; /* 13px 数値・ID・ログ */
+  --text-data--line-height: 1.5;
+  --text-data--font-weight: 500;
+
+  /*
+   * 余白の階層。**セクションの間とセルの中が同じ間隔だと、まとまりが目に入らない。**
+   * 名前で書くことで、どの距離がどの役割かがコードから読める。
+   */
+  --spacing-section: 2.5rem; /* 40px 画面の区画どうし */
+  --spacing-block: 1rem; /* 16px 枠の中のブロックどうし */
+  --spacing-row: 0.5rem; /* 8px 並ぶ行どうし */
+  --spacing-cell: 0.75rem; /* 12px セルの内側 */
+  --spacing-pad: 1.25rem; /* 20px 枠の内側 */
+
+  /* 角丸。2 段階。計測機器の佇まいでは角は立てる */
+  --radius-card: 6px;
+  --radius-chip: 3px;
+
+  /* 書体。実体は src/app/fonts.ts（next/font がビルド時に自己ホストする） */
+  --font-sans:
+    var(--font-sans-jp), -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN",
+    "Yu Gothic UI", Meiryo, sans-serif;
+  --font-mono: var(--font-mono-plex), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  min-height: 100vh;
-}
+@layer base {
+  /*
+   * キーボード操作の可視化（Web Interface Guidelines）。
+   *
+   * プリミティブ側だけに `focus-visible` を書くと、タブやフィルタのような素の `<button>` が
+   * 漏れる——実際 16 個中 1 個しか持っていなかった。**土台で受けるのが確実である。**
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
 
-/* Glassmorphism utility */
-.glass-panel {
-  background: rgba(17, 24, 39, 0.75);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* 動きを減らす設定を尊重する。読み込み表示の回転もここで止まる */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  html {
+    /* 明色のみの設計。スクロールバーとネイティブ部品を明色側へ寄せる */
+    color-scheme: light;
+    /* ダブルタップ拡大の 300ms 待ちを消す */
+    touch-action: manipulation;
+    /*
+     * `palt` は和文を字幅に応じて詰める。約物（読点・括弧）の前後に空く不自然な間が
+     * 締まり、日本語の見出しが英文と同じ密度で組める。
+     */
+    font-feature-settings: "palt" 1;
+  }
+
+  body {
+    background: var(--color-surface-page);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.8;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* 数値は桁を揃える。スコアや件数が縦に並んだとき読み比べができる */
+  table,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 見出しは字面が詰まるほうが締まる。本文の 1.8 を引き継がせない */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
+    text-wrap: balance;
+  }
 }

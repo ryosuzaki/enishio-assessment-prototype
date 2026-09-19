@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import { DYNAMIC_TASKS } from "@/data/dynamic-task";
 import type { AppTab } from "./types";
-import { Play, Anchor, Building2, UserCheck, Award, Zap, PanelRightOpen } from "lucide-react";
 import { InitStep } from "./components/InitStep";
 import { AnchorQuestionStep } from "./components/AnchorQuestionStep";
 import { DialogueSessionStep } from "./components/DialogueSessionStep";
@@ -19,6 +18,7 @@ import { useLearnerSession } from "./hooks/useLearnerSession";
 import { useWindowBlurTelemetry } from "./hooks/useWindowBlurTelemetry";
 import { useAnchorFlow } from "./hooks/useAnchorFlow";
 import { useDialogueFlow } from "./hooks/useDialogueFlow";
+import { Button, cn } from "./components/ui";
 
 /**
  * 2層構造プロトタイプの入口（`[D-79]`: Viability / Feasibility）。
@@ -79,60 +79,40 @@ export default function AssessmentPrototypePage() {
     setActiveTab("session");
   };
 
-  const TABS: { id: AppTab; label: string; icon: React.ReactNode }[] = [
-    {
-      id: "session",
-      label: "実務演習セッション（3ペイン動的対話）",
-      icon: <Play className="w-3.5 h-3.5" />,
-    },
-    {
-      id: "anchor",
-      label: "共通アンカー評価（固定尺度・SCT型）",
-      icon: <Anchor className="w-3.5 h-3.5 text-blue-400" />,
-    },
-    {
-      id: "org_dashboard",
-      label: "① 組織・受講管理ダッシュボード",
-      icon: <Building2 className="w-3.5 h-3.5" />,
-    },
-    {
-      id: "learner_profile",
-      label: "② 受講者スキルカルテ",
-      icon: <UserCheck className="w-3.5 h-3.5" />,
-    },
-    {
-      id: "benchmark_gallery",
-      label: "③ エキスパート事後講評",
-      icon: <Award className="w-3.5 h-3.5 text-amber-400" />,
-    },
+  const TABS: { id: AppTab; label: string }[] = [
+    { id: "session", label: "実務演習セッション（3ペイン動的対話）" },
+    { id: "anchor", label: "共通アンカー評価（固定尺度・SCT型）" },
+    { id: "org_dashboard", label: "① 組織・受講管理ダッシュボード" },
+    { id: "learner_profile", label: "② 受講者スキルカルテ" },
+    { id: "benchmark_gallery", label: "③ エキスパート事後講評" },
   ];
 
   return (
-    <div className="max-w-[1536px] mx-auto px-4 sm:px-6 lg:px-6 py-8 space-y-6">
+    <div className="mx-auto max-w-[1536px] space-y-section px-6 py-section">
       {/* 2-Layer Navigation Tab Bar ([D-79]: Viability & Feasibility) */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
-        <div className="flex flex-wrap items-center gap-2 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
+      <div className="flex flex-col gap-row border-b border-line sm:flex-row sm:items-end sm:justify-between">
+        <nav className="-mb-px flex flex-wrap items-end gap-x-block gap-y-row" aria-label="画面の切り替え">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+              aria-current={activeTab === tab.id ? "page" : undefined}
+              className={cn(
+                "border-b-2 pb-2.5 text-label transition-colors",
                 activeTab === tab.id
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-              }`}
+                  ? "border-accent font-semibold text-ink"
+                  : "border-transparent text-ink-3 hover:text-ink-2",
+              )}
             >
-              {tab.icon}
-              <span>{tab.label}</span>
+              {tab.label}
             </button>
           ))}
-        </div>
+        </nav>
 
-        <div className="text-xs text-slate-500 hidden xl:flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-          <span>2層構造プロトタイプ（Viability / Feasibility）</span>
-        </div>
+        <span className="hidden pb-2.5 text-label text-ink-3 xl:block">
+          2層構造プロトタイプ（Viability / Feasibility）
+        </span>
       </div>
 
       {/* Tab 1: Organization Analytics Dashboard */}
@@ -148,7 +128,9 @@ export default function AssessmentPrototypePage() {
       )}
 
       {/* Tab 2: Learner Profile & Skill Card */}
-      {activeTab === "learner_profile" && <LearnerProfile onStartSession={goToSessionWithTask} />}
+      {activeTab === "learner_profile" && (
+        <LearnerProfile onStartSession={goToSessionWithTask} />
+      )}
 
       {/* Tab 3: Scenario Benchmark & Archetype Gallery */}
       {activeTab === "benchmark_gallery" && (
@@ -161,7 +143,7 @@ export default function AssessmentPrototypePage() {
 
       {/* Tab: Standard Benchmark Anchor */}
       {activeTab === "anchor" && (
-        <div className="space-y-4">
+        <div className="space-y-block">
           <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
           <AnchorQuestionStep
             currentStep={anchor.anchorStep}
@@ -198,28 +180,23 @@ export default function AssessmentPrototypePage() {
         <div className="space-y-4">
           {!showTelemetry && (
             <div className="flex justify-end">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={() => setShowTelemetry(true)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs shadow-sm transition-all hover:border-slate-700"
                 title="テレメトリモニターを展開する"
+                
               >
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span>Live Telemetry を表示</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Connected
-                </span>
-                <PanelRightOpen className="w-3.5 h-3.5 text-slate-400" />
-              </button>
+                Live Telemetry を表示
+              </Button>
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 gap-section lg:grid-cols-12">
             {/* Main Content Area */}
             <div
               className={`${
                 showTelemetry ? "lg:col-span-8 xl:col-span-9" : "col-span-12"
-              } space-y-6 min-w-0 transition-all`}
+              } space-y-section min-w-0 transition-all`}
             >
               <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
 
@@ -311,7 +288,7 @@ export default function AssessmentPrototypePage() {
 
             {/* Right Column: Live Telemetry Monitor & System Architecture */}
             {showTelemetry && (
-              <div className="lg:col-span-4 xl:col-span-3 space-y-6 min-w-0">
+              <div className="lg:col-span-4 xl:col-span-3 space-y-block min-w-0">
                 <TelemetryPanel
                   learnerId={learnerId}
                   sessionId={sessionId}

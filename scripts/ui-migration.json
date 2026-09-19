@@ -1,0 +1,20 @@
+{
+  "_comment": "計測レポート系デザイン（[D-101]）へ移行済みのファイル。check:ui はここに挙がったファイルだけを検査する。1画面ずつ移行しては、このリストへ足していく。全ファイルが載ったら、この仕組みごと畳んで globals.css の既定パレット無効化へ切り替える。",
+  "migrated": [
+    "src/app/layout.tsx",
+    "src/app/page.tsx",
+    "src/app/components/ui/",
+    "src/app/components/InitStep.tsx",
+    "src/app/components/ErrorBanner.tsx",
+    "src/app/components/TelemetryPanel.tsx",
+    "src/app/components/AnchorQuestionStep.tsx",
+    "src/app/components/DialogueSessionStep.tsx",
+    "src/app/components/PreliminaryJudgementStep.tsx",
+    "src/app/components/EvaluationReportStep.tsx",
+    "src/app/components/MediationStatePanel.tsx",
+    "src/app/components/OrganizationDashboard.tsx",
+    "src/app/components/LearnerProfile.tsx",
+    "src/app/components/BenchmarkGallery.tsx"
+  ],
+  "remaining": []
+}

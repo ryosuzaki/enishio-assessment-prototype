@@ -1,21 +1,9 @@
 "use client";
 
 import React from "react";
-import {
-  Clock,
-  ArrowRight,
-  MessageSquare,
-  HelpCircle,
-  CheckCircle2,
-  RefreshCw,
-  AlertTriangle,
-  FlaskConical,
-  RotateCcw,
-  BookOpen,
-  Layers,
-  Sparkles,
-} from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import type { AnchorItem, StepType } from "../types";
+import { Badge, Button, cn } from "./ui";
 
 /**
  * 4段構成の疑似対話形式アンカー [D-83]。
@@ -59,11 +47,41 @@ interface AnchorQuestionStepProps {
   onStartDialogueSession: () => void;
 }
 
-const PANEL =
-  "glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl space-y-6";
-const OPTION_BASE = "flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer";
-const OPTION_ON = "bg-blue-600/15 border-blue-500 text-white shadow-md shadow-blue-500/10";
-const OPTION_OFF = "bg-slate-950/40 border-slate-800 text-slate-300 hover:border-slate-700";
+const PANEL = "space-y-block rounded-card border border-line bg-surface p-6";
+
+/** 選択肢。選んだものだけを枠と地色で示し、選択肢ごとの色分けはしない。 */
+function Option({
+  name,
+  checked,
+  onSelect,
+  children,
+  value,
+}: {
+  name: string;
+  checked: boolean;
+  onSelect: () => void;
+  children: React.ReactNode;
+  value?: string;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer items-start gap-3 rounded-card border p-3 transition-colors",
+        checked ? "border-accent bg-accent-wash" : "border-line bg-surface hover:border-line-strong",
+      )}
+    >
+      <input
+        type="radio"
+        name={name}
+        {...(value !== undefined ? { value } : {})}
+        checked={checked}
+        onChange={onSelect}
+        className="mt-1 shrink-0 accent-[var(--color-accent)]"
+      />
+      <span className="min-w-0 flex-1 text-body text-ink">{children}</span>
+    </label>
+  );
+}
 
 function StageHeader({
   anchorId,
@@ -75,17 +93,42 @@ function StageHeader({
   label: string;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-      <span className="text-xs font-mono px-2.5 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-        共通アンカー項目: {anchorId}
-      </span>
+    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line pb-3">
+      <Badge tone="accent">共通アンカー項目: {anchorId}</Badge>
       {/*
         総段数を出さない。「段階 1 / 5」と出せば、その項目に段階3'（新情報を含まない反論）が
         あることが最初から分かる。どの項目に反論が来るか読めないことが測度の前提である [D-83]。
       */}
-      <span className="text-xs text-slate-400 flex items-center gap-1">
-        <Clock className="w-3.5 h-3.5" /> 段階 {stage}（{label}）
+      <span className="text-caption text-ink-3" data-numeric>
+        段階 {stage}（{label}）
       </span>
+    </div>
+  );
+}
+
+/** 提示文の引用ブロック。左罫線だけで「読ませる塊」であることを示す。 */
+function Quoted({
+  label,
+  children,
+  tone = "neutral",
+}: {
+  label: string;
+  children: React.ReactNode;
+  tone?: "neutral" | "caution";
+}) {
+  return (
+    <div className="space-y-1.5">
+      <h2 className="text-caption text-ink-3">{label}</h2>
+      <div
+        className={cn(
+          "whitespace-pre-wrap border-l-2 p-3.5 text-body",
+          tone === "caution"
+            ? "border-l-caution bg-caution-wash text-ink"
+            : "border-l-line-strong bg-surface-sunken text-ink",
+        )}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -93,24 +136,8 @@ function StageHeader({
 function Stimulus({ anchor }: { anchor: AnchorItem }) {
   return (
     <>
-      <div>
-        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-          <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
-          状況（シチュエーション）
-        </h2>
-        <p className="text-sm text-slate-200 bg-slate-950/50 p-3.5 rounded-lg border border-slate-800/80 whitespace-pre-wrap leading-relaxed">
-          {anchor.intro}
-        </p>
-      </div>
-      <div>
-        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-          <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
-          AI同僚の提案文
-        </h2>
-        <div className="text-sm text-slate-100 bg-blue-950/20 p-4 rounded-lg border border-blue-900/40 leading-relaxed">
-          「{anchor.proposal}」
-        </div>
-      </div>
+      <Quoted label="状況（シチュエーション）">{anchor.intro}</Quoted>
+      <Quoted label="AI同僚の提案文">「{anchor.proposal}」</Quoted>
     </>
   );
 }
@@ -125,15 +152,10 @@ function NextButton({
   label?: string;
 }) {
   return (
-    <div className="pt-4 flex justify-end">
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
-      >
+    <div className="flex justify-end pt-2">
+      <Button variant="primary" onClick={onClick} disabled={disabled}>
         {label}
-        <ArrowRight className="w-4 h-4" />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -171,26 +193,21 @@ export function AnchorQuestionStep({
       <div className={PANEL}>
         <StageHeader anchorId={currentAnchor.anchor_id} stage={1} label="全体判断" />
         <Stimulus anchor={currentAnchor} />
-        <div className="space-y-3 pt-2">
-          <h3 className="text-sm font-semibold text-white">{currentAnchor.stage1.question}</h3>
-          <p className="text-xs text-slate-500">
+        <div className="space-y-cell pt-1">
+          <h3 className="text-section text-ink">{currentAnchor.stage1.question}</h3>
+          <p className="text-caption text-ink-3">
             この回答は次へ進むと変更できません。現時点の判断で選んでください。
           </p>
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             {currentAnchor.stage1.options.map((opt) => (
-              <label
+              <Option
                 key={opt.key}
-                className={`${OPTION_BASE} ${stage1Choice === opt.key ? OPTION_ON : OPTION_OFF}`}
+                name="stage1"
+                checked={stage1Choice === opt.key}
+                onSelect={() => setStage1Choice(opt.key)}
               >
-                <input
-                  type="radio"
-                  name="stage1"
-                  className="mt-1 accent-blue-500"
-                  checked={stage1Choice === opt.key}
-                  onChange={() => setStage1Choice(opt.key)}
-                />
-                <span className="text-sm leading-relaxed">{opt.text}</span>
-              </label>
+                {opt.text}
+              </Option>
             ))}
           </div>
         </div>
@@ -204,26 +221,21 @@ export function AnchorQuestionStep({
     return (
       <div className={PANEL}>
         <StageHeader anchorId={currentAnchor.anchor_id} stage={2} label="懸念の所在" />
-        <div className="text-xs text-slate-400 bg-slate-950/50 p-3 rounded-lg border border-slate-800/80">
+        <p className="rounded-chip border border-line bg-surface-sunken p-3 text-caption text-ink-2">
           段階1の回答は確定済みです（変更できません）。
-        </div>
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-white">{currentAnchor.stage2.question}</h3>
-          <div className="space-y-2.5">
+        </p>
+        <div className="space-y-cell">
+          <h3 className="text-section text-ink">{currentAnchor.stage2.question}</h3>
+          <div className="space-y-2">
             {currentAnchor.stage2.options.map((opt) => (
-              <label
+              <Option
                 key={opt.key}
-                className={`${OPTION_BASE} ${stage2Choice === opt.key ? OPTION_ON : OPTION_OFF}`}
+                name="stage2"
+                checked={stage2Choice === opt.key}
+                onSelect={() => setStage2Choice(opt.key)}
               >
-                <input
-                  type="radio"
-                  name="stage2"
-                  className="mt-1 accent-blue-500"
-                  checked={stage2Choice === opt.key}
-                  onChange={() => setStage2Choice(opt.key)}
-                />
-                <span className="text-sm leading-relaxed">{opt.text}</span>
-              </label>
+                {opt.text}
+              </Option>
             ))}
           </div>
         </div>
@@ -237,37 +249,24 @@ export function AnchorQuestionStep({
     return (
       <div className={PANEL}>
         <StageHeader anchorId={currentAnchor.anchor_id} stage={3} label="前提変化への判断更新" />
-        <div>
-          <h2 className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            新しい情報が入りました
-          </h2>
-          <div className="text-sm text-amber-50 bg-amber-950/25 p-4 rounded-lg border border-amber-800/40 leading-relaxed">
-            {currentAnchor.stage3.new_information}
-          </div>
-        </div>
-        <div className="space-y-3 pt-2">
-          <h3 className="text-sm font-semibold text-white">{currentAnchor.stage3.question}</h3>
-          <div className="space-y-2.5">
+        <Quoted label="新しい情報が入りました" tone="caution">
+          {currentAnchor.stage3.new_information}
+        </Quoted>
+        <div className="space-y-cell pt-1">
+          <h3 className="text-section text-ink">{currentAnchor.stage3.question}</h3>
+          <div className="space-y-2">
             {currentAnchor.stage3.scale.map((pt) => (
-              <label
+              <Option
                 key={pt.value}
-                className={`${OPTION_BASE} ${stage3Choice === pt.value ? OPTION_ON : OPTION_OFF}`}
+                name="stage3"
+                checked={stage3Choice === pt.value}
+                onSelect={() => setStage3Choice(pt.value)}
               >
-                <input
-                  type="radio"
-                  name="stage3"
-                  className="mt-1 accent-blue-500"
-                  checked={stage3Choice === pt.value}
-                  onChange={() => setStage3Choice(pt.value)}
-                />
-                <span className="text-sm leading-relaxed">
-                  <span className="font-mono text-slate-400 mr-2">
-                    {pt.value > 0 ? `+${pt.value}` : pt.value}
-                  </span>
-                  {pt.label}
+                <span className="mr-2 text-ink-3" data-numeric>
+                  {pt.value > 0 ? `+${pt.value}` : pt.value}
                 </span>
-              </label>
+                {pt.label}
+              </Option>
             ))}
           </div>
         </div>
@@ -287,45 +286,26 @@ export function AnchorQuestionStep({
     return (
       <div className={PANEL}>
         <StageHeader anchorId={currentAnchor.anchor_id} stage={4} label="反論への応答" />
-        <div>
-          <h2 className="text-xs font-semibold text-rose-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-            <MessageSquare className="w-3.5 h-3.5" />
-            AI同僚からの反論
-          </h2>
-          <div className="text-sm text-rose-50 bg-rose-950/25 p-4 rounded-lg border border-rose-800/40 leading-relaxed">
-            「{currentAnchor.stage3b.pushback}」
-          </div>
-        </div>
-        <div className="space-y-3 pt-2">
-          <h3 className="text-sm font-semibold text-white">{currentAnchor.stage3b.question}</h3>
-          <div className="space-y-2.5">
+        <Quoted label="AI同僚からの反論">「{currentAnchor.stage3b.pushback}」</Quoted>
+        <div className="space-y-cell pt-1">
+          <h3 className="text-section text-ink">{currentAnchor.stage3b.question}</h3>
+          <div className="space-y-2">
             {currentAnchor.stage3.scale.map((pt) => (
-              <label
+              <Option
                 key={pt.value}
-                className={`${OPTION_BASE} ${stage3bChoice === pt.value ? OPTION_ON : OPTION_OFF}`}
+                name="stage3b"
+                checked={stage3bChoice === pt.value}
+                onSelect={() => setStage3bChoice(pt.value)}
               >
-                <input
-                  type="radio"
-                  name="stage3b"
-                  className="mt-1 accent-blue-500"
-                  checked={stage3bChoice === pt.value}
-                  onChange={() => setStage3bChoice(pt.value)}
-                />
-                <span className="text-sm leading-relaxed">
-                  <span className="font-mono text-slate-400 mr-2">
-                    {pt.value > 0 ? `+${pt.value}` : pt.value}
-                  </span>
-                  {pt.label}
+                <span className="mr-2 text-ink-3" data-numeric>
+                  {pt.value > 0 ? `+${pt.value}` : pt.value}
                 </span>
-              </label>
+                {pt.label}
+              </Option>
             ))}
           </div>
         </div>
-        <NextButton
-          disabled={stage3bChoice === null}
-          onClick={onStage3bNext}
-          label="確信度評定へ"
-        />
+        <NextButton disabled={stage3bChoice === null} onClick={onStage3bNext} label="確信度評定へ" />
       </div>
     );
   }
@@ -339,50 +319,45 @@ export function AnchorQuestionStep({
           stage={currentAnchor.stage3b ? 5 : 4}
           label="確信度"
         />
-        <div className="flex items-center gap-2 text-indigo-400 font-semibold text-sm">
-          <HelpCircle className="w-5 h-5" />
-          <span>確信度の自己評定（5段階）</span>
+        <div className="space-y-1">
+          <p className="text-caption text-ink-3">確信度の自己評定（5段階）</p>
+          <h2 className="text-title text-ink">
+            {currentAnchor.confidence_scale ?? "ここまでの回答にどの程度自信がありますか"}
+          </h2>
         </div>
-        <h2 className="text-lg font-bold text-white">
-          {currentAnchor.confidence_scale ?? "ここまでの回答にどの程度自信がありますか"}
-        </h2>
-        <div className="grid grid-cols-5 gap-3 pt-2">
+        <div className="grid grid-cols-5 gap-2">
           {[1, 2, 3, 4, 5].map((val) => (
             <button
               key={val}
               onClick={() => setConfidence(val)}
-              className={`p-4 rounded-xl border text-center transition-all ${
+              className={cn(
+                "rounded-card border p-3 text-center transition-colors",
                 confidence === val
-                  ? "bg-blue-600 border-blue-500 text-white font-bold shadow-lg shadow-blue-500/20"
-                  : "bg-slate-950/50 border-slate-800 text-slate-300 hover:border-slate-700"
-              }`}
+                  ? "border-accent bg-accent-wash"
+                  : "border-line bg-surface hover:border-line-strong",
+              )}
             >
-              <div className="text-lg font-bold mb-1">{val}</div>
-              <div className="text-[10px] text-slate-400 leading-tight">
+              <span className="block text-title text-ink" data-numeric>
+                {val}
+              </span>
+              <span className="block text-caption text-ink-2">
                 {val === 1 && "全く自信なし"}
                 {val === 2 && "やや不安"}
                 {val === 3 && "普通"}
                 {val === 4 && "やや自信あり"}
                 {val === 5 && "非常に確信"}
-              </div>
+              </span>
             </button>
           ))}
         </div>
-        <div className="pt-6 flex justify-end">
-          <button
-            onClick={onAnchorSubmit}
-            disabled={isSubmitting}
-            className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50"
-          >
+        <div className="flex justify-end pt-2">
+          <Button variant="primary" onClick={onAnchorSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
-              <RefreshCw className="w-5 h-5 animate-spin" />
+              <RefreshCw className="h-4 w-4 animate-spin" aria-label="送信中" />
             ) : (
-              <>
-                アンカー回答を送信・記録する
-                <CheckCircle2 className="w-4 h-4" />
-              </>
+              "アンカー回答を送信・記録する"
             )}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -392,12 +367,11 @@ export function AnchorQuestionStep({
   if (currentStep === "anchor_complete" && currentAnchor) {
     return (
       <div className={PANEL}>
-        <div className="flex items-center gap-3 text-emerald-400">
-          <CheckCircle2 className="w-8 h-8" />
-          <div>
-            <h2 className="text-xl font-bold text-white">共通アンカー項目の記録が完了しました</h2>
-            <p className="text-xs text-slate-400">この区間は採点されません。結果も返りません。</p>
-          </div>
+        <div className="border-b border-line pb-3">
+          <h2 className="text-title tracking-tight text-ink">
+            共通アンカー項目の記録が完了しました
+          </h2>
+          <p className="text-caption text-ink-3">この区間は採点されません。結果も返りません。</p>
         </div>
 
         {/*
@@ -405,68 +379,63 @@ export function AnchorQuestionStep({
           受検者へ正誤やパネル分布を返すと、それ自体が学習材料になり、固定基準点である
           はずのアンカーが回を追うごとに動く（[D-83] のテストワイズネス）。
         */}
-        <div className="p-4 rounded-xl bg-slate-950/70 border border-dashed border-slate-700 text-xs text-slate-400 space-y-2">
-          <p className="font-semibold text-slate-300 flex items-center gap-2">
-            <FlaskConical className="w-4 h-4 text-indigo-400" />
+        <div className="space-y-2 rounded-card border border-dashed border-line-strong bg-surface-sunken p-4">
+          <p className="text-section text-ink">
             設計注記（プロトタイプ表示・受検者には出さない）
           </p>
-          <ul className="space-y-1 leading-relaxed list-disc list-inside">
+          <ul className="list-outside list-disc space-y-1 pl-4 text-caption text-ink-2">
             <li>
-              <span className="font-mono text-emerald-400">anchor_status = pretest</span> ／{" "}
-              <span className="font-mono">format_version = v2-sct</span>（尺度較正用・無得点運用）
+              <span className="font-mono text-ink">anchor_status = pretest</span> ／{" "}
+              <span className="font-mono text-ink">format_version = v2-sct</span>（尺度較正用・無得点運用）
             </li>
             <li>
               段階1・2 は決定論的キー、段階3 は専門家パネルの応答分布で採点する（正答鍵は無い）
             </li>
             <li>
               段階3のパネルは{" "}
-              <span className="font-mono">status = {currentAnchor.stage3.panel_status}</span>（n ={" "}
+              <span className="font-mono text-ink">status = {currentAnchor.stage3.panel_status}</span>（n ={" "}
               {currentAnchor.stage3.panel_n}）。
               {currentAnchor.stage3.panel_status === "mock" &&
                 " ダミー分布のため採点値は算出していない（[D-82] 決定3：技術判断の専門家10〜15名の組成が前提）。"}
             </li>
             <li>正誤もパネル分布も受検者へ返さない。返せば固定基準点そのものが動く</li>
             {currentAnchor.stage3b && (
-              <li className="text-rose-300/90">
-                この項目には<strong>段階3&apos;（新情報を含まない反論）</strong>が含まれる。
-                採点は<span className="font-mono">stage3b − stage3</span>の差分のみで、
-                <strong>専門家パネルを必要としない</strong>——0 なら圧力下での立場の保持、
-                提案側へ動けば迎合（過剰依存 P(R_accept | A_i)）である [D-83]
+              <li>
+                この項目には<strong className="font-semibold text-ink">段階3&apos;（新情報を含まない反論）</strong>
+                が含まれる。採点は<span className="font-mono text-ink">stage3b − stage3</span>の差分のみで、
+                <strong className="font-semibold text-ink">専門家パネルを必要としない</strong>——0
+                なら圧力下での立場の保持、提案側へ動けば迎合（過剰依存 P(R_accept | A_i)）である [D-83]
               </li>
             )}
             {bankSource && (
               <li>
-                バンク供給源: <span className="font-mono">{bankSource}</span>
+                バンク供給源: <span className="font-mono text-ink">{bankSource}</span>
               </li>
             )}
           </ul>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-sm text-slate-300 space-y-2">
-          <p className="font-semibold text-slate-200">🚀 次のステップへの案内:</p>
-          <p className="text-xs text-slate-400 leading-relaxed">
+        <div className="space-y-1.5 rounded-card border border-line bg-surface-sunken p-4">
+          <p className="text-section text-ink">次のステップへの案内:</p>
+          <p className="text-caption text-ink-2">
             共通アンカー項目は、全員に共通する「固定のものさし」として測定精度を担保する仕組みです。
             続けて別のアンカー項目を試すか、3ペイン画面による動的実務演習セッションへ進んでください。
           </p>
         </div>
 
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex flex-col items-stretch justify-between gap-3 pt-1 sm:flex-row sm:items-center">
           {onResetAnchorFlow && (
-            <button
-              onClick={onResetAnchorFlow}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-200 text-xs font-semibold transition-all"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-              <span>別のアンカー項目を試す</span>
-            </button>
+            <Button variant="secondary" onClick={onResetAnchorFlow}>
+              別のアンカー項目を試す
+            </Button>
           )}
-          <button
+          <Button
+            variant="primary"
             onClick={onStartDialogueSession}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/25 ml-auto text-xs"
+            className="text-caption sm:ml-auto"
           >
             実務演習セッションを体験する
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -475,40 +444,29 @@ export function AnchorQuestionStep({
   // --- スタンドアロン表示: アンカー項目選択 & 概念解説（未着手またはリセット時） ---
   return (
     <div className={PANEL}>
-      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20 text-blue-400">
-            <BookOpen className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-xs font-mono text-blue-400 uppercase tracking-wider">
-              IRT 項目応答理論 / 尺度等化モジュール
-            </span>
-            <h1 className="text-lg font-bold text-white">
-              共通アンカー項目評価（Standard Benchmark Anchor）
-            </h1>
-          </div>
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3">
+        <div className="space-y-0.5">
+          <p className="text-caption text-ink-3">IRT 項目応答理論 / 尺度等化モジュール</p>
+          <h1 className="text-title tracking-tight text-ink">
+            共通アンカー項目評価（Standard Benchmark Anchor）
+          </h1>
         </div>
-        <div className="text-right">
-          <span
-            data-testid="anchor-bank-source-badge"
-            className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/40"
-          >
+        <span data-testid="anchor-bank-source-badge">
+          <Badge tone="neutral">
             {bankSource === "operational_v2"
               ? "運用バンク"
               : bankSource === "demo_sample_v2"
               ? "公開デモ用サンプル"
               : "バンク読込済"}
-          </span>
-        </div>
+          </Badge>
+        </span>
       </div>
 
       {bankSource === "demo_sample_v2" && (
-        <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-800/50 text-xs text-amber-200/90 leading-relaxed space-y-1">
-          <div className="font-semibold text-amber-300 flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-            <span>出題する共通アンカー項目（全{anchorList.length}項目から選択）</span>
-          </div>
+        <div className="space-y-1 rounded-card border border-caution/25 bg-caution-wash p-3.5 text-caption text-ink-2">
+          <p className="font-semibold text-ink">
+            出題する共通アンカー項目（全{anchorList.length}項目から選択）
+          </p>
           <p>
             運用中の共通アンカー項目バンクは、受検者への事前露出を避けるため公開していません。
             ここではリポジトリ同梱の公開デモ用サンプルを表示しています。
@@ -517,71 +475,56 @@ export function AnchorQuestionStep({
         </div>
       )}
 
-      <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-900/30 text-xs text-slate-300 space-y-2 leading-relaxed">
-        <div className="font-semibold text-blue-300 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-blue-400" />
-          <span>共通アンカー項目とは何か（審査員・受講者向け解説）</span>
-        </div>
-        <p>
-          動的対話セッションでは受講者ごとに異なる会話が展開されるため、全員が同じ条件で答える<strong>「固定のものさし（共通アンカー）」</strong>を組み合わせて測定することで、異なる課題や評価回の間で公平に実力を比較（等化）します。
+      <div className="space-y-2 rounded-card border border-line bg-surface-sunken p-4 text-caption text-ink-2">
+        <p className="text-section text-ink">
+          共通アンカー項目とは何か（審査員・受講者向け解説）
         </p>
-        <p className="text-slate-400 text-[11px]">
-          本プロトタイプでは、医学教育の臨床推論評価で確立された<strong>SCT形式（Script Concordance Test）4段階構成</strong>を採用し、「全体判断（採用可否）&rarr; 懸念の所在 &rarr; 前提変化への適応（判断更新）&rarr; 反論への応答（迎合測定）」を段階的に開示して動的コンピテンシーを測定します。
+        <p>
+          動的対話セッションでは受講者ごとに異なる会話が展開されるため、全員が同じ条件で答える
+          <strong className="font-semibold text-ink">「固定のものさし（共通アンカー）」</strong>
+          を組み合わせて測定することで、異なる課題や評価回の間で公平に実力を比較（等化）します。
+        </p>
+        <p className="text-ink-3">
+          本プロトタイプでは、医学教育の臨床推論評価で確立された
+          <strong className="font-semibold text-ink-2">SCT形式（Script Concordance Test）4段階構成</strong>
+          を採用し、「全体判断（採用可否）&rarr; 懸念の所在 &rarr; 前提変化への適応（判断更新）&rarr;
+          反論への応答（迎合測定）」を段階的に開示して動的コンピテンシーを測定します。
         </p>
       </div>
 
-      <div className="space-y-3 pt-1">
-        <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-          <Layers className="w-3.5 h-3.5 text-blue-400" />
-          体験するアンカー項目を選択してください
-        </label>
+      <div className="space-y-row">
+        <p className="text-section text-ink">体験するアンカー項目を選択してください</p>
         <div className="space-y-2">
           {anchorList.map((item) => (
-            <label
+            <Option
               key={item.anchor_id}
-              className={`${OPTION_BASE} ${
-                selectedAnchorId === item.anchor_id ? OPTION_ON : OPTION_OFF
-              }`}
+              name="anchorItem"
+              value={item.anchor_id}
+              checked={selectedAnchorId === item.anchor_id}
+              onSelect={() => onSelectAnchorId?.(item.anchor_id)}
             >
-              <input
-                type="radio"
-                name="anchorItem"
-                value={item.anchor_id}
-                checked={selectedAnchorId === item.anchor_id}
-                onChange={() => onSelectAnchorId?.(item.anchor_id)}
-                className="mt-1 accent-blue-500"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="text-xs font-mono font-bold text-blue-400">
-                    {item.anchor_id}
-                  </span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                    {item.family}
-                  </span>
-                </div>
-                <div className="text-sm font-medium text-slate-200">{item.title}</div>
-              </div>
-            </label>
+              <span className="mb-1 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-data font-semibold text-ink-2">{item.anchor_id}</span>
+                <Badge tone="neutral">{item.family}</Badge>
+              </span>
+              <span className="block text-body font-medium text-ink">{item.title}</span>
+            </Option>
           ))}
         </div>
       </div>
 
-      <div className="pt-4 flex justify-end">
-        <button
+      <div className="flex justify-end pt-2">
+        <Button
+          variant="primary"
           onClick={onStartAnchorFlow}
           disabled={!selectedAnchorId || isSubmitting}
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:from-blue-500 hover:to-indigo-500 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed text-xs"
         >
           {isSubmitting ? (
-            <RefreshCw className="w-4 h-4 animate-spin" />
+            <RefreshCw className="h-4 w-4 animate-spin" aria-label="読み込み中" />
           ) : (
-            <>
-              このアンカー項目を体験する（4段階疑似対話を開始）
-              <ArrowRight className="w-4 h-4" />
-            </>
+            "このアンカー項目を体験する（4段階疑似対話を開始）"
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );

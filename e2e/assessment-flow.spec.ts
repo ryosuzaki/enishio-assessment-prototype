@@ -415,7 +415,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     const focusInput = page.getByPlaceholder("検証対象とするコード断片・キーワード");
     await focusInput.fill("redis.get(merchantId)");
     await page.getByRole("button", { name: "検証パネルへ追加" }).click();
-    await expect(page.locator("span.bg-purple-500\\/20", { hasText: "#1" })).toBeVisible();
+    // 見た目のクラス名ではなく testid で掴む（配色はデザイン移行で変わるため。[D-101]）
+    await expect(page.getByTestId("focus-item-seq").filter({ hasText: "#1" })).toBeVisible();
     await expect(page.getByText("redis.get(merchantId)")).toBeVisible();
 
     // 場面3 前提変化：**受講者が発生させるボタンは存在しない** [D-100]

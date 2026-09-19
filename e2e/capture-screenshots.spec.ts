@@ -216,7 +216,9 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
   test("全STEPのUIスクリーンショットをdocs/screenshots/へ高解像度出力する", async ({ page }) => {
     // 01. 初期画面 (Init Step)
     await page.goto("/");
-    await expect(page.locator("h1")).toContainText("動的実務演習セッション（AI同僚協働・レビュー対話）");
+    // 見出しと副題は別の行に分けてある（`[D-102]`：h1 に括弧付きの長い副題を抱かせない）
+    await expect(page.locator("h1")).toContainText("動的実務演習セッション");
+    await expect(page.getByText("AI同僚協働・レビュー対話")).toBeVisible();
     await expect(page.getByText("Live Telemetry Monitor")).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
@@ -302,11 +304,12 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     const focusInput = page.getByPlaceholder("検証対象とするコード断片・キーワード");
     await focusInput.fill("redis.get(merchantId)");
     await page.getByRole("button", { name: "検証パネルへ追加" }).click();
-    await expect(page.locator("span.bg-purple-500\\/20", { hasText: "#1" })).toBeVisible();
+    // 見た目のクラス名ではなく testid で掴む（配色はデザイン移行で変わるため。[D-101]）
+    await expect(page.getByTestId("focus-item-seq").filter({ hasText: "#1" })).toBeVisible();
 
     await focusInput.fill("merchant.pci_dss_compliant");
     await page.getByRole("button", { name: "検証パネルへ追加" }).click();
-    await expect(page.locator("span.bg-purple-500\\/20", { hasText: "#2" })).toBeVisible();
+    await expect(page.getByTestId("focus-item-seq").filter({ hasText: "#2" })).toBeVisible();
 
     // AI同僚へメッセージ送信
     const promptInput = page.getByPlaceholder(/AI同僚に指示・指摘を入力/);

@@ -34,6 +34,11 @@ jobs:
       - name: TypeScript typecheck
         run: npx tsc --noEmit
 
+      # 移行済みUIに装飾（グラデーション・色付きの影・既定パレット直指定など）が
+      # 混入していないかの回帰チェック。決め事は .claude/skills/ui-design/SKILL.md。
+      - name: Check UI design tokens
+        run: npm run check:ui
+
       - name: Run unit tests (Vitest)
         run: npm run test
 

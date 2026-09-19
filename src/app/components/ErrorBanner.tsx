@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertOctagon, X } from "lucide-react";
+import { X } from "lucide-react";
 
 interface ErrorBannerProps {
   message: string | null;
@@ -23,19 +23,18 @@ export function ErrorBanner({ message, onDismiss }: ErrorBannerProps) {
     <div
       role="alert"
       data-testid="error-banner"
-      className="flex items-start gap-3 p-4 rounded-xl bg-red-950/40 border border-red-900/60 shadow-lg"
+      className="flex items-start gap-3 rounded-card border border-critical/30 bg-critical-wash px-4 py-3"
     >
-      <AlertOctagon className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-      <p className="flex-1 text-sm text-red-200 leading-relaxed whitespace-pre-wrap break-words">
+      <p className="flex-1 whitespace-pre-wrap break-words text-body text-critical">
         {message}
       </p>
       <button
         type="button"
         onClick={onDismiss}
         aria-label="エラー表示を閉じる"
-        className="shrink-0 p-1 rounded-lg text-red-300 hover:text-red-100 hover:bg-red-900/40 transition-colors"
+        className="shrink-0 rounded-chip p-1 text-critical/70 transition-colors hover:bg-critical/10 hover:text-critical"
       >
-        <X className="w-4 h-4" />
+        <X className="h-4 w-4" />
       </button>
     </div>
   );

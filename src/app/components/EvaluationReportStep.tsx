@@ -2,17 +2,6 @@
 
 import React from "react";
 import {
-  AlertCircle,
-  AlertTriangle,
-  HelpCircle,
-  CheckCircle2,
-  Scale,
-  ArrowRightLeft,
-  Anchor,
-  Award,
-  ChevronRight,
-} from "lucide-react";
-import {
   DISAGREEMENT_OPTIONS,
   isRetiredBankSource,
   type AnchorBankSourceView,
@@ -20,6 +9,7 @@ import {
   type EvidenceComponent,
   type ChatMessage,
 } from "../types";
+import { Badge, Button, Card, cn, thresholdTone, toneChip } from "./ui";
 
 interface EvaluationReportStepProps {
   evaluation: EvaluationResult;
@@ -83,11 +73,13 @@ function renderChatContentWithHighlights(
       <mark
         key={`hl-${idx}`}
         title={`${r.comp.component_type} / ${r.comp.rationale_summary}`}
-        className={
-          isFlawLinked
-            ? "bg-emerald-500/25 text-emerald-100 rounded px-0.5 not-italic"
-            : "bg-indigo-500/20 text-indigo-100 rounded px-0.5 not-italic"
-        }
+        className={cn(
+          "rounded-chip px-0.5 not-italic text-ink",
+          // 2 種のハイライトは「どの検証行動か」の区別であり、良し悪しの評価ではない。
+          // 同じ色の濃淡違いでは並べたときに見分けがつかなかったため、
+          // 仕込み不備に対応するものだけがアクセントを持ち、他は無彩色で沈める。
+          isFlawLinked ? "bg-accent/20" : "bg-line-strong/50",
+        )}
       >
         {content.slice(r.start, r.end)}
       </mark>
@@ -98,6 +90,16 @@ function renderChatContentWithHighlights(
     nodes.push(content.slice(cursor));
   }
   return nodes;
+}
+
+/** 4領域の観測サマリー1枚。領域ごとに色を割り当てない（[D-101]）。 */
+function AxisCell({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1 rounded-chip border border-line bg-surface p-2.5">
+      <p className="text-section text-ink">{title}</p>
+      <p className="text-caption text-ink-2">{children}</p>
+    </div>
+  );
 }
 
 export function EvaluationReportStep({
@@ -121,6 +123,10 @@ export function EvaluationReportStep({
   onResetToInit,
   onViewBenchmarkGallery,
 }: EvaluationReportStepProps) {
+  /**
+   * 事前の採否判断と、AI が抽出した検証行動が噛み合っているか。
+   * **CFF 画面で最初に見るべきはここ**なので、文章だけでなく面の色でも示す。
+   */
   const components = evaluation?.evidenceComponents ?? [];
   const matchedFlaws = Array.from(
     new Set(
@@ -130,50 +136,52 @@ export function EvaluationReportStep({
     )
   );
 
+  const isJudgementConsistent =
+    (prelimAction === "remand" && matchedFlaws.length > 0) ||
+    (prelimAction === "comment" && matchedFlaws.length > 0) ||
+    (prelimAction === "approve" && matchedFlaws.length === 0);
+
   return (
-    <div className="glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/70 shadow-2xl space-y-6">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-        <div className="flex items-center gap-3">
-          <div
-            className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-white text-lg ${
+    <div className="space-y-block">
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
+        <div className="flex items-start gap-3">
+          <span
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-card border text-title",
               evaluation.isPendingHumanReview
-                ? "bg-slate-700"
-                : "bg-gradient-to-tr from-emerald-500 to-teal-500"
-            }`}
+                ? "border-line-strong bg-surface-sunken text-ink-2"
+                : Number(evaluation.ratingCategory) >= 4
+                  ? "border-positive bg-positive text-white"
+                  : Number(evaluation.ratingCategory) >= 3
+                    ? "border-accent bg-accent text-white"
+                    : "border-caution bg-caution text-white",
+            )}
+            data-numeric
           >
             {evaluation.isPendingHumanReview ? "—" : evaluation.ratingCategory}
-          </div>
-          <div>
-            <span className="text-xs font-mono text-emerald-400 uppercase tracking-wider">
-              AutoSCORE 2段階評価結果（XAIレポート）
-            </span>
-            <h2 className="text-lg font-bold text-white">
-              {evaluation.isPendingHumanReview
-                ? "評点保留（人間の確認待ち）"
-                : evaluation.levelLabel}
+          </span>
+          <div className="space-y-0.5">
+            <p className="text-caption text-ink-3">AutoSCORE 2段階評価結果（XAIレポート）</p>
+            <h2 className="text-title tracking-tight text-ink">
+              {evaluation.isPendingHumanReview ? "評点保留（人間の確認待ち）" : evaluation.levelLabel}
             </h2>
           </div>
         </div>
-        <span className="text-xs font-mono px-2.5 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">
-          {evaluation.scorerModelVersion}
-        </span>
-      </div>
+        <span className="font-mono text-data text-ink-3">{evaluation.scorerModelVersion}</span>
+      </header>
 
       {/* 暫定値ラベル [D-22]。スコア表示には必ず併記する */}
       {evaluation.isPendingHumanReview ? (
-        <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-600 space-y-1.5">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
-            <AlertCircle className="w-4 h-4 text-slate-400" />
-            この判定は確定していません
-          </div>
-          <p className="text-[11px] text-slate-400 leading-relaxed">
+        <div className="space-y-1.5 rounded-card border border-line-strong bg-surface-sunken p-4">
+          <p className="text-section text-ink">この判定は確定していません</p>
+          <p className="text-caption text-ink-2">
             採点器の確信度が閾値（{evaluation.confidenceThreshold.toFixed(2)}）を下回ったため（
-            {evaluation.scoringConfidence.toFixed(2)}）、バンドを確定させず
-            `rater_type = pending_human` として記録しました。評点は人間の評価者が確認してから確定します。
+            {evaluation.scoringConfidence.toFixed(2)}）、バンドを確定させず `rater_type = pending_human`
+            として記録しました。評点は人間の評価者が確認してから確定します。
           </p>
           {evaluation.isDemoThresholdOverride && (
             <p
-              className="text-[10px] text-slate-500 leading-relaxed border-t border-slate-700/60 pt-1.5"
+              className="border-t border-line pt-1.5 text-caption text-ink-3"
               data-testid="demo-threshold-override-note"
             >
               ※ この閾値は `HITL_DEMO_CONFIDENCE_THRESHOLD` によりデモ用に引き上げられています。
@@ -182,16 +190,21 @@ export function EvaluationReportStep({
           )}
         </div>
       ) : (
-        <div className="p-4 rounded-xl bg-amber-950/25 border border-amber-900/40 space-y-1.5">
-          <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-            <AlertTriangle className="w-4 h-4" />
+        <div className="space-y-1.5 rounded-card border border-caution/30 bg-caution-wash p-4">
+          <p className="text-section text-ink">
             これは開発中の推定器による「暫定値」です
-          </div>
-          <p className="text-[11px] text-amber-200/80 leading-relaxed">
+          </p>
+          <p className="text-caption text-ink-2">
             妥当性は未検証であり、能力の確定的な評価ではありません。ルーブリックの行動記述に対する位置づけであって、
             他者との比較・序列ではありません。判定に納得できない場合は下の異議申立からお知らせください
             （申立の有無は評点に影響しません）。
-            <span className="ml-1 font-mono text-amber-200/60">
+            <span
+              className={cn(
+                "ml-1 font-semibold",
+                toneChip(thresholdTone(evaluation.scoringConfidence, { good: 0.8, poor: 0.6 })),
+              )}
+              data-numeric
+            >
               確信度 {evaluation.scoringConfidence.toFixed(2)}
             </span>
           </p>
@@ -199,260 +212,245 @@ export function EvaluationReportStep({
       )}
 
       {/* 共通アンカー課題（別の測定量・並置提示） [D-60, P-16] */}
-      <div
-        className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-4"
-        data-testid="anchor-parallel-report-block"
-      >
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Anchor className="w-4 h-4 text-blue-400" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              共通アンカー課題（別の測定量・並置提示）
-            </h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/40">
-              固定刺激（無得点記録・尺度較正用）
+      <div data-testid="anchor-parallel-report-block">
+        <Card
+          title="共通アンカー課題（別の測定量・並置提示）"
+          meta={
+            <span className="flex flex-wrap items-center gap-2">
+              <Badge tone="accent">固定刺激（無得点記録・尺度較正用）</Badge>
+              {anchorStatus && <Badge tone="neutral">status: {anchorStatus}</Badge>}
             </span>
-            {anchorStatus && (
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                status: {anchorStatus}
-              </span>
-            )}
-          </div>
-        </div>
+          }
+        >
+          <div className="space-y-cell">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3">
+                <p className="text-caption text-ink-3">出題項目 ID / 供給源</p>
+                <p className="flex flex-wrap items-center gap-1.5 font-mono text-data font-semibold text-ink">
+                  <span>{anchorId || "—"}</span>
+                  <Badge tone={isRetiredBankSource(bankSource ?? null) ? "caution" : "neutral"}>
+                    {bankSource === "operational_v2"
+                      ? "運用バンク (v2-sct)"
+                      : bankSource === "demo_sample_v2"
+                      ? "公開デモ用サンプル (v2-sct)"
+                      : isRetiredBankSource(bankSource ?? null)
+                      ? "退役形式 (v1-static)"
+                      : "項目バンク"}
+                  </Badge>
+                </p>
+              </div>
+              <div className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3">
+                <p className="text-caption text-ink-3">受検者回答（段階1〜3）</p>
+                <p className="text-data font-semibold text-ink" data-numeric>
+                  1: {stage1Choice || "—"} ／ 2: {stage2Choice || "—"} ／ 3:{" "}
+                  {stage3Choice === null || stage3Choice === undefined
+                    ? "—"
+                    : stage3Choice > 0
+                    ? `+${stage3Choice}`
+                    : String(stage3Choice)}
+                </p>
+              </div>
+              <div className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3">
+                <p className="text-caption text-ink-3">自己評定確信度</p>
+                <p className="text-data font-semibold text-ink" data-numeric>
+                  {confidence ? `${confidence} / 5` : "—"}
+                  <span className="ml-1.5 font-sans text-caption font-normal text-ink-2">
+                    (
+                    {confidence === 1
+                      ? "全く自信なし"
+                      : confidence === 2
+                      ? "やや不安"
+                      : confidence === 3
+                      ? "普通"
+                      : confidence === 4
+                      ? "やや自信あり"
+                      : confidence === 5
+                      ? "非常に確信"
+                      : ""}
+                    )
+                  </span>
+                </p>
+              </div>
+            </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
-            <span className="text-[10px] text-slate-500 block">出題項目 ID / 供給源</span>
-            <div className="font-mono text-slate-200 font-semibold flex items-center gap-1.5 flex-wrap">
-              <span>{anchorId || "—"}</span>
-              <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                {bankSource === "operational_v2"
-                  ? "運用バンク (v2-sct)"
-                  : bankSource === "demo_sample_v2"
-                  ? "公開デモ用サンプル (v2-sct)"
-                  : isRetiredBankSource(bankSource ?? null)
-                  ? "⚠️ 退役形式 (v1-static)"
-                  : "項目バンク"}
-              </span>
+            <div className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3.5 text-caption text-ink-2">
+              <p className="text-section text-ink">
+                尺度連結および並置提示に関する設計上の原則（[P-16] [D-60]）
+              </p>
+              <p>
+                共通アンカー課題は<strong className="font-semibold text-ink">固定刺激</strong>であり、
+                <strong className="font-semibold text-ink">対話セッションの評点とは別の測定量</strong>
+                です。両者を同一尺度へ等化・合算していません。 &theta; 尺度の較正には項目バンク全体で{" "}
+                <span className="text-ink">N &ge; 150〜200</span>{" "}
+                の応答が必要であり、
+                <strong className="font-semibold text-ink">本プロトタイプでは &theta; を算出していません</strong>。
+              </p>
             </div>
           </div>
-          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
-            <span className="text-[10px] text-slate-500 block">受検者回答（段階1〜3）</span>
-            <div className="font-mono text-slate-200 font-semibold text-[11px]">
-              1: <span className="text-blue-400">{stage1Choice || "—"}</span> ／ 2:{" "}
-              <span className="text-indigo-400">{stage2Choice || "—"}</span> ／ 3:{" "}
-              <span className="text-amber-400">
-                {stage3Choice === null || stage3Choice === undefined
-                  ? "—"
-                  : stage3Choice > 0
-                  ? `+${stage3Choice}`
-                  : String(stage3Choice)}
-              </span>
-            </div>
-          </div>
-          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
-            <span className="text-[10px] text-slate-500 block">自己評定確信度</span>
-            <div className="font-mono text-slate-200 font-semibold">
-              {confidence ? `${confidence} / 5` : "—"}
-              <span className="text-[10px] font-normal text-slate-400 ml-1.5">
-                ({confidence === 1 ? "全く自信なし" : confidence === 2 ? "やや不安" : confidence === 3 ? "普通" : confidence === 4 ? "やや自信あり" : confidence === 5 ? "非常に確信" : ""})
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-900/30 text-[11px] text-slate-400 space-y-1 leading-relaxed">
-          <div className="flex items-center gap-1.5 text-blue-300 font-semibold text-xs">
-            <AlertCircle className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-            <span>尺度連結および並置提示に関する設計上の原則（[P-16] [D-60]）</span>
-          </div>
-          <p>
-            共通アンカー課題は<strong>固定刺激</strong>であり、<strong>対話セッションの評点とは別の測定量</strong>です。両者を同一尺度へ等化・合算していません。
-            &theta; 尺度の較正には項目バンク全体で <span className="font-mono text-slate-300">N &ge; 150〜200</span> の応答が必要であり、<strong>本プロトタイプでは &theta; を算出していません</strong>。
-          </p>
-        </div>
+        </Card>
       </div>
 
       {/* CFF Discrepancy Highlighting [MVP 2.5, Buçinca et al. 2021, D-80] */}
-      <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-900/40 space-y-3" data-testid="discrepancy-highlighting-block">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Scale className="w-4 h-4 text-purple-400" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              認知強制機能（CFF）：事前採否判断とAI検証結果の対照
-            </h3>
-          </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/40">
-            Discrepancy Highlighting
-          </span>
-        </div>
-
-        {/* 採否判断 vs 抽出された検証行動 */}
-        <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
-          <div className="text-[11px] font-bold text-slate-300">
-            採否判断と抽出された検証行動の対照
-          </div>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-800/80">
-              <span className="text-[11px] text-slate-400">受講者の事前採否判断（Force Decision First）:</span>
-              <span
-                className={`font-bold font-mono text-[11px] px-2 py-0.5 rounded ${
-                  prelimAction === "approve"
-                    ? "bg-emerald-950 text-emerald-300 border border-emerald-800/50"
-                    : prelimAction === "remand"
-                    ? "bg-rose-950 text-rose-300 border border-rose-800/50"
-                    : prelimAction === "comment"
-                    ? "bg-sky-950 text-sky-300 border border-sky-800/50"
-                    : "text-slate-400"
-                }`}
-                data-testid="prelim-action-display"
+      <div data-testid="discrepancy-highlighting-block">
+        <Card
+          title="認知強制機能（CFF）：事前採否判断とAI検証結果の対照"
+          meta={<Badge tone="neutral">Discrepancy Highlighting</Badge>}
+        >
+          <div className="space-y-cell">
+            {/* 採否判断 vs 抽出された検証行動 */}
+            <div className="space-y-2 rounded-chip border border-line bg-surface-sunken p-3.5">
+              <p className="text-section text-ink">採否判断と抽出された検証行動の対照</p>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3 rounded-chip border border-line bg-surface p-2">
+                  <span className="text-caption text-ink-2">
+                    受講者の事前採否判断（Force Decision First）:
+                  </span>
+                  <span
+                    className="text-data font-semibold text-ink"
+                    data-testid="prelim-action-display"
+                  >
+                    {prelimAction === "approve"
+                      ? "承認 (Approve)"
+                      : prelimAction === "remand"
+                      ? "修正要求 (Request Changes)"
+                      : prelimAction === "comment"
+                      ? "条件付き承認 (Comment)"
+                      : "未選択"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-chip border border-line bg-surface p-2">
+                  <span className="text-caption text-ink-2">抽出された不備指摘:</span>
+                  <span className="text-data text-ink" data-testid="matched-flaws-count" data-numeric>
+                    {matchedFlaws.length > 0
+                      ? `${matchedFlaws.length}件 (${matchedFlaws.join(", ")})`
+                      : "0件"}
+                  </span>
+                </div>
+              </div>
+              <p
+                className={cn(
+                  "rounded-chip border px-cell py-2 text-caption",
+                  isJudgementConsistent
+                    ? "border-positive/25 bg-positive-wash text-ink"
+                    : "border-caution/30 bg-caution-wash text-ink",
+                )}
+                data-testid="action-collate-message"
               >
-                {prelimAction === "approve"
-                  ? "承認 (Approve)"
-                  : prelimAction === "remand"
-                  ? "修正要求 (Request Changes)"
-                  : prelimAction === "comment"
-                  ? "条件付き承認 (Comment)"
-                  : "未選択"}
-              </span>
+                {prelimAction === "approve" && matchedFlaws.length > 0
+                  ? `受講者はドラフトを「承認」と判断しましたが、対話ログからは仕込み不備（${matchedFlaws.join(", ")}）に対応する検証行動が抽出されています。`
+                  : prelimAction === "remand" && matchedFlaws.length > 0
+                  ? `受講者の「修正要求」判断と、AI採点器が抽出した仕込み不備（${matchedFlaws.join(", ")}）への検証行動が対応しています。`
+                  : prelimAction === "comment" && matchedFlaws.length > 0
+                  ? `受講者は「条件付き承認」と判断し、不備（${matchedFlaws.join(", ")}）への検証行動を踏まえて追加条件付きでのリリースを指示しています。`
+                  : prelimAction === "comment" && matchedFlaws.length === 0
+                  ? "受講者は「条件付き承認」と判断しましたが、仕込み不備に対する直接の検証行動は抽出されませんでした。"
+                  : prelimAction === "remand" && matchedFlaws.length === 0
+                  ? "受講者は「修正要求」と判断しましたが、仕込み不備に対する直接の検証行動は抽出されませんでした。"
+                  : "受講者の「承認」判断と、不備指摘の非抽出状態が一致しています。"}
+              </p>
             </div>
-            <div className="flex justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-800/80">
-                <span className="text-[11px] text-slate-400">抽出された不備指摘:</span>
-                <span className="font-mono text-[11px] text-slate-200" data-testid="matched-flaws-count">
-                  {matchedFlaws.length > 0 ? `${matchedFlaws.length}件 (${matchedFlaws.join(", ")})` : "0件"}
-                </span>
+
+            {/* 動的コンピテンシー4領域の観測サマリー */}
+            <div className="space-y-2 rounded-chip border border-line bg-surface-sunken p-3.5">
+              <p className="text-section text-ink">
+                動的コンピテンシー 4領域の観測サマリー（提案書準拠）
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <AxisCell title="① 評価的判断力 (Evaluative Judgement)">
+                  仕込み不備検出:{" "}
+                  <span
+                    className={cn(
+                      "font-semibold",
+                      matchedFlaws.length > 0 ? "text-positive" : "text-caution",
+                    )}
+                    data-numeric
+                  >
+                    {matchedFlaws.length}件
+                  </span>
+                  {matchedFlaws.length > 0 ? ` (${matchedFlaws.join(", ")})` : " (検出なし)"}
+                </AxisCell>
+                <AxisCell title="② 高次認知・動的思考 (Higher-Order Reasoning)">
+                  前提トレードオフの言語化と、過剰指摘の回避（正常箇所の正当な弁別）
+                </AxisCell>
+                <AxisCell title="③ 対話的共創力 (Collaborative Co-Creation)">
+                  AI同僚への建設的指示。対話ターン数{" "}
+                  <span className="font-semibold text-ink" data-numeric>
+                    {chatHistory.filter((m) => m.role === "user").length}ターン
+                  </span>
+                </AxisCell>
+                <AxisCell title="④ メタ認知・適応力 (Metacognition &amp; Adaptability)">
+                  緊急仕様変更（前提変化）への適応と、反論への応答（迎合回避）
+                </AxisCell>
               </div>
             </div>
-            <p className="text-[11px] text-slate-400 px-1 pt-1 leading-relaxed" data-testid="action-collate-message">
-              {prelimAction === "approve" && matchedFlaws.length > 0
-                ? `受講者はドラフトを「承認」と判断しましたが、対話ログからは仕込み不備（${matchedFlaws.join(", ")}）に対応する検証行動が抽出されています。`
-                : prelimAction === "remand" && matchedFlaws.length > 0
-                ? `受講者の「修正要求」判断と、AI採点器が抽出した仕込み不備（${matchedFlaws.join(", ")}）への検証行動が対応しています。`
-                : prelimAction === "comment" && matchedFlaws.length > 0
-                ? `受講者は「条件付き承認」と判断し、不備（${matchedFlaws.join(", ")}）への検証行動を踏まえて追加条件付きでのリリースを指示しています。`
-                : prelimAction === "comment" && matchedFlaws.length === 0
-                ? "受講者は「条件付き承認」と判断しましたが、仕込み不備に対する直接の検証行動は抽出されませんでした。"
-                : prelimAction === "remand" && matchedFlaws.length === 0
-                ? "受講者は「修正要求」と判断しましたが、仕込み不備に対する直接の検証行動は抽出されませんでした。"
-                : "受講者の「承認」判断と、不備指摘の非抽出状態が一致しています。"}
-            </p>
-          </div>
 
-        {/* 動的コンピテンシー4領域の観測サマリー */}
-        <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
-          <div className="text-[11px] font-bold text-slate-300">
-            動的コンピテンシー 4領域の観測サマリー（提案書準拠）
+            {prelimJustification && (
+              <div
+                className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3"
+                data-testid="prelim-justification-display"
+              >
+                <p className="text-caption text-ink-3">
+                  受講者の事前理由記述（Mandatory Justification）:
+                </p>
+                <p className="border-l-2 border-l-line-strong pl-2 text-caption text-ink">
+                  &quot;{prelimJustification}&quot;
+                </p>
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 space-y-1">
-              <span className="text-[10px] font-semibold text-emerald-400 block">
-                ① 評価的判断力 (Evaluative Judgement)
-              </span>
-              <p className="text-[11px] text-slate-300">
-                仕込み不備検出: <span className="font-mono text-emerald-300 font-bold">{matchedFlaws.length}件</span>
-                {matchedFlaws.length > 0 ? ` (${matchedFlaws.join(", ")})` : " (検出なし)"}
-              </p>
-            </div>
-            <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 space-y-1">
-              <span className="text-[10px] font-semibold text-indigo-400 block">
-                ② 高次認知・動的思考 (Higher-Order Reasoning)
-              </span>
-              <p className="text-[11px] text-slate-300">
-                前提トレードオフ言語化 &bull; 過剰指摘の回避（正常箇所の正当な弁別）
-              </p>
-            </div>
-            <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 space-y-1">
-              <span className="text-[10px] font-semibold text-sky-400 block">
-                ③ 対話的共創力 (Collaborative Co-Creation)
-              </span>
-              <p className="text-[11px] text-slate-300">
-                AI同僚への建設的指示 &bull; 対話ターン数: <span className="font-mono text-sky-300 font-bold">{chatHistory.filter(m => m.role === "user").length}ターン</span>
-              </p>
-            </div>
-            <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 space-y-1">
-              <span className="text-[10px] font-semibold text-purple-400 block">
-                ④ メタ認知・適応力 (Metacognition & Adaptability)
-              </span>
-              <p className="text-[11px] text-slate-300">
-                緊急仕様変更（前提変化）への適応 &bull; 反論への応答（迎合回避）
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {prelimJustification && (
-          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-300 space-y-1" data-testid="prelim-justification-display">
-            <span className="text-[10px] text-slate-400 font-mono block">受講者の事前理由記述（Mandatory Justification）:</span>
-            <p className="italic text-slate-200 pl-1 leading-relaxed">&quot;{prelimJustification}&quot;</p>
-          </div>
-        )}
+        </Card>
       </div>
 
       {/* Rationale & Feedback */}
-      <div className="space-y-4">
-        <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-            判定根拠（Evidence Summary）
-          </h3>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            {evaluation.evidenceSummary}
-          </p>
-        </div>
+      <div className="space-y-block">
+        <Card title="判定根拠（Evidence Summary）">
+          <p className="text-caption text-ink-2">{evaluation.evidenceSummary}</p>
+        </Card>
 
-        <div className="p-4 rounded-xl bg-blue-950/30 border border-blue-900/40 space-y-2">
-          <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider">
-            形成的診断アドバイス（Diagnostic Feedback）
-          </h3>
-          <p className="text-xs text-blue-200/90 leading-relaxed">
-            {evaluation.diagnosticFeedback}
-          </p>
-        </div>
+        <Card title="形成的診断アドバイス（Diagnostic Feedback）">
+          <p className="text-caption text-ink-2">{evaluation.diagnosticFeedback}</p>
+        </Card>
 
         {evaluation.probeConsistency && (
-          <div
-            className="p-4 rounded-xl bg-cyan-950/25 border border-cyan-900/40 space-y-2"
-            data-testid="probe-consistency-block"
-          >
-            <h3 className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
-              深掘りへの応答の一貫性（Probe Consistency）
-            </h3>
-            {evaluation.probeConsistency.score === null ? (
-              <p className="text-xs text-cyan-200/70 leading-relaxed italic">
-                このセッションでは深掘り（ソクラテス型深掘り・What-if注入）が発生しなかったため、
-                判定対象がありません。
-              </p>
-            ) : (
-              <>
-                <p className="text-xs text-cyan-200/90 font-mono">
-                  {evaluation.probeConsistency.score.toFixed(2)}
+          <div data-testid="probe-consistency-block">
+            <Card title="深掘りへの応答の一貫性（Probe Consistency）">
+              {evaluation.probeConsistency.score === null ? (
+                <p className="text-caption text-ink-2">
+                  このセッションでは深掘り（ソクラテス型深掘り・What-if注入）が発生しなかったため、
+                  判定対象がありません。
                 </p>
-                <p className="text-xs text-cyan-200/80 leading-relaxed">
-                  {evaluation.probeConsistency.rationale}
-                </p>
-              </>
-            )}
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-section text-ink" data-numeric>
+                    {evaluation.probeConsistency.score.toFixed(2)}
+                  </p>
+                  <p className="text-caption text-ink-2">
+                    {evaluation.probeConsistency.rationale}
+                  </p>
+                </div>
+              )}
+            </Card>
           </div>
         )}
       </div>
 
       {/* Dialogue Log with Evidence Highlights [根拠ハイライト] */}
-      <div className="space-y-3 pt-2">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-          対話ログ（根拠ハイライト付き）
-        </h3>
-        <p className="text-[10px] text-slate-500 flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block w-3 h-3 rounded-sm bg-emerald-500/25 border border-emerald-500/40" />
-            仕込み不備・正常箇所に対応する検証行動
+      <Card
+        title="対話ログ（根拠ハイライト付き）"
+        description={
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-3 w-3 rounded-chip border border-accent/35 bg-accent/20" />
+              仕込み不備・正常箇所に対応する検証行動
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-3 w-3 rounded-chip border border-line-strong bg-line-strong/50" />
+              それ以外の一般的な検証行動
+            </span>
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block w-3 h-3 rounded-sm bg-indigo-500/20 border border-indigo-500/40" />
-            それ以外の一般的な検証行動
-          </span>
-        </p>
-        <div className="space-y-3 max-h-96 overflow-y-auto pr-2 bg-slate-950/60 border border-slate-800 rounded-xl p-4">
+        }
+      >
+        <div className="max-h-96 space-y-cell overflow-y-auto pr-2">
           {chatHistory.map((msg, i) => {
             const turnComponents = evaluation.evidenceComponents.filter(
               (c) => c.turn_index === msg.turnSeq
@@ -466,25 +464,28 @@ export function EvaluationReportStep({
             return (
               <div
                 key={i}
-                className={`flex flex-col ${
+                className={cn(
+                  "flex flex-col",
                   msg.role === "user"
                     ? "items-end"
                     : msg.role === "mediator"
                       ? "items-center"
-                      : "items-start"
-                }`}
+                      : "items-start",
+                )}
               >
-                <div className="text-[10px] text-slate-500 mb-1 font-mono">
-                  {speakerLabel} ・ Turn {msg.turnSeq}
-                </div>
+                <span className="mb-1 flex items-baseline gap-2 text-label text-ink-3">
+                  <span>{speakerLabel}</span>
+                  <span data-numeric>Turn {msg.turnSeq}</span>
+                </span>
                 <div
-                  className={`max-w-[90%] p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
+                  className={cn(
+                    "max-w-[90%] whitespace-pre-wrap rounded-card border p-3 text-caption",
                     msg.role === "user"
-                      ? "bg-blue-600/90 text-white rounded-tr-sm"
+                      ? "border-accent/40 bg-accent-wash text-ink"
                       : msg.role === "mediator"
-                        ? "bg-cyan-950/40 text-cyan-100 border border-cyan-800/50 italic"
-                        : "bg-slate-800/90 text-slate-100 rounded-tl-sm border border-slate-700/60"
-                  }`}
+                        ? "border-dashed border-line-strong bg-surface-sunken text-ink-2"
+                        : "border-line bg-surface-sunken text-ink",
+                  )}
                 >
                   {renderChatContentWithHighlights(msg.content, turnComponents)}
                 </div>
@@ -492,63 +493,48 @@ export function EvaluationReportStep({
             );
           })}
         </div>
-      </div>
+      </Card>
 
       {/* Evidence Components Highlight Spans */}
-      <div className="space-y-3 pt-2">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-          抽出された受講者の検証行動スパン（Stage 1 構造化出力）
-        </h3>
-        <div className="space-y-2.5">
+      <Card title="抽出された受講者の検証行動スパン（Stage 1 構造化出力）">
+        <div className="space-y-row">
           {evaluation.evidenceComponents.map((comp, i) => (
-            <div
-              key={i}
-              className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5"
-            >
-              <div className="flex justify-between items-center text-[10px] font-mono">
-                <span className="text-purple-400 font-bold">
+            <div key={i} className="space-y-1.5 rounded-chip border border-line bg-surface-sunken p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-data font-semibold text-ink-2" data-numeric>
                   [Turn {comp.turn_index}] {comp.component_type}
                 </span>
-                {comp.injected_flaw_id && (
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    Match: {comp.injected_flaw_id}
-                  </span>
-                )}
+                {comp.injected_flaw_id && <Badge tone="accent">Match: {comp.injected_flaw_id}</Badge>}
               </div>
-              <div className="text-xs font-medium text-slate-200 bg-slate-900/80 p-2 rounded border border-slate-800/60 font-mono">
+              <p className="rounded-chip border border-line bg-surface p-2 font-mono text-data leading-relaxed text-ink">
                 &quot;{comp.quoted_span}&quot;
-              </div>
-              <p className="text-[11px] text-slate-400">{comp.rationale_summary}</p>
+              </p>
+              <p className="text-caption text-ink-2">{comp.rationale_summary}</p>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
       {/* Score Feedback & Dispute Section [MVP 4.5] */}
-      <div className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-3 pt-4">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-          <HelpCircle className="w-4 h-4 text-amber-400" />
-          評点に対する異議申立・フィードバック（MVP 4.5 準拠）
-        </div>
+      <Card title="評点に対する異議申立・フィードバック（MVP 4.5 準拠）">
         {disputeSubmitted ? (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
-            ✓ 異議申立が `score_feedback` テーブルへ記録されました。SME評価者による再検証対象となります。
-          </div>
+          <p className="rounded-chip border border-positive/25 bg-positive-wash p-3 text-caption text-positive">
+            異議申立が `score_feedback` テーブルへ記録されました。SME評価者による再検証対象となります。
+          </p>
         ) : (
-          <div className="space-y-2.5">
-            <div className="space-y-1.5">
-              <span className="text-[11px] text-slate-400">
-                どこが違うと考えますか（必須）
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          <div className="space-y-row">
+            <fieldset className="space-y-1.5">
+              <legend className="text-caption text-ink-2">どこが違うと考えますか（必須）</legend>
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {DISAGREEMENT_OPTIONS.map((opt) => (
                   <label
                     key={opt.value}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-xs transition-all ${
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-chip border px-3 py-2 text-caption transition-colors",
                       disputeDirection === opt.value
-                        ? "border-blue-500 bg-blue-500/10 text-slate-100"
-                        : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-600"
-                    }`}
+                        ? "border-accent bg-accent-wash text-ink"
+                        : "border-line bg-surface text-ink-2 hover:border-line-strong",
+                    )}
                   >
                     <input
                       type="radio"
@@ -556,70 +542,59 @@ export function EvaluationReportStep({
                       value={opt.value}
                       checked={disputeDirection === opt.value}
                       onChange={(e) => setDisputeDirection(e.target.value)}
-                      className="accent-blue-500"
+                      className="accent-[var(--color-accent)]"
                     />
                     <span>{opt.label}</span>
-                    <span className="ml-auto font-mono text-[10px] text-slate-500">
-                      {opt.value}
-                    </span>
+                    <span className="ml-auto font-mono text-data text-ink-3">{opt.value}</span>
                   </label>
                 ))}
               </div>
-            </div>
+            </fieldset>
             <textarea
+              aria-label="異議の理由"
               value={disputeReason}
               onChange={(e) => setDisputeReason(e.target.value)}
-              placeholder="「ターン3で触れたフォールバック要件の指摘が反映されていません」など、異議の理由を具体的に記述してください（必須）"
-              className="w-full bg-slate-900 text-xs text-slate-200 p-3 rounded-xl border border-slate-700 resize-none h-20 focus:outline-none focus:border-blue-500"
+              placeholder="「ターン3で触れたフォールバック要件の指摘が反映されていません」など、異議の理由を具体的に記述してください（必須）…"
+              className={cn(
+                "h-20 w-full resize-none rounded-chip border border-line-strong bg-surface p-3",
+                "text-caption text-ink focus:border-accent focus:outline-none",
+              )}
             />
             <div className="flex justify-end">
-              <button
+              <Button
+                variant="secondary"
                 onClick={onSubmitDispute}
                 disabled={!disputeReason.trim() || !disputeDirection}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 text-xs font-medium hover:bg-slate-700 border border-slate-700 disabled:opacity-40"
               >
                 異議を申し立てる（記録）
-              </button>
+              </Button>
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Debriefing & Benchmark Gallery Link */}
       {onViewBenchmarkGallery && (
-        <div className="p-4 rounded-xl border border-indigo-900/60 bg-gradient-to-r from-indigo-950/40 via-slate-900 to-blue-950/40 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <Award className="w-5 h-5 text-amber-400 shrink-0" />
-            <div>
-              <div className="text-xs font-bold text-slate-100">
-                このシナリオのエキスパート事後講評（デブリーフィング）を見る
-              </div>
-              <div className="text-[11px] text-slate-400">
-                AIトラップ構造の解剖、上位者の攻略ルート、動的コンピテンシー別の客観的行動と自身の伸び代を振り返ることができます。
-              </div>
-            </div>
+        <div className="flex flex-col items-start justify-between gap-3 rounded-card border border-line bg-surface-sunken p-4 sm:flex-row sm:items-center">
+          <div className="space-y-0.5">
+            <p className="text-section text-ink">
+              このシナリオのエキスパート事後講評（デブリーフィング）を見る
+            </p>
+            <p className="text-caption text-ink-2">
+              AIトラップ構造の解剖、上位者の攻略ルート、動的コンピテンシー別の客観的行動と自身の伸び代を振り返ることができます。
+            </p>
           </div>
-          <button
-            onClick={onViewBenchmarkGallery}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/30 flex items-center gap-1.5 shrink-0"
-          >
-            <span>事後講評を開く</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+          <Button variant="primary" onClick={onViewBenchmarkGallery} className="shrink-0">
+            事後講評を開く
+          </Button>
         </div>
       )}
 
-      <div className="pt-4 flex justify-between items-center border-t border-slate-800">
-        <button
-          onClick={onResetToInit}
-          className="text-xs text-slate-400 hover:text-slate-200 underline"
-        >
+      <div className="flex items-center justify-between gap-4 border-t border-line pt-4">
+        <Button variant="quiet" onClick={onResetToInit}>
           ← トップへ戻り最初からやり直す
-        </button>
-        <div className="text-xs text-emerald-400 font-mono flex items-center gap-1.5">
-          <CheckCircle2 className="w-4 h-4" />
-          W1〜W5 全フロー縦切り動作完了
-        </div>
+        </Button>
+        <span className="text-caption text-ink-2">W1〜W5 全フロー縦切り動作完了</span>
       </div>
     </div>
   );

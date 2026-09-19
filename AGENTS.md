@@ -65,6 +65,13 @@
    渡すと仕込み不備へ向かう固定ヒント梯子になり、答え鍵つきのテストに変質する
    （`[D-28]`。設計決定記録 D-56）。深掘り前後の差分を得点にもしない（`[D-29]`）。
 
+9. **UIを書く前に `.claude/skills/ui-design/SKILL.md` を読む。**画面は測定結果を読ませる
+   計器であり、SaaSのダッシュボードではない。**色・文字サイズ・余白のいずれも素の値で書かない**
+   ——`src/app/globals.css` が定めた役割名（`ink` / `line` / `accent`、`text-body` / `text-label`、
+   `space-y-section` / `gap-block`）と `src/app/components/ui/` のプリミティブだけを使う。
+   装飾は3階層に配分し、**全部をカードにしない**（`Section` は枠を持たない）。
+   `npm run check:ui` がCIで落とす（`[D-101]` `[D-102]`）。
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
