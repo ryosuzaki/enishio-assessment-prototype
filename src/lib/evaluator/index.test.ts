@@ -161,7 +161,7 @@ describe("採点モデルの解決", () => {
 
   it("scorer_model_version はモデルID＋抽出版＋採点版の複合文字列になる", () => {
     process.env.EVALUATOR_MODEL = "some-model";
-    expect(getScorerModelVersion()).toBe("some-model/extract-v6/score-v3");
+    expect(getScorerModelVersion()).toBe("some-model/extract-v7/score-v3");
     expect(getScorerModelVersion().split("/")).toHaveLength(3);
   });
 
@@ -203,7 +203,7 @@ describe("第1段階（根拠抽出）", () => {
     process.env.OPENAI_API_KEY = "test-key";
   });
 
-  it("対話ログ・最終成果物・正答鍵（仕込み不備の基準マップ）をプロンプトへ載せる", async () => {
+  it("対話ログ・最終成果物・正答鍵（仕込み不備の基準マップ）をプロンプトへ載せ、プロンプトインジェクション防御を適用する", async () => {
     createMock.mockResolvedValue(llmResponse(SAMPLE_EVIDENCE));
 
     await extractEvidence(
@@ -220,6 +220,12 @@ describe("第1段階（根拠抽出）", () => {
     expect(prompt).toContain("VALID-01");
     // MEDIATOR の発話を受講者の検証行動として数えない規則が落ちていないこと
     expect(prompt).toContain("MEDIATOR");
+    // プロンプトインジェクション防御の境界タグと安全規則が含まれていること
+    expect(prompt).toContain("<transcript>");
+    expect(prompt).toContain("</transcript>");
+    expect(prompt).toContain("<final_artifact>");
+    expect(prompt).toContain("</final_artifact>");
+    expect(prompt).toContain("プロンプトインジェクション防御");
   });
 
   it("未知の task_id では正答鍵を引けず、黙って別課題へすり替えない", async () => {
