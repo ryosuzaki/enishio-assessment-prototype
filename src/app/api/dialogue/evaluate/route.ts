@@ -19,19 +19,32 @@ import {
 import type { LlmUsage } from "@/lib/llm";
 import { getDynamicTask } from "@/data/dynamic-task";
 import { getInjectedFlaws } from "@/data/dynamic-task.server";
+import { z } from "zod";
+import {
+  MAX_ARTIFACT_CHARS,
+  MAX_USER_MESSAGE_CHARS,
+  parseRequestBody,
+} from "@/lib/request-validation";
+
+const TranscriptItemSchema = z.object({
+  turnSeq: z.coerce.number().int().min(0),
+  role: z.string().min(1).max(50),
+  content: z.string().max(MAX_USER_MESSAGE_CHARS),
+});
+
+const EvaluateRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  taskId: z.string().min(1),
+  transcript: z.array(TranscriptItemSchema),
+  finalArtifact: z.string().max(MAX_ARTIFACT_CHARS).nullable().optional(),
+});
 
 // POST /api/dialogue/evaluate - execute 2-stage AutoSCORE evaluation and record rating
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { sessionId, taskId, transcript, finalArtifact } = body;
-
-    if (!sessionId || !taskId || !transcript || !Array.isArray(transcript)) {
-      return NextResponse.json(
-        { success: false, error: "Missing required transcript parameters" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseRequestBody(req, EvaluateRequestSchema, "AutoSCORE evaluation");
+    if (!parsed.ok) return parsed.response;
+    const { sessionId, taskId, transcript, finalArtifact } = parsed.data;
 
     // taskId が未知のIDなら getDynamicTask が投げる（黙って別課題にすり替えない）
     const task = getDynamicTask(taskId);
