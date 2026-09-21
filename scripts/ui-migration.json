@@ -3,6 +3,9 @@
   "migrated": [
     "src/app/layout.tsx",
     "src/app/page.tsx",
+    "src/app/error.tsx",
+    "src/app/not-found.tsx",
+    "src/app/components/AssessmentWorkbench.tsx",
     "src/app/components/ui/",
     "src/app/components/InitStep.tsx",
     "src/app/components/ErrorBanner.tsx",
