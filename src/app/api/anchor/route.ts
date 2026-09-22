@@ -126,7 +126,17 @@ export async function GET(req: Request) {
   });
 }
 
-// POST /api/anchor - record response
+/**
+ * 解答所要時間の数値変換（RV-A6）。
+ * 未出題時（undefined / null）は 0 ではなく null を保持し、即答（0ms）と未出題を区別する。
+ */
+function parseDuration(val: unknown): number | null {
+  if (val === undefined || val === null || val === "") return null;
+  const n = Number(val);
+  return Number.isFinite(n) ? n : null;
+}
+
+// POST /api/anchor - submit anchor response
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -152,11 +162,11 @@ export async function POST(req: Request) {
       confidence,
     } = body;
 
-    const isV2Payload = formatVersion === "v2-sct";
+    const isV2Payload = formatVersion === "v2-sct" || stage1Selection !== undefined;
 
     if (!sessionId || !anchorId) {
       return NextResponse.json(
-        { success: false, error: "Missing required fields" },
+        { success: false, error: "Missing required fields (sessionId, anchorId)" },
         { status: 400 }
       );
     }
@@ -214,14 +224,14 @@ export async function POST(req: Request) {
           ? Number(stage3bSelection)
           : null,
       stage2Order: isV2Payload ? (stage2Order ?? null) : null,
-      stage1DurationMs: isV2Payload ? Number(stage1DurationMs) || 0 : null,
-      stage2DurationMs: isV2Payload ? Number(stage2DurationMs) || 0 : null,
-      stage3DurationMs: isV2Payload ? Number(stage3DurationMs) || 0 : null,
-      stage3bDurationMs: isV2Payload ? Number(stage3bDurationMs) || 0 : null,
+      stage1DurationMs: isV2Payload ? parseDuration(stage1DurationMs) : null,
+      stage2DurationMs: isV2Payload ? parseDuration(stage2DurationMs) : null,
+      stage3DurationMs: isV2Payload ? parseDuration(stage3DurationMs) : null,
+      stage3bDurationMs: isV2Payload ? parseDuration(stage3bDurationMs) : null,
       q1Selection: isV2Payload ? null : q1Selection,
       q2Selection: isV2Payload ? null : q2Selection,
-      q1DurationMs: isV2Payload ? null : Number(q1DurationMs) || 0,
-      q2DurationMs: isV2Payload ? null : Number(q2DurationMs) || 0,
+      q1DurationMs: isV2Payload ? null : parseDuration(q1DurationMs),
+      q2DurationMs: isV2Payload ? null : parseDuration(q2DurationMs),
       confidence: Number(confidence) || 3,
     });
 

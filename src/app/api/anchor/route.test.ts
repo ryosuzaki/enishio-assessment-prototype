@@ -291,16 +291,25 @@ describe("POST — 応答の記録", () => {
   });
 
   it("段階3'（新情報なしの反論）が無い項目では null で記録する", async () => {
-    await post(v2Body({ stage3bSelection: undefined }));
+    await post(v2Body({ stage3bSelection: undefined, stage3bDurationMs: undefined }));
 
     expect(recordAnchorResponse.mock.calls[0][0].stage3bSelection).toBeNull();
+    expect(recordAnchorResponse.mock.calls[0][0].stage3bDurationMs).toBeNull();
   });
 
-  it("類型C（段階2なし）では段階2の回答が無くても通す", async () => {
-    const res = await post(v2Body({ stage2Selection: undefined }));
+  it("類型C（段階2なし）では段階2の回答が無くても通し、所要時間も null を維持する (RV-A6)", async () => {
+    const res = await post(v2Body({ stage2Selection: undefined, stage2DurationMs: undefined }));
 
     expect(res.status).toBe(200);
     expect(recordAnchorResponse.mock.calls[0][0].stage2Selection).toBeNull();
+    expect(recordAnchorResponse.mock.calls[0][0].stage2DurationMs).toBeNull();
+  });
+
+  it("解答所要時間が 0ms の場合は 0 を保持する（null と 0ms 即答を弁別する）", async () => {
+    const res = await post(v2Body({ stage1DurationMs: 0 }));
+
+    expect(res.status).toBe(200);
+    expect(recordAnchorResponse.mock.calls[0][0].stage1DurationMs).toBe(0);
   });
 
   it("段階1が無ければ 400 で弾く", async () => {
