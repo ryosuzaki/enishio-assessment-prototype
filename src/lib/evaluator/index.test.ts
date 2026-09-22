@@ -298,6 +298,14 @@ describe("第1段階（根拠抽出）", () => {
     });
   });
 
+  it("JSON構文が壊れている出力は SyntaxError で落ちず ScoringUnavailableError を投げる (RV-C1)", async () => {
+    createMock.mockResolvedValue({ choices: [{ message: { content: "INVALID_JSON{broken" } }] });
+    await expect(extractEvidence([], "", "TASK-FINTECH-AUTH-01")).rejects.toMatchObject({
+      name: "ScoringUnavailableError",
+      stage: "extract",
+    });
+  });
+
   it("未定義の component_type を通さない（採点側のルーブリック対応が崩れるため）", async () => {
     createMock.mockResolvedValue(
       llmResponse({

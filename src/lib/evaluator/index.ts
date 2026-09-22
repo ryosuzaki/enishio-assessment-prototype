@@ -196,7 +196,16 @@ function parseStructured<T extends z.ZodTypeAny>(
   if (!content) {
     throw new ScoringUnavailableError(stage, `${label}の構造化出力が得られませんでした。`);
   }
-  const validated = schema.safeParse(JSON.parse(content));
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (err) {
+    throw new ScoringUnavailableError(
+      stage,
+      `${label}のJSON構文解析に失敗しました: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  const validated = schema.safeParse(parsed);
   if (!validated.success) {
     throw new ScoringUnavailableError(
       stage,

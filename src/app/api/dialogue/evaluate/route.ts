@@ -5,7 +5,7 @@ import {
   computeBandScore,
   levelLabelFor,
   ScoringUnavailableError,
-  SCORER_MODEL_VERSION,
+  getScorerModelVersion,
   resolveConfidenceThreshold,
   getScorerModel,
 } from "@/lib/evaluator";
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
       ratingCategory: isPending ? null : scoring.rating_category,
       raterType: isPending ? "pending_human" : "llm",
       raterId: isPending ? "awaiting-human-review" : getScorerModel(),
-      scorerModelVersion: SCORER_MODEL_VERSION,
+      scorerModelVersion: getScorerModelVersion(),
       stimulusRef: task.task_id,
       stimulusType: "generated",
       anchorId: null,
@@ -143,7 +143,7 @@ export async function POST(req: Request) {
       diagnosticFeedback: scoring.diagnostic_feedback,
       evidenceComponents: evidence.components,
       probeConsistency: evidence.probe_consistency ?? null,
-      scorerModelVersion: SCORER_MODEL_VERSION,
+      scorerModelVersion: getScorerModelVersion(),
     });
   } catch (error: unknown) {
     if (error instanceof ScoringUnavailableError) {

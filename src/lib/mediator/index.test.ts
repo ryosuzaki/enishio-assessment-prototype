@@ -238,6 +238,11 @@ describe("構造化出力の検証", () => {
     await expect(selectProbe(baseParams())).rejects.toBeInstanceOf(MediationUnavailableError);
   });
 
+  it("JSON構文が壊れている出力は SyntaxError で落ちず MediationUnavailableError を投げる (RV-C1)", async () => {
+    createMock.mockResolvedValue({ choices: [{ message: { content: "BROKEN_JSON{unclosed" } }] });
+    await expect(selectProbe(baseParams())).rejects.toBeInstanceOf(MediationUnavailableError);
+  });
+
   it("定義に無い手を通さない", async () => {
     createMock.mockResolvedValue(llmResponse({ ...SELECTION, probe_move: "give_the_answer" }));
     await expect(selectProbe(baseParams())).rejects.toBeInstanceOf(MediationUnavailableError);

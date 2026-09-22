@@ -232,7 +232,15 @@ ${params.probesSoFar.length > 0 ? params.probesSoFar.join(" → ") : "（まだ1
   if (!content) {
     throw new MediationUnavailableError("プローブ選択の構造化出力が得られませんでした。");
   }
-  const validated = ProbeSelectionSchema.safeParse(JSON.parse(content));
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (err) {
+    throw new MediationUnavailableError(
+      `プローブ選択のJSON構文解析に失敗しました: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  const validated = ProbeSelectionSchema.safeParse(parsed);
   if (!validated.success) {
     throw new MediationUnavailableError(
       `プローブ選択の構造化出力がスキーマに適合しませんでした: ${validated.error.message}`
