@@ -92,6 +92,7 @@ export function DialogueSessionStep({
   const [leftTab, setLeftTab] = useState<"requirements" | "context">("requirements");
   const [codeTab, setCodeTab] = useState<"impl" | "test">("impl");
   const [quoteNotice, setQuoteNotice] = useState<string | null>(null);
+  const [leftQuoteNotice, setLeftQuoteNotice] = useState<string | null>(null);
   const [isChatExpanded, setIsChatExpanded] = useState<boolean>(false);
 
   const implTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -102,6 +103,31 @@ export function DialogueSessionStep({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  /** 選択された要件・コンテキスト文章をチャット入力欄に Markdown 引用形式で挿入 */
+  const handleQuoteRequirement = () => {
+    let selectedText = "";
+    if (typeof window !== "undefined") {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        selectedText = selection.toString().trim();
+      }
+    }
+
+    if (!selectedText) {
+      setLeftQuoteNotice("要件またはコンテキストの文字列を選択してから押してください");
+      setTimeout(() => setLeftQuoteNotice(null), 3000);
+      return;
+    }
+
+    const formattedQuote = `> ${selectedText.split("\n").map((line) => line.trim()).filter(Boolean).join("\n> ")}\n\n`;
+    const nextPrompt = userPromptInput ? `${userPromptInput}\n${formattedQuote}` : formattedQuote;
+    setUserPromptInput(nextPrompt);
+    setLeftQuoteNotice("要件テキストをチャット欄に引用しました");
+    setTimeout(() => setLeftQuoteNotice(null), 2500);
+
+    promptInputRef.current?.focus();
+  };
 
   /** 選択されたコード行をチャット入力欄に Markdown 引用形式で挿入 */
   const handleQuoteCode = () => {
@@ -293,6 +319,28 @@ export function DialogueSessionStep({
               ))}
             </div>
           )}
+
+          {/* Requirement / Context Quoting Bar */}
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-2 text-caption">
+            <span className="text-caption text-ink-3">
+              {leftQuoteNotice ? (
+                <span className="font-semibold text-accent">{leftQuoteNotice}</span>
+              ) : (
+                "要件・本文を選択して「チャットに引用」を押すと挿入されます"
+              )}
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleQuoteRequirement}
+              data-testid="quote-requirement-btn"
+              className="shrink-0 whitespace-nowrap px-3 py-1.5 text-caption"
+            >
+              <Quote className="mr-1.5 h-3.5 w-3.5" />
+              選択箇所をチャットに引用
+            </Button>
+          </div>
         </Pane>
 
         {/* Middle Pane (2): AI Artifact Code Editor & PR Description */}

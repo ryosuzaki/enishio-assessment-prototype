@@ -411,7 +411,26 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("【第3ペイン】検証パネル")).toHaveCount(0);
     await expect(page.getByText("AI同僚との対話・修正指示（マルチターン対話）")).toBeVisible();
 
-    // コード引用機能の確認
+    // 第1ペイン（要件引用機能）の確認
+    const quoteReqBtn = page.getByTestId("quote-requirement-btn");
+    await expect(quoteReqBtn).toBeVisible();
+
+    // 未選択時は案内トーストが表示されること
+    await quoteReqBtn.click();
+    await expect(page.getByText("要件またはコンテキストの文字列を選択してから押してください")).toBeVisible();
+
+    // 要件選択時にチャット欄へ引用行が挿入されること
+    await page.getByText("受入基準（Acceptance Criteria）:").evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    });
+    await quoteReqBtn.click();
+    await expect(page.getByText("要件テキストをチャット欄に引用しました")).toBeVisible();
+
+    // 第2ペイン（コード引用機能）の確認
     const quoteBtn = page.getByTestId("quote-code-btn");
     await expect(quoteBtn).toBeVisible();
 
