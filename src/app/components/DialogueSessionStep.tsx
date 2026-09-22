@@ -501,7 +501,15 @@ export function DialogueSessionStep({
             type="text"
             value={userPromptInput}
             onChange={(e) => setUserPromptInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !isSubmitting && onSendDialogueTurn()}
+            onKeyDown={(e) => {
+              // 日本語IME変換中のEnter確定による誤送信を防止する（RV-J3）
+              if (e.nativeEvent.isComposing || e.key === "Process") return;
+              if (e.key === "Enter" && !isSubmitting && userPromptInput.trim()) {
+                e.preventDefault();
+                onSendDialogueTurn();
+              }
+            }}
+            aria-label="AI同僚への指示・指摘入力"
             placeholder="AI同僚に指示・指摘を入力（例: JWT検証のみだと強制ログアウト時に無効化できないリスクがあります）…"
             className={cn(
               "flex-1 rounded-chip border border-line-strong bg-surface px-4 py-2.5",

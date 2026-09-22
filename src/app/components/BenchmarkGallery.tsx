@@ -115,14 +115,29 @@ export function BenchmarkGallery({
           )}
         </div>
 
-        <h1 className="text-display tracking-tight text-ink">
-          シナリオ分析＆エキスパート検証戦略
-        </h1>
+        <div className="flex flex-wrap items-baseline gap-cell">
+          <h1 className="text-display tracking-tight text-ink">
+            シナリオ分析＆エキスパート検証戦略
+          </h1>
+          <Badge tone="neutral">Viability</Badge>
+        </div>
         <p className="max-w-3xl text-body text-ink-2">
           AIが仕掛けた欺瞞トリックの解剖、上位者が採用した複数の攻略ルート、そして観測された客観的行動ログ（テレメトリ）を対比します。
           限られたターン数の中でどのアプローチを選択するかは受講者の自律的判断です。説教や行動の強制を行わず、上位者のアプローチを客観的な選択肢・引き出しとして提供します。
         </p>
       </header>
+
+      {/* モック層の明示（Constitution Principle I / RV-I2） */}
+      <aside
+        aria-label="モック画面に関する注意"
+        className="rounded-card border border-line bg-surface p-3.5 text-caption text-ink-2"
+      >
+        <p>
+          <strong className="font-semibold text-ink">【画面仕様に関するご案内】</strong>{" "}
+          本画面（エキスパート事後講評＆デブリーフィング）は、受検後の振り返り体験を検証するためのモック展示層（Viability）です。
+          掲載されているエキスパート検証戦略・行動ログ・採用率は設計モックデータであり、実DBとの永続化結合は行っていません。
+        </p>
+      </aside>
 
       {/*
         シナリオの選択。**下線タブにはしない**——課題名が1行に収まらない長さなので、
