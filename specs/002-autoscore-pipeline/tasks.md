@@ -1,4 +1,4 @@
-# Work Breakdown & Tasks: AutoSCORE 2段階採点パイプライン (002-autoscore-pipeline)
+# Work Breakdown & Tasks: 構造化採点パイプライン (002-autoscore-pipeline)
 
 > **対応仕様書**: [specs/002-autoscore-pipeline/spec.md](spec.md)  
 > **対応計画書**: [specs/002-autoscore-pipeline/plan.md](plan.md)  

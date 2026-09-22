@@ -800,7 +800,7 @@ export function OrganizationDashboard({
             <Badge tone="neutral">Feasibility</Badge>
           </div>
           <p className="max-w-2xl text-caption text-ink-2">
-            AI同僚との動的対話、ソクラテス型深掘り・What-if注入、CFF事前暫定判断、およびAutoSCOREによる2段階根拠抽出＆動的コンピテンシー解析を実際に動かせます。
+            AI同僚との動的対話、ソクラテス型深掘り・What-if注入、CFF事前暫定判断、および構造化採点パイプラインによる2段階根拠抽出＆動的コンピテンシー解析を実際に動かせます。
           </p>
         </div>
 

@@ -1,4 +1,4 @@
-# Technical Implementation Plan: AutoSCORE 2段階採点パイプライン (002-autoscore-pipeline)
+# Technical Implementation Plan: 構造化採点パイプライン (002-autoscore-pipeline)
 
 > **対応仕様書**: [specs/002-autoscore-pipeline/spec.md](spec.md)  
 > **全体アーキテクチャ・ER図**: [specs/README.md](../README.md)  
@@ -8,7 +8,7 @@
 
 ## 1. データモデル仕様 (Data Models Owned by 002)
 
-本フィーチャーは、AutoSCORE 2段階採点エンジン、客観的根拠要素、適正依存指標、および LLM 監査ログに関する以下の 4 モデルの正本を管理する。
+本フィーチャーは、構造化採点パイプライン（2段階採点エンジン）、客観的根拠要素、適正依存指標、および LLM 監査ログに関する以下の 4 モデルの正本を管理する。
 
 ### 1.1 モデル一覧と責務
 
@@ -101,7 +101,7 @@ LLMによる直接採点（生ログ → 点数＋理由）で発生するハル
 ## 3. API エンドポイント設計 (Contracts)
 
 ### `POST /api/dialogue/evaluate`
-* **責務**: AutoSCORE 2段階採点を実行し、DBに `Rating`、`EvidenceComponent`、`RelianceMetrics` を一括保存する。
+* **責務**: 構造化採点パイプライン（2段階採点）を実行し、DBに `Rating`、`EvidenceComponent`、`RelianceMetrics` を一括保存する。
 * **Request Body**:
   ```json
   {

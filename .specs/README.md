@@ -11,7 +11,7 @@ specs/
 │   ├── plan.md                     # 技術計画・DBモデル定義・API契約・垂直スライスチケット
 │   └── tasks.md                    # 実装タスク・収束確認
 │
-├── 002-autoscore-pipeline/          # AutoSCORE 2段階採点・適正依存指標（4モデル・評価API）
+├── 002-autoscore-pipeline/          # 構造化採点パイプライン・適正依存指標（4モデル・評価API）
 │   ├── spec.md
 │   ├── plan.md
 │   └── tasks.md

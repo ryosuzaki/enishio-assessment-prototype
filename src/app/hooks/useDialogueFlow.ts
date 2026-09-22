@@ -23,7 +23,7 @@ interface DialogueFlowDeps {
 }
 
 /**
- * 実務演習セッション（3ペイン動的対話 → CFF → AutoSCORE → XAIレポート）の進行。
+ * 実務演習セッション（2ペイン動的対話 → CFF → 構造化採点パイプライン → XAIレポート）の進行。
  *
  * セッションIDは `ensureSession()` の戻り値を使う。開始直後に state を読むと、
  * まだ反映されていない空文字を API へ送ってしまう。
@@ -410,8 +410,8 @@ export function useDialogueFlow({
         addTelemetry(`Verification focus sequence recorded (${focusItems.length} items)`);
       }
 
-      // 3. Trigger 2-Stage AutoSCORE Evaluation (W4)
-      addTelemetry("Triggering AutoSCORE 2-Stage Evaluator (Axis 4)...");
+      // 3. Trigger 2-Stage Structured Scoring Pipeline (W4)
+      addTelemetry("Triggering 構造化採点パイプライン (Axis 4)...");
       const evalRes = await fetch("/api/dialogue/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

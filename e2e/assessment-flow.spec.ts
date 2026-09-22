@@ -207,7 +207,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("動的コンピテンシー アセスメント＆テレメトリ基盤")).toBeVisible();
 
     // 5タブナビゲーションの存在確認
-    await expect(page.getByRole("button", { name: "実務演習セッション（3ペイン動的対話）" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "実務演習セッション（2ペイン動的対話）" })).toBeVisible();
     await expect(page.getByRole("button", { name: "共通アンカー評価（固定尺度・SCT型）" })).toBeVisible();
     await expect(page.getByRole("button", { name: /① 組織.*ダッシュボード/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /② 受講者スキルカルテ/ })).toBeVisible();
@@ -397,7 +397,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.locator("input[name='stage3b']")).toHaveCount(0);
   });
 
-  test("動的2ペイン対話・コード引用（セッション内前提変化含む） → CFF暫定判断 → AutoSCORE採点 → XAIレポート表示の全フローが完走する", async ({ page }) => {
+  test("動的2ペイン対話・コード引用（セッション内前提変化含む） → CFF暫定判断 → 構造化採点パイプライン → XAIレポート表示の全フローが完走する", async ({ page }) => {
     await page.goto("/");
 
     // 1. 実務演習セッションを直接開始
@@ -405,10 +405,10 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(startSessionBtn).toBeVisible();
     await startSessionBtn.click();
 
-    // 2ペインの表示確認（第3ペインは廃止され2ペイン＋チャット引用に刷新）
+    // 2ペインの表示確認（第2ペインは廃止され2ペイン＋チャット引用に刷新）
     await expect(page.getByText("【第1ペイン】開発Issue ＆ チーム情報")).toBeVisible();
     await expect(page.getByText("【第2ペイン】成果物ドラフト")).toBeVisible();
-    await expect(page.getByText("【第3ペイン】検証パネル")).toHaveCount(0);
+    await expect(page.getByText("【第2ペイン】検証パネル")).toHaveCount(0);
     await expect(page.getByText("AI同僚との対話・修正指示（マルチターン対話）")).toBeVisible();
 
     // 第1ペイン（要件引用機能）の確認
@@ -492,7 +492,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
 
     // 4. XAIレポート画面の確認
-    await expect(page.getByText("AutoSCORE 2段階評価結果（XAIレポート）")).toBeVisible();
+    await expect(page.getByText("構造化採点パイプライン 2段階評価結果（XAIレポート）")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Band 3: 前提摘発・要件検証行動" })).toBeVisible();
     await expect(page.getByText("これは開発中の推定器による「暫定値」です")).toBeVisible();
     await expect(page.getByText("判定根拠（Evidence Summary）")).toBeVisible();

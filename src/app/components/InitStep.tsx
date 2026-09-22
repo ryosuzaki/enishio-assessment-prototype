@@ -25,7 +25,7 @@ const SCENE_FLOW: { no: number; title: string; detail: string; disrupted?: boole
     disrupted: true,
   },
   { no: 4, title: "意思決定（CFF）", detail: "AI採点前に［承認／条件付き承認／修正要求］を先行確定" },
-  { no: 5, title: "AutoSCORE XAI診断", detail: "2段階客観評価・根拠ハイライト・異議申立導線" },
+  { no: 5, title: "構造化採点パイプライン XAI診断", detail: "2段階客観評価・根拠ハイライト・異議申立導線" },
 ];
 
 export function InitStep({

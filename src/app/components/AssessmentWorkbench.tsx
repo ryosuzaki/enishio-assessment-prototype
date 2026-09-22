@@ -84,7 +84,7 @@ export function AssessmentWorkbench({
   };
 
   const TABS: { id: AppTab; label: string }[] = [
-    { id: "session", label: "実務演習セッション（3ペイン動的対話）" },
+    { id: "session", label: "実務演習セッション（2ペイン動的対話）" },
     { id: "anchor", label: "共通アンカー評価（固定尺度・SCT型）" },
     { id: "org_dashboard", label: "① 組織・受講管理ダッシュボード" },
     { id: "learner_profile", label: "② 受講者スキルカルテ" },

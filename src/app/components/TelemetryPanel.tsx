@@ -120,7 +120,7 @@ export function TelemetryPanel({
             <code className="font-mono text-data text-ink">prompt_turns</code>,{" "}
             <code className="font-mono text-data text-ink">learner_preliminary_judgements</code> 本番準拠
           </li>
-          <li>AutoSCORE: 自由記述CoTを排した2段階構造化採点（設定可能モデル）</li>
+          <li>構造化採点パイプライン: 自由記述CoTを排した2段階構造化採点（設定可能モデル）</li>
           <li>CFF機能: Force Decision First &amp; Mandatory Justification</li>
           <li>2ペイン演習: 課題要件・成果物エディタ ＆ コード引用連動チャット</li>
           <li>XAIレポート: 根拠スパンの可視化と異議申立導線（MVP 4.5）</li>

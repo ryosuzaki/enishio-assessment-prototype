@@ -16,7 +16,7 @@
                                                                 │
                                                                 ▼
 ┌──────────────┐     ┌───────────────────────┐     ┌────────────────────────┐
-│ 5. 評価結果  │ <── │ 4. AutoSCORE 2段階採点│ <── │ 3. CFF事前判断         │
+│ 5. 評価結果  │ <── │ 4. 構造化採点パイプライン│ <── │ 3. CFF事前判断         │
 │ & 申立 (XAI) │     │ (Evaluate API)        │     │ (PreliminaryJudgement) │
 └──────────────┘     └───────────────────────┘     └────────────────────────┘
 ```
@@ -25,9 +25,9 @@
 | :--- | :--- | :--- |
 | **0. Init** | `InitStep` | 受講者IDの決定論的生成、セッション連番の採番（`/api/session/start`）。 |
 | **1. Anchor** | `AnchorQuestionStep` | 共通アンカー項目の出題（`/api/anchor`）。v1（選択式）または v2（4段構成疑似対話）の回答記録（正答鍵はクライアントに非開示）。 |
-| **2. Dialogue** | `DialogueSessionStep` | 3ペイン画面（課題仕様・対話・成果物エディタ）。ターン対話（`/api/dialogue/turn`）、行フォーカス（`/api/dialogue/focus`）、ソクラテス型深掘りプローブ（`/api/dialogue/probe`）、編集距離計算。 |
+| **2. Dialogue** | `DialogueSessionStep` | 2ペイン画面（課題仕様・対話・成果物エディタ）。ターン対話（`/api/dialogue/turn`）、行フォーカス（`/api/dialogue/focus`）、ソクラテス型深掘りプローブ（`/api/dialogue/probe`）、編集距離計算。 |
 | **3. CFF** | `PreliminaryJudgementStep` | **認知先行判断（Force Decision First）**。AIレポートを見る前に「承認/差し戻し」と必須理由記述（`/api/dialogue/preliminary-judgement`）を確定させる。 |
-| **4. Evaluate** | （API実行） | AutoSCORE 2段階採点（`/api/dialogue/evaluate`）。第1段階（根拠抽出）→ 第2段階（バンド採点）→ 確信度閾値判定（HITL）。 |
+| **4. Evaluate** | （API実行） | 構造化採点パイプライン（2段階採点、`/api/dialogue/evaluate`）。第1段階（根拠抽出）→ 第2段階（バンド採点）→ 確信度閾値判定（HITL）。 |
 | **5. Report** | `EvaluationReportStep` | XAIレポート描画。4領域レーダー、抽出根拠ハイライト、適正依存3指標、および異議申し立て・フィードバック送信（`/api/feedback`）。 |
 
 ---
@@ -207,7 +207,7 @@
 ### 2.4 採点・評価 API
 
 #### `POST /api/dialogue/evaluate`
-* **責務**: AutoSCORE 2段階採点（第1段階：根拠抽出 → 第2段階：バンド採点）を実行し、確信度判定を行い、DBに評定（Rating）および根拠要素（EvidenceComponent）を永続化する。
+* **責務**: 構造化採点パイプライン（2段階採点：第1段階「根拠抽出」→ 第2段階「バンド採点」）を実行し、確信度判定を行い、DBに評定（Rating）および根拠要素（EvidenceComponent）を永続化する。
 * **Request Body**:
   ```json
   {

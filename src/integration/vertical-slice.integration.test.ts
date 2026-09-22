@@ -366,7 +366,7 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     expect(rows[0].justification).toBe("失効の扱いだけ条件付きで通す");
   });
 
-  it("8. AutoSCORE が評点・根拠要素・適正依存指標を同じセッションへ書き切る", async () => {
+  it("8. 構造化採点パイプライン が評点・根拠要素・適正依存指標を同じセッションへ書き切る", async () => {
     createMock
       .mockResolvedValueOnce(llmResponse(EVIDENCE))
       .mockResolvedValueOnce(llmResponse(scoring(0.82, 3)));

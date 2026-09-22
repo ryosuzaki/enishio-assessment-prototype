@@ -419,7 +419,7 @@ export function AnchorQuestionStep({
           <p className="text-section text-ink">次のステップへの案内:</p>
           <p className="text-caption text-ink-2">
             共通アンカー項目は、全員に共通する「固定のものさし」として測定精度を担保する仕組みです。
-            続けて別のアンカー項目を試すか、3ペイン画面による動的実務演習セッションへ進んでください。
+            続けて別のアンカー項目を試すか、2ペイン画面による動的実務演習セッションへ進んでください。
           </p>
         </div>
 

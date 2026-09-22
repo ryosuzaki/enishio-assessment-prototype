@@ -285,7 +285,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       fullPage: true,
     });
 
-    // アンカー送信 ➔ 動的3ペイン対話セッション (Dynamic 3-Pane Dialogue)
+    // アンカー送信 ➔ 動的2ペイン対話セッション (Dynamic 3-Pane Dialogue)
     await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
     await expect(page.getByText("共通アンカー項目の記録が完了しました")).toBeVisible();
     await page.getByRole("button", { name: "実務演習セッションを体験する" }).click();
@@ -298,7 +298,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     // 2ペインの表示確認
     await expect(page.getByText("【第1ペイン】開発Issue ＆ チーム情報")).toBeVisible();
     await expect(page.getByText("【第2ペイン】成果物ドラフト")).toBeVisible();
-    await expect(page.getByText("【第3ペイン】検証パネル")).toHaveCount(0);
+    await expect(page.getByText("【第2ペイン】検証パネル")).toHaveCount(0);
 
     // コード引用機能の確認（エディタから選択してチャットに引用）
     const quoteBtn = page.getByTestId("quote-code-btn");
@@ -352,9 +352,9 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       fullPage: true,
     });
 
-    // 06. AutoSCORE 2段階採点結果（XAIレポート）
+    // 06. 構造化採点パイプライン 2段階採点結果（XAIレポート）
     await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
-    await expect(page.getByText("AutoSCORE 2段階評価結果（XAIレポート）")).toBeVisible();
+    await expect(page.getByText("構造化採点パイプライン 2段階評価結果（XAIレポート）")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Band 3: 前提摘発・要件検証行動" })).toBeVisible();
     await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
     await expect(page.getByText("判定根拠（Evidence Summary）")).toBeVisible();

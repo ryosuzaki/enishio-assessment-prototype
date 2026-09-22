@@ -161,7 +161,7 @@ export function EvaluationReportStep({
             {evaluation.isPendingHumanReview ? "—" : evaluation.ratingCategory}
           </span>
           <div className="space-y-0.5">
-            <p className="text-caption text-ink-3">AutoSCORE 2段階評価結果（XAIレポート）</p>
+            <p className="text-caption text-ink-3">構造化採点パイプライン 2段階評価結果（XAIレポート）</p>
             <h2 className="text-title tracking-tight text-ink">
               {evaluation.isPendingHumanReview ? "評点保留（人間の確認待ち）" : evaluation.levelLabel}
             </h2>

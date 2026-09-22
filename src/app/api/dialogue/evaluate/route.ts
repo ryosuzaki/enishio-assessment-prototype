@@ -50,10 +50,10 @@ const EvaluateRequestSchema = z.object({
   stakesContext: z.enum(STAKES_CONTEXT_VALUES).optional(),
 });
 
-// POST /api/dialogue/evaluate - execute 2-stage AutoSCORE evaluation and record rating
+// POST /api/dialogue/evaluate - execute 2-stage structured scoring pipeline and record rating
 export async function POST(req: Request) {
   try {
-    const parsed = await parseRequestBody(req, EvaluateRequestSchema, "AutoSCORE evaluation");
+    const parsed = await parseRequestBody(req, EvaluateRequestSchema, "構造化採点パイプライン評価");
     if (!parsed.ok) return parsed.response;
     const { sessionId, taskId, transcript, finalArtifact, stakesContext } = parsed.data;
 

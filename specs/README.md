@@ -17,7 +17,7 @@
 │  │   UI Layer ("use client")   │    │   API Layer (Route Handlers)  │  │
 │  │  - Session Orchestration    │    │  - Session & Telemetry        │  │
 │  │  - 3-Pane Dynamic Dialogue  │───>│  - Dynamic Task & Flaws (Svr) │  │
-│  │  - Viability Mocks          │    │  - 2-Stage AutoSCORE          │  │
+│  │  - Viability Mocks          │    │  - 構造化採点パイプライン (2-Stage) │  │
 │  └─────────────────────────────┘    │  - Socratic Mediator          │  │
 │                                     └──────────────┬────────────────┘  │
 └────────────────────────────────────────────────────┼───────────────────┘
@@ -74,7 +74,7 @@ erDiagram
 * **ドキュメント**: [spec.md](001-session-orchestration/spec.md) / [plan.md](001-session-orchestration/plan.md) / [tasks.md](001-session-orchestration/tasks.md)
 
 ### [002-autoscore-pipeline](002-autoscore-pipeline/)
-* **責務**: AutoSCORE 2段階採点エンジン、客観的根拠要素抽出、ルーブリック規準評定、適正依存3指標算出、HITL閾値判定、および LLM 呼出監査。
+* **責務**: 構造化採点パイプライン（2段階採点エンジン）、客観的根拠要素抽出、ルーブリック規準評定、適正依存3指標算出、HITL閾値判定、および LLM 呼出監査。
 * **管理する DB モデル (4モデル)**: `Rating`, `EvidenceComponent`, `RelianceMetrics`, `LlmCall`
 * **管理する API エンドポイント (1本)**: `/api/dialogue/evaluate`
 * **ドキュメント**: [spec.md](002-autoscore-pipeline/spec.md) / [plan.md](002-autoscore-pipeline/plan.md) / [tasks.md](002-autoscore-pipeline/tasks.md)

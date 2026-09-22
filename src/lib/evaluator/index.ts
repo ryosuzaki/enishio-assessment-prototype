@@ -227,7 +227,7 @@ export function sanitizeXmlBoundary(text: string): string {
 }
 
 /**
- * AutoSCORE Stage 1: Extract evidence spans from dialogue and diff
+ * 構造化採点パイプライン Stage 1: Extract evidence spans from dialogue and diff
  */
 export async function extractEvidence(
   transcript: { turnSeq: number; role: string; content: string }[],
@@ -293,7 +293,7 @@ ${sanitizeXmlBoundary(finalArtifact)}
 }
 
 /**
- * AutoSCORE Stage 2: Band score based strictly on structured evidence components
+ * 構造化採点パイプライン Stage 2: Band score based strictly on structured evidence components
  *
  * 入力は第1段階の構造化出力のみ。対話ログの生テキストは渡さない（実行指示書 §6.1-2）。
  */
