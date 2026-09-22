@@ -27,8 +27,9 @@
 * **`prisma/schema.prisma` の厳格管理**: スキーマは MVP 定義書 4.1.1 の正本写しであり、フィールド名や型の無断変更・削除を禁止する。ログの破壊は過去セッションデータの永久喪失を意味する。
 * **用途の凍結**: レーティングやアンカー応答には `stakes_context`（"formative" / "education" / "promotion" / "selection" / "verification"）を記録し、事後分析可能性を担保する（`[D-67]`）。
 
-### Principle V: 仕様書駆動（SDD）と Matt Pocock 式 TDD / 垂直スライス規律
-* **Spec First**: コードを書く前に、必ず `.specs/` または該当する仕様書で要求（What）と技術計画（How）を定義する。
+### Principle V: 仕様書駆動（SDD）と Living Spec / 垂直スライス規律
+* **Contract First & Living Spec**: 実稼働層（Feasibility: 採点・DB・API・セッション進行）の変更時は、コードを書く前に必ず `specs/<機能>/spec.md` で要求（What）と受入基準を改定・合意する。モック層（Viability）の見た目調整やタイポ修正はコード先行で迅速に回してよい。
+* **Flow-Back の義務化**: 実装現場で判明した技術制約や例外挙動は必ず `specs/` 正本へ書き戻し、仕様とコードの乖離（Spec Drift）を放置しない。
 * **Grill セッションの実施**: 仕様策定時、AIはイエスマンにならず、前提の穴・エッジケース・モック/本物の境界を徹底的に逆質問（Grill）して合意を形成する。
 * **Vertical Slice & TDD**: 実装は横切り（全UIを作ってから全APIを作る等）ではなく、1つのユースケースが動く垂直スライスで分割し、テスト先行（Red-Green-Refactor）で実装する。
 
