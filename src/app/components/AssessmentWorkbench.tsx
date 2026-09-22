@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { DYNAMIC_TASKS } from "@/data/dynamic-task";
-import type { AppTab } from "../types";
+import { MAX_PROBES_PER_SESSION, type AppTab } from "../types";
 import { InitStep } from "./InitStep";
 import { AnchorQuestionStep } from "./AnchorQuestionStep";
 import { DialogueSessionStep } from "./DialogueSessionStep";
@@ -298,6 +298,12 @@ export function AssessmentWorkbench({
                   sessionSeq={sessionSeq}
                   telemetryLog={telemetryLog}
                   onToggleCollapse={() => setShowTelemetry(false)}
+                  mediationStateEstimate={dialogue.mediationStateEstimate}
+                  lastProbeMove={dialogue.lastProbeMove}
+                  lastSelectionRationale={dialogue.lastSelectionRationale}
+                  probesIssued={dialogue.probesIssued}
+                  maxProbes={MAX_PROBES_PER_SESSION}
+                  isProbing={dialogue.isProbing}
                 />
               </div>
             )}

@@ -97,12 +97,7 @@ export function MediationStatePanel({
           )}
 
           <p className="border-t border-line pt-2.5 text-caption text-ink-3">
-            ※ 推定と選んだ手は <code className="font-mono text-label text-ink-2">mediation_probes</code>{" "}
-            ログへ理由つきで保存されます。
-            <strong className="font-semibold text-ink-2">
-              メディエーターには仕込み不備の位置を渡していません
-            </strong>
-            ——引き出すためであって、正解へ導くためではないためです。
+            ※ 進行役は対話ログから受講者の着眼状態を推定し、正解誘導ではなく自律的な気付きを促す問いを生成します。
           </p>
         </div>
       </Card>

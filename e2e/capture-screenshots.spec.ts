@@ -184,7 +184,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
           levelLabel: "Band 3: 前提摘発・要件検証行動",
           scoringConfidence: 0.88,
           evidenceSummary:
-            "受講者はRedis障害時の単一障害点リスクおよびPCI DSS要件との乖離を的確に指摘し、AI同僚に適切な修正指示を出している。また検証パネルを用いて該当コードスパンを明示的に抽出・特定した。",
+            "受講者はRedis障害時の単一障害点リスクおよびPCI DSS要件との乖離を的確に指摘し、該当コードを引用してAI同僚に適切な修正指示を出している。",
           diagnosticFeedback:
             "セキュリティ制約と高可用性のトレードオフを意識した優れた検証行動が確認できました。今後は例外発生時の監査ログ追跡性にも着目すると、より高位の評価に到達します。",
           evidenceComponents: [
@@ -295,21 +295,21 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       .getByRole("button", { name: "実務演習セッションを開始する（課題提示へ）" })
       .click();
 
-    // 3ペインの表示確認
+    // 2ペインの表示確認
     await expect(page.getByText("【第1ペイン】開発Issue ＆ チーム情報")).toBeVisible();
     await expect(page.getByText("【第2ペイン】成果物ドラフト")).toBeVisible();
-    await expect(page.getByText("【第3ペイン】検証パネル")).toBeVisible();
+    await expect(page.getByText("【第3ペイン】検証パネル")).toHaveCount(0);
 
-    // 第3ペイン（検証パネル）へアイテムを追加
-    const focusInput = page.getByPlaceholder("検証対象とするコード断片・キーワード");
-    await focusInput.fill("redis.get(merchantId)");
-    await page.getByRole("button", { name: "検証パネルへ追加" }).click();
-    // 見た目のクラス名ではなく testid で掴む（配色はデザイン移行で変わるため。[D-101]）
-    await expect(page.getByTestId("focus-item-seq").filter({ hasText: "#1" })).toBeVisible();
+    // コード引用機能の確認（エディタから選択してチャットに引用）
+    const quoteBtn = page.getByTestId("quote-code-btn");
+    await expect(quoteBtn).toBeVisible();
 
-    await focusInput.fill("merchant.pci_dss_compliant");
-    await page.getByRole("button", { name: "検証パネルへ追加" }).click();
-    await expect(page.getByTestId("focus-item-seq").filter({ hasText: "#2" })).toBeVisible();
+    const codeEditor = page.getByTestId("draft-code-editor");
+    await codeEditor.evaluate((el: HTMLTextAreaElement) => {
+      el.setSelectionRange(0, 35);
+    });
+    await quoteBtn.click();
+    await expect(page.getByText("コードをチャット欄に引用しました")).toBeVisible();
 
     // AI同僚へメッセージ送信
     const promptInput = page.getByPlaceholder(/AI同僚に指示・指摘を入力/);
@@ -329,7 +329,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     await page.getByRole("button", { name: "送信" }).click();
     await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toBeVisible();
 
-    // 04. 3ペイン対話画面 (3-Pane Dialogue)
+    // 04. 動的対話画面 (2-Pane Dialogue with Code Quoting)
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: path.join(screenshotsDir, "04-dialogue-3pane.png"),
@@ -365,7 +365,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     await page.locator("input[value='too_low']").check();
     const disputeTextarea = page.getByPlaceholder(/異議の理由を具体的に記述してください/);
     await disputeTextarea.fill(
-      "ターン2でのPCI DSS要件に対する指摘および検証パネルでのコードスパン抽出行動が、より高位のBand 4基準に該当すると考えます。"
+      "ターン2でのPCI DSS要件に対する指摘およびチャットでの該当コード引用行動が、より高位のBand 4基準に該当すると考えます。"
     );
 
     await page.evaluate(() => window.scrollTo(0, 0));

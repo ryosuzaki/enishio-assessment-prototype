@@ -1,11 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
-import { Trash2 } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Quote } from "lucide-react";
 import type { DynamicTaskScenario } from "@/data/dynamic-task";
 import type { ChatMessage, EvidenceTargetState, FocusItem, ProbeMove, PremiseShiftState } from "../types";
-import { MAX_PROBES_PER_SESSION } from "../types";
-import { MediationStatePanel } from "./MediationStatePanel";
 import { Badge, Button, cn } from "./ui";
 
 /**
@@ -25,34 +23,30 @@ interface DialogueSessionStepProps {
   selectedTask: DynamicTaskScenario;
   artifactCode: string;
   setArtifactCode: (code: string) => void;
-  focusItems: FocusItem[];
-  focusInputText: string;
-  setFocusInputText: (text: string) => void;
   chatHistory: ChatMessage[];
   turnCounter: number;
   userPromptInput: string;
-  setUserPromptInput: (input: string) => void;
+  setUserPromptInput: React.Dispatch<React.SetStateAction<string>> | ((input: string) => void);
   cffActiveWarning: string | null;
   isSubmitting: boolean;
-  mediationStateEstimate: EvidenceTargetState[] | null;
-  lastProbeMove: ProbeMove | null;
-  lastSelectionRationale: string | null;
-  probesIssued: number;
-  isProbing: boolean;
   premiseShiftState?: PremiseShiftState;
-  /**
-   * 開発ビルド限定の手動発火。**受講者UIには出さない** `[D-100]` ——
-   * 前提変化は進行役側が対話ログから決定論的に撃つものであり、受講者が撃つ時点を
-   * 選べるなら「不意の前提変化への適応」を測っていることにならない。
-   */
   onForcePremiseShiftForDebug?: () => void;
   onProceedToPreliminaryJudgement: () => void;
-  onAddFocusItem: (textSnippet?: string, noteText?: string) => void;
-  onRemoveFocusItem: (seq: number) => void;
   onSendDialogueTurn: () => void;
+  // 互換性のためのオプショナルProps
+  focusItems?: FocusItem[];
+  focusInputText?: string;
+  setFocusInputText?: (text: string) => void;
+  onAddFocusItem?: (textSnippet?: string, noteText?: string) => void;
+  onRemoveFocusItem?: (seq: number) => void;
+  mediationStateEstimate?: EvidenceTargetState[] | null;
+  lastProbeMove?: ProbeMove | null;
+  lastSelectionRationale?: string | null;
+  probesIssued?: number;
+  isProbing?: boolean;
 }
 
-/** ペインの器。3枚が同じ高さで並ぶ前提の縦積みレイアウトを持つ。 */
+/** ペインの器。2枚が並ぶ縦積みレイアウトを持つ。 */
 function Pane({
   title,
   meta,
@@ -84,29 +78,47 @@ export function DialogueSessionStep({
   selectedTask,
   artifactCode,
   setArtifactCode,
-  focusItems,
-  focusInputText,
-  setFocusInputText,
   chatHistory,
   turnCounter,
   userPromptInput,
   setUserPromptInput,
   cffActiveWarning,
   isSubmitting,
-  mediationStateEstimate,
-  lastProbeMove,
-  lastSelectionRationale,
-  probesIssued,
-  isProbing,
   premiseShiftState,
   onForcePremiseShiftForDebug,
   onProceedToPreliminaryJudgement,
-  onAddFocusItem,
-  onRemoveFocusItem,
   onSendDialogueTurn,
 }: DialogueSessionStepProps) {
   const [leftTab, setLeftTab] = useState<"requirements" | "context">("requirements");
   const [codeTab, setCodeTab] = useState<"impl" | "test">("impl");
+  const [quoteNotice, setQuoteNotice] = useState<string | null>(null);
+
+  const implTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const testTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const promptInputRef = useRef<HTMLTextAreaElement>(null);
+
+  /** 選択されたコード行をチャット入力欄に Markdown 引用形式で挿入 */
+  const handleQuoteCode = () => {
+    const textarea = codeTab === "impl" ? implTextareaRef.current : testTextareaRef.current;
+    let selectedText = "";
+    if (textarea && textarea.selectionStart !== textarea.selectionEnd) {
+      selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd).trim();
+    }
+
+    if (!selectedText) {
+      setQuoteNotice("エディタ内のコード行を選択してから押してください");
+      setTimeout(() => setQuoteNotice(null), 3000);
+      return;
+    }
+
+    const formattedQuote = `> ${selectedText.split("\n").join("\n> ")}\n\n`;
+    const nextPrompt = userPromptInput ? `${userPromptInput}\n${formattedQuote}` : formattedQuote;
+    setUserPromptInput(nextPrompt);
+    setQuoteNotice("コードをチャット欄に引用しました");
+    setTimeout(() => setQuoteNotice(null), 2500);
+
+    promptInputRef.current?.focus();
+  };
 
   return (
     <div className="space-y-block">
@@ -170,10 +182,10 @@ export function DialogueSessionStep({
         </div>
       ) : null}
 
-      {/* 3-Pane Layout Grid (Left: Requirements / Middle: Artifact / Right: Verification Panel) */}
+      {/* 2-Pane Layout Grid (Left: Requirements & Context / Right: Artifact & Code Editor) */}
       <div className="flex flex-col items-stretch gap-4 lg:flex-row">
         {/* Left Pane (1): Scenario & Requirements with Sub-tabs */}
-        <Pane title="【第1ペイン】開発Issue ＆ チーム情報" className="w-full shrink-0 lg:w-[28%]">
+        <Pane title="【第1ペイン】開発Issue ＆ チーム情報" className="w-full shrink-0 lg:w-[38%]">
           <div className="flex shrink-0 border-b border-line">
             <button
               onClick={() => setLeftTab("requirements")}
@@ -333,6 +345,8 @@ export function DialogueSessionStep({
 
           {codeTab === "impl" ? (
             <textarea
+              ref={implTextareaRef}
+              data-testid="draft-code-editor"
               aria-label="成果物ドラフトの実装コード"
               value={artifactCode}
               onChange={(e) => setArtifactCode(e.target.value)}
@@ -350,98 +364,41 @@ export function DialogueSessionStep({
                 <span className="shrink-0 font-mono text-data text-ink-2">All tests passed (3/3)</span>
               </div>
               <textarea
+                ref={testTextareaRef}
+                data-testid="test-code-editor"
                 aria-label="AI同僚が作成したテストコード"
                 readOnly
                 value={selectedTask.test_code}
                 className={cn(
-                  "min-h-0 w-full flex-1 select-text resize-none overflow-x-auto whitespace-pre rounded-chip",
-                  "border border-line bg-surface-sunken p-3.5 font-mono text-data leading-relaxed text-ink-2 focus:outline-none",
+                  "min-h-0 w-full flex-1 resize-none overflow-x-auto whitespace-pre rounded-chip border border-line",
+                  "bg-surface-sunken p-3.5 font-mono text-data leading-relaxed text-ink focus:border-accent focus:outline-none",
                 )}
               />
             </div>
           )}
 
-          {/* Quick Focus Add Bar */}
-          <div className="flex shrink-0 items-center gap-2 pt-1.5">
-            <input
-              type="text"
-              value={focusInputText}
-              onChange={(e) => setFocusInputText(e.target.value)}
-              placeholder="検証対象とするコード断片・キーワード…"
-              className={cn(
-                "min-w-0 flex-1 rounded-chip border border-line-strong bg-surface px-2 py-1.5",
-                "text-caption text-ink focus:border-accent focus:outline-none",
+          {/* Code Quoting Bar */}
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-2 text-caption">
+            <span className="text-caption text-ink-3">
+              {quoteNotice ? (
+                <span className="font-semibold text-accent">{quoteNotice}</span>
+              ) : (
+                "コードを選択して「チャットに引用」を押すと、下の指示欄に挿入されます"
               )}
-            />
+            </span>
             <Button
+              type="button"
               variant="secondary"
-              onClick={() => onAddFocusItem()}
-              disabled={!focusInputText.trim()}
-              className="shrink-0 whitespace-nowrap px-2.5 py-1.5 text-caption"
+              onClick={handleQuoteCode}
+              data-testid="quote-code-btn"
+              className="shrink-0 whitespace-nowrap px-3 py-1.5 text-caption"
             >
-              検証パネルへ追加
+              <Quote className="mr-1.5 h-3.5 w-3.5" />
+              選択コードをチャットに引用
             </Button>
           </div>
         </Pane>
-
-        {/* Right Pane (3): Verification Focus Panel [MVP 4.4, T-17b] */}
-        <Pane
-          title="【第3ペイン】検証パネル"
-          meta={<span className="shrink-0 font-mono text-data text-ink-3">focus_seq</span>}
-          className="w-full shrink-0 lg:w-[28%]"
-        >
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-            {focusItems.length === 0 ? (
-              <p className="flex h-full items-center justify-center p-4 text-center text-caption text-ink-3">
-                成果物の確認箇所を選択・入力して「検証パネルへ追加」を押すと、検証順序がここに記録されます。
-              </p>
-            ) : (
-              focusItems.map((item) => (
-                <div
-                  key={item.focusSeq}
-                  className="space-y-1 rounded-chip border border-line bg-surface-sunken p-2.5"
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className="text-data font-semibold text-ink-2"
-                      data-testid="focus-item-seq"
-                      data-numeric
-                    >
-                      #{item.focusSeq}
-                    </span>
-                    <button
-                      onClick={() => onRemoveFocusItem(item.focusSeq)}
-                      className="p-0.5 text-ink-3 transition-colors hover:text-critical"
-                      title="削除" aria-label={`検証項目 #${item.focusSeq} を削除`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <p className="break-words rounded-chip border border-line bg-surface p-2 font-mono text-data leading-relaxed text-ink">
-                    {item.selectedText}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-
-          <p className="shrink-0 border-t border-line pt-2 text-caption text-ink-3">
-            ※ 選択箇所と順序は{" "}
-            <code className="font-mono text-ink-2">verification_focus_sequence</code>{" "}
-            ログとして保存されます（AI採点には入力されません）。
-          </p>
-        </Pane>
       </div>
-
-      {/* Mediation State Panel (MVP 2.1 ステップ7・8) */}
-      <MediationStatePanel
-        stateEstimate={mediationStateEstimate}
-        lastProbeMove={lastProbeMove}
-        selectionRationale={lastSelectionRationale}
-        probesIssued={probesIssued}
-        maxProbes={MAX_PROBES_PER_SESSION}
-        isProbing={isProbing}
-      />
 
       {/* Chat & Prompt Dialogue Pane */}
       <section className="space-y-block rounded-card border border-line bg-surface p-5">
@@ -496,23 +453,24 @@ export function DialogueSessionStep({
         )}
 
         {/* Input Prompt Box */}
-        <div className="flex gap-2 pt-1">
-          <input
-            type="text"
+        <div className="flex items-end gap-2 pt-1">
+          <textarea
+            ref={promptInputRef}
+            rows={2}
             value={userPromptInput}
             onChange={(e) => setUserPromptInput(e.target.value)}
             onKeyDown={(e) => {
               // 日本語IME変換中のEnter確定による誤送信を防止する（RV-J3）
               if (e.nativeEvent.isComposing || e.key === "Process") return;
-              if (e.key === "Enter" && !isSubmitting && userPromptInput.trim()) {
+              if (e.key === "Enter" && !e.shiftKey && !isSubmitting && userPromptInput.trim()) {
                 e.preventDefault();
                 onSendDialogueTurn();
               }
             }}
             aria-label="AI同僚への指示・指摘入力"
-            placeholder="AI同僚に指示・指摘を入力（例: JWT検証のみだと強制ログアウト時に無効化できないリスクがあります）…"
+            placeholder="AI同僚に指示・指摘を入力（Enterで送信、Shift+Enterで改行。コード引用対応）…"
             className={cn(
-              "flex-1 rounded-chip border border-line-strong bg-surface px-4 py-2.5",
+              "flex-1 resize-y rounded-chip border border-line-strong bg-surface px-4 py-2.5",
               "text-caption text-ink focus:border-accent focus:outline-none",
             )}
           />
@@ -520,6 +478,7 @@ export function DialogueSessionStep({
             variant="primary"
             onClick={onSendDialogueTurn}
             disabled={isSubmitting || !userPromptInput.trim()}
+            className="h-[42px]"
           >
             送信
           </Button>

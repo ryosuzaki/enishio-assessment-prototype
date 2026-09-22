@@ -397,7 +397,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.locator("input[name='stage3b']")).toHaveCount(0);
   });
 
-  test("動的3ペイン対話（セッション内前提変化含む） → CFF暫定判断 → AutoSCORE採点 → XAIレポート表示の全フローが完走する", async ({ page }) => {
+  test("動的2ペイン対話・コード引用（セッション内前提変化含む） → CFF暫定判断 → AutoSCORE採点 → XAIレポート表示の全フローが完走する", async ({ page }) => {
     await page.goto("/");
 
     // 1. 実務演習セッションを直接開始
@@ -405,19 +405,27 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(startSessionBtn).toBeVisible();
     await startSessionBtn.click();
 
-    // 3ペインの表示確認
+    // 2ペインの表示確認（第3ペインは廃止され2ペイン＋チャット引用に刷新）
     await expect(page.getByText("【第1ペイン】開発Issue ＆ チーム情報")).toBeVisible();
     await expect(page.getByText("【第2ペイン】成果物ドラフト")).toBeVisible();
-    await expect(page.getByText("【第3ペイン】検証パネル")).toBeVisible();
+    await expect(page.getByText("【第3ペイン】検証パネル")).toHaveCount(0);
     await expect(page.getByText("AI同僚との対話・修正指示（マルチターン対話）")).toBeVisible();
 
-    // 検証パネルへコードスパンを追加
-    const focusInput = page.getByPlaceholder("検証対象とするコード断片・キーワード");
-    await focusInput.fill("redis.get(merchantId)");
-    await page.getByRole("button", { name: "検証パネルへ追加" }).click();
-    // 見た目のクラス名ではなく testid で掴む（配色はデザイン移行で変わるため。[D-101]）
-    await expect(page.getByTestId("focus-item-seq").filter({ hasText: "#1" })).toBeVisible();
-    await expect(page.getByText("redis.get(merchantId)")).toBeVisible();
+    // コード引用機能の確認
+    const quoteBtn = page.getByTestId("quote-code-btn");
+    await expect(quoteBtn).toBeVisible();
+
+    // 未選択時は案内トーストが表示されること
+    await quoteBtn.click();
+    await expect(page.getByText("エディタ内のコード行を選択してから押してください")).toBeVisible();
+
+    // コード選択時にチャット欄へ引用行が挿入されること
+    const codeEditor = page.getByTestId("draft-code-editor");
+    await codeEditor.evaluate((el: HTMLTextAreaElement) => {
+      el.setSelectionRange(0, 35);
+    });
+    await quoteBtn.click();
+    await expect(page.getByText("コードをチャット欄に引用しました")).toBeVisible();
 
     // 場面3 前提変化：**受講者が発生させるボタンは存在しない** [D-100]
     await expect(page.getByRole("button", { name: /緊急仕様変更を発生させる/ })).toHaveCount(0);
@@ -432,7 +440,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
       page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時").first()
     ).toBeVisible();
 
-    // 媒介プローブの確認
+    // 媒介プローブの確認（右サイドバーの TelemetryPanel 内に移設表示）
     await expect(page.getByTestId("mediation-state-panel")).toBeVisible();
     await expect(page.getByText("その指摘は業務要件のどの部分から来ていますか？")).toBeVisible();
     await expect(page.getByText("進行役（媒介プローブ）")).toBeVisible();
