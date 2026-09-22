@@ -55,12 +55,12 @@
    `npm run build && grep -rl "FLAW-01" .next/static/`（0件であること）
 6. **アンカー項目の正答（`note` / `hidden_premise` / `cheat_notes` / `distractor_notes`）を
    APIレスポンスへ含めない。**画面に描画していなくてもネットワークタブから読める。
-7. **アンカー項目バンクの供給源は2つあり、混同しない。**`src/data/anchors.json`（運用20項目）は
+7. **アンカー項目バンクの供給源は混同しない。**運用バンク（`src/data/anchors.v2.json` / `src/data/anchors.json` 等の20項目）は
    `.gitignore` 済みで**このリポジトリへ絶対にコミットしない**（項目露出）。
-   `src/data/anchors.sample.json`（公開デモ用2項目）は同梱してよく、**削除しない**
+   `src/data/anchors.v2.sample.json`（公開デモ用3項目）は同梱してよく、**削除しない**
    ——これが無いと clone しただけの利用者はアンカー出題を1問も動かせない。
    どちらを読んだかは `src/lib/anchor-bank.ts` の `source` が返し、画面に明示される。
-   **サンプル2項目を運用20項目として提示しない。**
+   **サンプル3項目を運用20項目として提示しない。**
 8. **`src/lib/mediator`（ソクラテス型深掘り・What-if注入の選択器）へ正答鍵を渡さない。**
    `dynamic-task.server.ts` を import しない・`injected_flaw_map` を引数に含めない。
    渡すと仕込み不備へ向かう固定ヒント梯子になり、答え鍵つきのテストに変質する

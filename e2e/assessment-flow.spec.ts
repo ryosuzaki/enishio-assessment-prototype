@@ -225,8 +225,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
   });
 
   test("同梱サンプルへフォールバックした場合、運用バンクではないことが画面に明示される", async ({ page }) => {
-    // 運用バンク（src/data/anchors.json）を持たない環境＝公開リポジトリのcloneを再現する。
-    // サンプル2項目を運用20項目に見せてはならない（README「主張を増やさない」）。
+    // 運用バンク（src/data/anchors.v2.json / src/data/anchors.json）を持たない環境＝公開リポジトリのcloneを再現する。
+    // サンプル項目（公開デモ用）を運用20項目に見せてはならない（README「主張を増やさない」）。
     await page.route("**/api/anchor?*", async (route) => await route.continue());
     await page.route("**/api/anchor", async (route) => {
       if (route.request().method() !== "GET") return await route.fallback();
