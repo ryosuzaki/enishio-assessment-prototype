@@ -1,5 +1,6 @@
 # Work Breakdown & Tasks: ソクラテス型メディエーター (003-socratic-mediator)
 
+> **対応仕様書**: [specs/003-socratic-mediator/spec.md](spec.md)  
 > **対応計画書**: [specs/003-socratic-mediator/plan.md](plan.md)  
 > **ステータス**: 実装・検証完了 (All Completed)
 
@@ -7,20 +8,21 @@
 
 ## 1. 垂直スライスタスク一覧
 
-### Phase 1: メディエーター中核ロジック
-- [x] **Task 1.1**: 正答鍵遮断プロンプト設計（`injected_flaw_map` の完全除外）
-- [x] **Task 1.2**: 誘出型プローブ生成関数実装（`src/lib/mediator/index.ts`）
-- [x] **Task 1.3**: 単体テスト作成（`src/lib/mediator/index.test.ts` 23テスト）
+### Phase 1: メディエーター中核ロジック (Mediator Core & Answer Key Isolation)
+- [x] T001 [US2] `src/lib/mediator/index.ts`: 正答鍵遮断コンテキストビルダー設計（injected_flaw_map および dynamic-task.server.ts の完全除外・遮断保証）
+- [x] T002 [US1] `src/lib/mediator/index.ts`: 誘出型プローブ生成関数実装（5つの状態推定と7つのプローブアクション自律選択）
+- [x] T003 [US1] `src/lib/mediator/index.test.ts`: メディエーター単体テスト作成（23テスト、正答鍵非参照・誘出移動検証）
 
-### Phase 2: 場面3 前提変化（Premise Shift）
-- [x] **Task 2.1**: 仕様変更シナリオ定義
-- [x] **Task 2.2**: 場面3検知・注入ロジック実装（`src/lib/premise-shift/index.ts`）
-- [x] **Task 2.3**: 前提変化テスト作成（`src/lib/premise-shift/index.test.ts` 8テスト）
+### Phase 2: 場面3 前提変化（Premise Shift Engine）
+- [x] T004 [US3] `src/lib/premise-shift/index.ts`: 場面3仕様変更シナリオ定義（緊急仕様変更・追加要件通知テキスト）
+- [x] T005 [US3] `src/lib/premise-shift/index.ts`: 場面3到達検知および決定論的注入ロジック実装（LLM非呼び出し・受講者任意発火禁止）
+- [x] T006 [US3] `src/lib/premise-shift/index.test.ts`: 前提変化注入ロジック単体テスト作成（8テスト）
 
-### Phase 3: APIルート・Prisma永続化
-- [x] **Task 3.1**: `src/app/api/dialogue/probe/route.ts` 実装
-- [x] **Task 3.2**: `MediationProbe` レコード保存処理
-- [x] **Task 3.3**: プローブルートテスト作成（`src/app/api/dialogue/probe/route.test.ts` 16テスト）
+### Phase 3: APIルート・Prisma永続化 (Probe Route & Persistence)
+- [x] T007 [US1] `src/app/api/dialogue/probe/route.ts`: プローブAPIルートハンドラー実装
+- [x] T008 [US4] `src/app/api/dialogue/probe/route.ts`: MediationProbe レコードへのプローブ・状態推定・受講者応答永続化
+- [x] T009 [US3] `src/app/api/dialogue/premise-shift/route.ts`: 場面3前提変化APIルート実装
+- [x] T010 [US1] `src/app/api/dialogue/probe/route.test.ts`: プローブAPI単体・結合テスト作成（16テスト）
 
 ---
 

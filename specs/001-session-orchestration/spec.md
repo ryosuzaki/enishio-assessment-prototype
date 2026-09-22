@@ -3,7 +3,8 @@
 > **ステータス**: Approved / Implemented  
 > **対象レイヤー**: Feasibility（実稼働）  
 > **関連原則**: Principle I（2層分離）, Principle II（正答鍵非漏洩）, Principle IV（スキーマ保全）  
-> **アーキテクチャ参照**: [00-system-architecture.md](../baseline/00-system-architecture.md), [01-session-lifecycle-and-apis.md](../baseline/01-session-lifecycle-and-apis.md), [03-ui-component-map.md](../baseline/03-ui-component-map.md)
+> **アーキテクチャ・設計詳細**: [plan.md](plan.md)  
+> **全体アーキテクチャ・ER図**: [specs/README.md](../README.md)  
 
 ---
 
@@ -22,7 +23,7 @@
 
 ## 2. ユーザーストーリーと受入基準 (Acceptance Criteria)
 
-### Story 1: セッションの初期化と連番付与
+### [US1] Story 1: セッションの初期化と連番付与
 * **前提 (Given)**: 受講者が演習トップ画面でテナント名と受講者識別名を入力する。
 * **操作 (When)**: 「セッション開始」ボタンを押下する。
 * **結果 (Then)**:
@@ -30,7 +31,7 @@
   * 受講者の過去受講履歴に応じた `sessionSeq`（1, 2, ...）が採番され、Prisma `Session` レコードが作成される。
   * 画面が自動的に「共通アンカー評価（AnchorQuestionStep）」へ遷移する。
 
-### Story 2: 共通アンカー出題と回答記録（非漏洩）
+### [US2] Story 2: 共通アンカー出題と回答記録（非漏洩）
 * **前提 (Given)**: 受講者が共通アンカー画面に遷移している。
 * **操作 (When)**: アンカー項目（選択式 v1 または 4段構成疑似対話 v2）に回答を送信する。
 * **結果 (Then)**:
@@ -38,7 +39,7 @@
   * **受入ゲート（Principle II）**: APIレスポンスやクライアント状態に、アンカーの正答・解説・作問意図（`note`, `hidden_premise`, `cheat_notes`）が一切含まれていないこと。
   * 回答完了後、動的対話演習（DialogueSessionStep）へ遷移する。
 
-### Story 3: 2ペイン動的対話演習・要件/コード引用（Dual Quoting）とテレメトリ収集
+### [US3] Story 3: 2ペイン動的対話演習・要件/コード引用（Dual Quoting）とテレメトリ収集
 * **前提 (Given)**: 受講者が演習画面（左: 課題要件・チーム情報、右: 成果物エディタ、下: AI同僚チャット）にいる。右側には開閉可能な「Live Telemetry Monitor」が配置され、必要に応じてメディエーター状態推定やログストリームをリアルタイム観測できる。
 * **操作 (When)**:
   1. 第1ペイン（開発Issue・受入基準・運用コンテキスト）内の要件記述、または第2ペイン（成果物ドラフト）内の疑わしいコードを選択し、各ペインの「チャットに引用」を押下してチャット入力欄に引用を挿入する。
@@ -49,7 +50,7 @@
   * 成果物の編集差分（Levenshtein距離）が `ArtifactEditDistanceSeries` に記録される。
   * 演習画面内には受講者にとってノイズとなるメタ注記（DBテーブル名や仕込み不備の言及）が一切露出しない。メディエーター状態推定は右側 TelemetryPanel 内に観測計器として集約される。
 
-### Story 4: CFF（認知先行判断）の強制
+### [US4] Story 4: CFF（認知先行判断）の強制
 * **前提 (Given)**: 対話演習を完了し、評価へ進もうとする。
 * **操作 (When)**: 「演習を完了して評価へ進む」ボタンを押下する。
 * **結果 (Then)**:
@@ -57,14 +58,14 @@
   * 受講者は「承認（Deploy）」か「差し戻し（Reject）」を選択し、必須の判断理由を入力しなければ採点（`/api/dialogue/evaluate`）へ進めない（Force Decision First）。
   * 判定内容は `LearnerPreliminaryJudgement` に記録される。
 
-### Story 5: XAI評価レポートと異議申立
+### [US5] Story 5: XAI評価レポートと異議申立
 * **前提 (Given)**: AutoSCORE採点が完了している。
 * **操作 (When)**: 評価レポート画面が表示され、受講者が評定内容を確認して異議・感想を送信する。
 * **結果 (Then)**:
   * 4領域レーダー、抽出された根拠ハイライト、適正依存3指標が描画される。
   * 受講者がフィードバックを送信した場合、`ScoreFeedback` に合意/異議フラグとコメントが永続化される。
 
-### Story 6: 異常系・エッジケース
+### [US6] Story 6: 異常系・エッジケース
 * **前提 (Given)**: 無効な `sessionId`、あるいは必須フィールドが欠落したリクエストが送信された場合。
 * **操作 (When)**: API ルート（`/api/session/*`, `/api/dialogue/*`）が呼び出される。
 * **結果 (Then)**:
@@ -78,7 +79,7 @@
 * **実稼働（Feasibility）の範囲**:
   * セッションライフサイクル（Init → Anchor → Dialogue → Judgement → Report）の全遷移。
   * `/api/session/start`, `/api/session/blur`, `/api/anchor`, `/api/dialogue/turn`, `/api/dialogue/focus`, `/api/dialogue/preliminary-judgement`, `/api/dialogue/evaluate`, `/api/feedback`。
-  * PostgreSQL DB への Prisma 12モデルの永続化。
+  * PostgreSQL DB への Prisma 16モデルの永続化。
 * **モック（Viability）の範囲**:
   * 組織ダッシュボード（`OrganizationDashboard`）、受講者カルテ（`LearnerProfile`）、ベンチマーク（`BenchmarkGallery`）は静的モックデータで描画し、セッション進行エンジンとは疎結合とする。
 

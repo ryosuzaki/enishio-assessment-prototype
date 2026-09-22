@@ -2,8 +2,8 @@
 
 > **ステータス**: Approved / Implemented  
 > **対象レイヤー**: Feasibility（実稼働）  
-> **関連原則**: Principle I（2層分離）, Principle III（完全性と追跡可能性・フォールバック禁止）, Principle IV（スキーマ保全）  
-> **アーキテクチャ参照**: [00-system-architecture.md](../baseline/00-system-architecture.md), [02-engine-algorithms.md](../baseline/02-engine-algorithms.md)
+> **アーキテクチャ・設計詳細**: [plan.md](plan.md)  
+> **全体アーキテクチャ・ER図**: [specs/README.md](../README.md)  
 
 ---
 
@@ -22,35 +22,35 @@ LLMに受講者の生ログを直接読ませて点数をつけさせると、�
 
 ## 2. ユーザーストーリーと受入基準 (Acceptance Criteria)
 
-### Story 1: 第1段階 根拠要素の客観的抽出 (extractEvidence)
+### [US1] Story 1: 第1段階 根拠要素の客観的抽出 (extractEvidence)
 * **前提 (Given)**: 対話演習ログ、成果物エディタの内容、課題仕様が存在する。
 * **操作 (When)**: 第1段階パーサーが実行される。
 * **結果 (Then)**:
   * 受講者の発言から具体的な検証行動（仕込み不備の指摘、トレードオフの言語化、正常箇所への過剰指摘、無批判な受容）が `EvidenceComponent` スキーマ（Zod）で抽出される。
   * メディエーターの発言は抽出対象外（受講者の発言のみが根拠）とされる。
 
-### Story 2: 第2段階 ルーブリック基準によるバンド評定 (computeBandScore)
+### [US2] Story 2: 第2段階 ルーブリック基準によるバンド評定 (computeBandScore)
 * **前提 (Given)**: 第1段階で抽出された構造化根拠データ（生ログは渡さない）が存在する。
 * **操作 (When)**: 第2段階バンド採点器が実行される。
 * **結果 (Then)**:
   * 軸4（AI協働検証力）のルーブリック基準に基づき、0〜5のバンドスコアが算出される。
   * 採点の自己申告確信度（`scoring_confidence`: 0.0〜1.0）および判定論拠要約が返される。
 
-### Story 3: 確信度閾値による HITL（Human-in-the-Loop）遷移
+### [US3] Story 3: 確信度閾値による HITL（Human-in-the-Loop）遷移
 * **前提 (Given)**: 採点器の自己申告確信度が閾値 0.7 未満である場合。
 * **操作 (When)**: スコア確定処理が実行される。
 * **結果 (Then)**:
   * `rater_type = "pending_human"` として記録され、スコアは保留状態となる。
   * 確信度が 0.7 以上の場合は `rater_type = "llm"` として即座に確定する。
 
-### Story 4: フォールバック採点の絶対禁止（Principle III）
+### [US4] Story 4: フォールバック採点の絶対禁止（Principle III）
 * **前提 (Given)**: OpenAI API キーが未設定、ネットワークタイムアウト、または構造化出力パースに失敗した場合。
 * **操作 (When)**: `/api/dialogue/evaluate` が呼び出される。
 * **結果 (Then)**:
   * キーワード一致やローカル計算による代替スコア（フォールバック）を絶対に生成してはならない。
   * `ScoringUnavailableError` をスローし、HTTP 500 / 503 としてエラーレスポンスを返さなければならない。
 
-### Story 5: 2段階データの完全永続化
+### [US5] Story 5: 2段階データの完全永続化
 * **前提 (Given)**: 採点パイプラインが正常終了する。
 * **操作 (When)**: DB 保存処理が実行される。
 * **結果 (Then)**:

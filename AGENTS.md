@@ -1,19 +1,17 @@
 # このリポジトリの位置づけ
 
 **コード実装および実証プロトタイプリポジトリである。**
-仕様・設計・調査の事業的背景は隣の `enishio-education` リポジトリが持ち、本リポジトリの実装仕様は `.specify/memory/constitution.md` および `specs/`（`specs/baseline/` および各機能ディレクトリ）に正本（Single Source of Truth）として整備されている。
+仕様・設計・調査の事業的背景は隣の `enishio-education` リポジトリが持ち、本リポジトリの実装仕様は `.specify/memory/constitution.md` および `specs/` 配下の各機能ディレクトリに正本（Single Source of Truth）として整備されている。
 
 両者は親リポジトリ `enishio-business` の `products/` 配下にサブモジュールとして並んでチェックアウトされるため、相対パスで参照できる。
 
 | 探すもの | 場所 |
 | :--- | :--- |
 | **プロジェクト憲法（不可侵原則）** | [`.specify/memory/constitution.md`](.specify/memory/constitution.md) |
-| **仕様書正本トップ（Spec Kit 標準構造）** | [`specs/README.md`](specs/README.md) |
-| **システム構成・データモデル仕様** | [`specs/baseline/00-system-architecture.md`](specs/baseline/00-system-architecture.md) |
-| **セッション・全APIエンドポイント仕様** | [`specs/baseline/01-session-lifecycle-and-apis.md`](specs/baseline/01-session-lifecycle-and-apis.md) |
-| **AutoSCORE・採点・メディエーション仕様** | [`specs/baseline/02-engine-algorithms.md`](specs/baseline/02-engine-algorithms.md) |
-| **画面コンポーネント・モック境界仕様** | [`specs/baseline/03-ui-component-map.md`](specs/baseline/03-ui-component-map.md) |
-| **主要機能仕様（Spec/Plan/Tasks）** | [`specs/001-session-orchestration/`](specs/001-session-orchestration/), [`002-autoscore-pipeline/`](specs/002-autoscore-pipeline/), [`003-socratic-mediator/`](specs/003-socratic-mediator/) |
+| **仕様書正本トップ（全体構成・ER図）** | [`specs/README.md`](specs/README.md) |
+| **セッション統制・UI・テレメトリ仕様（10モデル・8API）** | [`specs/001-session-orchestration/`](specs/001-session-orchestration/) (`spec.md` / `plan.md`) |
+| **AutoSCORE 2段階採点・適正依存指標仕様（4モデル・評価API）** | [`specs/002-autoscore-pipeline/`](specs/002-autoscore-pipeline/) (`spec.md` / `plan.md`) |
+| **ソクラテス型メディエーター・前提変化仕様（2モデル・プローブAPI）** | [`specs/003-socratic-mediator/`](specs/003-socratic-mediator/) (`spec.md` / `plan.md`) |
 | **開発者向け仕様書駆動開発ガイド（人間用マニュアル）** | [`docs/開発者向け仕様書駆動開発ガイド.md`](docs/開発者向け仕様書駆動開発ガイド.md) |
 | 動作確認・検証手順書 | `docs/プロトタイプ動作確認手順書.md` |
 | **コードレビューの観点・重大度基準・報告形式（AIレビュー実行者向け）** | [`docs/レビュー観点チェックリスト.md`](docs/レビュー観点チェックリスト.md) |
