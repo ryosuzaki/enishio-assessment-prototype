@@ -207,6 +207,17 @@ function parseStructured<T extends z.ZodTypeAny>(
 }
 
 /**
+ * プロンプト境界タグ（<transcript>, <final_artifact>）の脱出インジェクションを防止するためのサニタイズ関数。
+ * 受検者入力・対話ログ・成果物に含まれるタグ類似表記を無害化する（RV-B3）。
+ */
+export function sanitizeXmlBoundary(text: string): string {
+  if (!text) return "";
+  return text.replace(/<\/?(transcript|final_artifact)\b[^>]*>/gi, (match) =>
+    match.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  );
+}
+
+/**
  * AutoSCORE Stage 1: Extract evidence spans from dialogue and diff
  */
 export async function extractEvidence(
@@ -241,12 +252,12 @@ ${JSON.stringify(injectedFlaws, null, 2)}
 ${task.test_code ? `\n【課題に含まれるユニットテストコード（正常系のみ通過する設計の罠が含まれうる）】\n${task.test_code}\n` : ""}
 【対話ログ】
 <transcript>
-${transcript.map((t) => `[Turn ${t.turnSeq}] ${t.role.toUpperCase()}: ${t.content}`).join("\n")}
+${transcript.map((t) => `[Turn ${t.turnSeq}] ${t.role.toUpperCase()}: ${sanitizeXmlBoundary(t.content)}`).join("\n")}
 </transcript>
 
 【受講者が確定した最終成果物】
 <final_artifact>
-${finalArtifact}
+${sanitizeXmlBoundary(finalArtifact)}
 </final_artifact>
 `;
 
