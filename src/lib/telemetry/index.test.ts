@@ -12,11 +12,15 @@ vi.mock("../db", () => ({
     learnerPreliminaryJudgement: {
       create: vi.fn().mockResolvedValue({ judgement_id: "judgement-1" }),
     },
+    session: {
+      update: vi.fn().mockResolvedValue({ session_id: "session-1", ended_at: new Date() }),
+    },
   },
 }));
 
 import { prisma } from "../db";
 import {
+  completeSession,
   recordPreliminaryJudgement,
   recordRating,
   recordScoreFeedback,
@@ -217,5 +221,55 @@ describe("recordPreliminaryJudgement", () => {
       recordPreliminaryJudgement(baseJudgementParams({ action: "comment" }))
     ).resolves.toEqual({ judgement_id: "judgement-1" });
     expect(prisma.learnerPreliminaryJudgement.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("completeSession (RV-K11)", () => {
+  it("セッションの ended_at を現在時刻で更新する", async () => {
+    const fixedDate = new Date("2026-09-22T10:00:00Z");
+    await completeSession("session-1", fixedDate);
+
+    expect(prisma.session.update).toHaveBeenCalledWith({
+      where: { session_id: "session-1" },
+      data: { ended_at: fixedDate },
+    });
+  });
+
+  it("トランザクションクライアント tx が渡された場合はそちらの session.update を呼ぶ", async () => {
+    const txMock = {
+      session: { update: vi.fn().mockResolvedValue({ session_id: "session-1" }) },
+    };
+    const fixedDate = new Date();
+    await completeSession("session-1", fixedDate, txMock as any);
+
+    expect(txMock.session.update).toHaveBeenCalledWith({
+      where: { session_id: "session-1" },
+      data: { ended_at: fixedDate },
+    });
+    expect(prisma.session.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("recordRating tx / stakesContext support (RV-E2, RV-A10)", () => {
+  it("tx が渡された場合は tx.rating.create を呼び出す", async () => {
+    const txMock = {
+      rating: { create: vi.fn().mockResolvedValue({ rating_id: "tx-rating-1" }) },
+    };
+    await recordRating(baseRatingParams(), txMock as any);
+
+    expect(txMock.rating.create).toHaveBeenCalledOnce();
+    expect(prisma.rating.create).not.toHaveBeenCalled();
+  });
+
+  it("stakesContext が指定された場合はその値を記録する", async () => {
+    await recordRating(baseRatingParams({ stakesContext: "promotion" }));
+
+    expect(prisma.rating.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          stakes_context: "promotion",
+        }),
+      })
+    );
   });
 });

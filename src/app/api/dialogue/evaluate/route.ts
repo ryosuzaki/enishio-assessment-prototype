@@ -15,16 +15,26 @@ import {
   recordEvidenceComponents,
   recordRelianceMetrics,
   recordLlmCall,
+  completeSession,
 } from "@/lib/telemetry";
 import type { LlmUsage } from "@/lib/llm";
 import { getDynamicTask } from "@/data/dynamic-task";
 import { getInjectedFlaws } from "@/data/dynamic-task.server";
+import { prisma } from "@/lib/db";
 import { z } from "zod";
 import {
   MAX_ARTIFACT_CHARS,
   MAX_USER_MESSAGE_CHARS,
   parseRequestBody,
 } from "@/lib/request-validation";
+
+const STAKES_CONTEXT_VALUES = [
+  "formative",
+  "education",
+  "promotion",
+  "selection",
+  "verification",
+] as const;
 
 const TranscriptItemSchema = z.object({
   turnSeq: z.coerce.number().int().min(0),
@@ -37,6 +47,7 @@ const EvaluateRequestSchema = z.object({
   taskId: z.string().min(1),
   transcript: z.array(TranscriptItemSchema),
   finalArtifact: z.string().max(MAX_ARTIFACT_CHARS).nullable().optional(),
+  stakesContext: z.enum(STAKES_CONTEXT_VALUES).optional(),
 });
 
 // POST /api/dialogue/evaluate - execute 2-stage AutoSCORE evaluation and record rating
@@ -44,7 +55,7 @@ export async function POST(req: Request) {
   try {
     const parsed = await parseRequestBody(req, EvaluateRequestSchema, "AutoSCORE evaluation");
     if (!parsed.ok) return parsed.response;
-    const { sessionId, taskId, transcript, finalArtifact } = parsed.data;
+    const { sessionId, taskId, transcript, finalArtifact, stakesContext } = parsed.data;
 
     // taskId が未知のIDなら getDynamicTask が投げる（黙って別課題にすり替えない）
     const task = getDynamicTask(taskId);
@@ -76,38 +87,7 @@ export async function POST(req: Request) {
 
     const stepId = `step-dynamic-${task.task_id}`;
 
-    const ratingRecord = await recordRating({
-      sessionId,
-      learnerId: session.learner_id,
-      sessionSeq: session.session_seq,
-      stepId,
-      axisId: "axis_4",
-      ratingCategory: isPending ? null : scoring.rating_category,
-      raterType: isPending ? "pending_human" : "llm",
-      raterId: isPending ? "awaiting-human-review" : getScorerModel(),
-      scorerModelVersion: getScorerModelVersion(),
-      stimulusRef: task.task_id,
-      stimulusType: "generated",
-      anchorId: null,
-      anchorStatus: null,
-      scoringConfidence: scoring.scoring_confidence,
-      // 深掘りが1手も入っていないセッションでは null が返る。0 で埋めない。
-      probeConsistencyScore: evidence.probe_consistency?.score ?? null,
-      stimulusFeatures: {
-        domain: task.domain,
-        error_types: task.stimulus_features.injected_flaw_types,
-        target_dimension: task.target_dimension,
-        variable_count: task.stimulus_features.variable_count,
-        tradeoff_complexity: task.stimulus_features.tradeoff_complexity,
-        jargon_density: task.stimulus_features.jargon_density,
-        identified_flaws_count: evidence.identified_flaws_count,
-        avoided_false_positives: evidence.avoided_false_positives,
-        // 保留になった場合、モデルが提示していたバンドは監査のため残す（確定値ではない）
-        proposed_rating_category: isPending ? scoring.rating_category : undefined,
-      },
-    });
-
-    // 4. 根拠要素を永続化する（MVP 4.4）。**評点だけ残して根拠を捨てない。**
+    // 4. 根拠要素の整形（MVP 4.4）。**評点だけ残して根拠を捨てない。**
     //    これが無いと「根拠と得点の対応がログ上で追跡可能」という2段階分離の主張が成立しない。
     const evidenceRecords = evidence.components.map((c) => ({
       turnIndex: c.turn_index,
@@ -117,17 +97,65 @@ export async function POST(req: Request) {
       injectedFlawId: c.injected_flaw_id,
       rationaleSummary: c.rationale_summary,
     }));
-    await recordEvidenceComponents(ratingRecord.rating_id, sessionId, evidenceRecords);
 
-    // 5. 適正依存の3指標を記録する（MVP 2.3 / 4.4）。
+    // 5. 適正依存の3指標（MVP 2.3 / 4.4）。
     //    正常箇所のラベルが要るため、正答鍵はサーバ側でのみ参照する。
     const flawMap = getInjectedFlaws(taskId);
-    await recordRelianceMetrics({
-      sessionId,
-      stepId,
-      flawIds: flawMap.filter((f) => f.is_flaw).map((f) => f.flaw_id),
-      validSpanIds: flawMap.filter((f) => !f.is_flaw).map((f) => f.flaw_id),
-      components: evidenceRecords,
+
+    // 評点、根拠要素、適正依存指標、セッション完了（ended_at）を同一トランザクションで不可分に確定させる（RV-E2, RV-K11）。
+    // 途中で失敗した場合に孤立した Rating だけが残ることを防ぐ。
+    const ratingRecord = await prisma.$transaction(async (tx) => {
+      const rating = await recordRating(
+        {
+          sessionId,
+          learnerId: session.learner_id,
+          sessionSeq: session.session_seq,
+          stepId,
+          axisId: "axis_4",
+          ratingCategory: isPending ? null : scoring.rating_category,
+          raterType: isPending ? "pending_human" : "llm",
+          raterId: isPending ? "awaiting-human-review" : getScorerModel(),
+          scorerModelVersion: getScorerModelVersion(),
+          stimulusRef: task.task_id,
+          stimulusType: "generated",
+          anchorId: null,
+          anchorStatus: null,
+          stakesContext,
+          scoringConfidence: scoring.scoring_confidence,
+          // 深掘りが1手も入っていないセッションでは null が返る。0 で埋めない。
+          probeConsistencyScore: evidence.probe_consistency?.score ?? null,
+          stimulusFeatures: {
+            domain: task.domain,
+            error_types: task.stimulus_features.injected_flaw_types,
+            target_dimension: task.target_dimension,
+            variable_count: task.stimulus_features.variable_count,
+            tradeoff_complexity: task.stimulus_features.tradeoff_complexity,
+            jargon_density: task.stimulus_features.jargon_density,
+            identified_flaws_count: evidence.identified_flaws_count,
+            avoided_false_positives: evidence.avoided_false_positives,
+            // 保留になった場合、モデルが提示していたバンドは監査のため残す（確定値ではない）
+            proposed_rating_category: isPending ? scoring.rating_category : undefined,
+          },
+        },
+        tx
+      );
+
+      await recordEvidenceComponents(rating.rating_id, sessionId, evidenceRecords, tx);
+
+      await recordRelianceMetrics(
+        {
+          sessionId,
+          stepId,
+          flawIds: flawMap.filter((f) => f.is_flaw).map((f) => f.flaw_id),
+          validSpanIds: flawMap.filter((f) => !f.is_flaw).map((f) => f.flaw_id),
+          components: evidenceRecords,
+        },
+        tx
+      );
+
+      await completeSession(sessionId, new Date(), tx);
+
+      return rating;
     });
 
     return NextResponse.json({
@@ -144,6 +172,7 @@ export async function POST(req: Request) {
       evidenceComponents: evidence.components,
       probeConsistency: evidence.probe_consistency ?? null,
       scorerModelVersion: getScorerModelVersion(),
+      stakesContext: ratingRecord.stakes_context,
     });
   } catch (error: unknown) {
     if (error instanceof ScoringUnavailableError) {

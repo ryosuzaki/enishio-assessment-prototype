@@ -13,12 +13,24 @@ const {
   recordEvidenceComponents,
   recordRelianceMetrics,
   recordLlmCall,
+  completeSession,
 } = vi.hoisted(() => ({
   recordRating: vi.fn(),
   resolveSessionContext: vi.fn(),
   recordEvidenceComponents: vi.fn(),
   recordRelianceMetrics: vi.fn(),
   recordLlmCall: vi.fn(),
+  completeSession: vi.fn(),
+}));
+
+const { transactionMock } = vi.hoisted(() => ({
+  transactionMock: vi.fn(async (cb: (tx: any) => Promise<any>) => cb({ txSentinel: true })),
+}));
+
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    $transaction: transactionMock,
+  },
 }));
 
 vi.mock("@/lib/evaluator", async (importOriginal) => ({
@@ -33,6 +45,7 @@ vi.mock("@/lib/telemetry", () => ({
   recordEvidenceComponents,
   recordRelianceMetrics,
   recordLlmCall,
+  completeSession,
 }));
 
 import { SCORER_MODEL_VERSION, ScoringUnavailableError } from "@/lib/evaluator";
@@ -106,10 +119,11 @@ beforeEach(() => {
     learner_id: "learner-from-session",
     session_seq: 7,
   });
-  recordRating.mockResolvedValue({ rating_id: "rating-1" });
+  recordRating.mockResolvedValue({ rating_id: "rating-1", stakes_context: "formative" });
   recordEvidenceComponents.mockResolvedValue(1);
   recordRelianceMetrics.mockResolvedValue({});
   recordLlmCall.mockResolvedValue({});
+  completeSession.mockResolvedValue({ session_id: "session-1" });
   extractEvidence.mockResolvedValue(EVIDENCE);
   computeBandScore.mockResolvedValue(scoring(0.82));
 });
@@ -271,16 +285,21 @@ describe("2段階分離と正答鍵の扱い", () => {
   it("評点だけでなく根拠要素そのものを、評点と同じ rating_id で永続化する", async () => {
     await post(validBody());
 
-    expect(recordEvidenceComponents).toHaveBeenCalledWith("rating-1", "session-1", [
-      {
-        turnIndex: 3,
-        quotedSpan: "失効済みトークンが通ってしまう",
-        componentType: "flaw_detection",
-        grounding: "tied_to_requirement",
-        injectedFlawId: "FLAW-01",
-        rationaleSummary: "要件2へ接続した指摘",
-      },
-    ]);
+    expect(recordEvidenceComponents).toHaveBeenCalledWith(
+      "rating-1",
+      "session-1",
+      [
+        {
+          turnIndex: 3,
+          quotedSpan: "失効済みトークンが通ってしまう",
+          componentType: "flaw_detection",
+          grounding: "tied_to_requirement",
+          injectedFlawId: "FLAW-01",
+          rationaleSummary: "要件2へ接続した指摘",
+        },
+      ],
+      expect.anything()
+    );
   });
 
   it("採点に使ったモデルとプロンプト版を評点へ記録する", async () => {
@@ -387,5 +406,47 @@ describe("採点できないときは採点しない", () => {
     expect(recordRating).not.toHaveBeenCalled();
     expect(recordEvidenceComponents).not.toHaveBeenCalled();
     expect(recordRelianceMetrics).not.toHaveBeenCalled();
+  });
+});
+
+describe("トランザクション化とセッション完了・用途の記録 (RV-E2, RV-K11, RV-A10)", () => {
+  it("prisma.$transaction を介して評点・根拠・適正依存・セッション完了を不可分に記録する (RV-E2, RV-K11)", async () => {
+    const res = await post(validBody());
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(transactionMock).toHaveBeenCalledOnce();
+    // 各記録関数にトランザクションクライアント txSentinel が渡されていること
+    expect(recordRating).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ txSentinel: true })
+    );
+    expect(recordEvidenceComponents).toHaveBeenCalledWith(
+      "rating-1",
+      "session-1",
+      expect.any(Array),
+      expect.objectContaining({ txSentinel: true })
+    );
+    expect(recordRelianceMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: "session-1" }),
+      expect.objectContaining({ txSentinel: true })
+    );
+    expect(completeSession).toHaveBeenCalledWith(
+      "session-1",
+      expect.any(Date),
+      expect.objectContaining({ txSentinel: true })
+    );
+    expect(json.stakesContext).toBe("formative");
+  });
+
+  it("リクエストで stakesContext が指定された場合は recordRating に伝達しレスポンスにも含める (RV-A10)", async () => {
+    recordRating.mockResolvedValue({ rating_id: "rating-1", stakes_context: "promotion" });
+
+    const res = await post(validBody({ stakesContext: "promotion" }));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(recordedRating().stakesContext).toBe("promotion");
+    expect(json.stakesContext).toBe("promotion");
   });
 });

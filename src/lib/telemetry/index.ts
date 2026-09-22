@@ -1,4 +1,5 @@
 import { prisma } from "../db";
+import type { Prisma } from "@prisma/client";
 import { prismaErrorCode } from "@/lib/error-message";
 import type { LlmUsage } from "@/lib/llm";
 import { v5 as uuidv5 } from "uuid";
@@ -193,7 +194,7 @@ export interface RecordRatingParams {
  * Record a rating entry (ratings is the single source of truth for evaluation)
  * Enforces anchor_id and anchor_status when stimulus_type === 'anchor' [D-50, D-51]
  */
-export async function recordRating(params: RecordRatingParams) {
+export async function recordRating(params: RecordRatingParams, tx?: Prisma.TransactionClient) {
   if (params.stimulusType === "anchor") {
     if (!params.anchorId || !params.anchorStatus) {
       throw new Error(
@@ -214,7 +215,8 @@ export async function recordRating(params: RecordRatingParams) {
     );
   }
 
-  return await prisma.rating.create({
+  const client = tx ?? prisma;
+  return await client.rating.create({
     data: {
       session_id: params.sessionId,
       learner_id: params.learnerId,
@@ -441,10 +443,12 @@ export interface EvidenceComponentRecord {
 export async function recordEvidenceComponents(
   ratingId: string,
   sessionId: string,
-  components: EvidenceComponentRecord[]
+  components: EvidenceComponentRecord[],
+  tx?: Prisma.TransactionClient
 ) {
   if (!components || components.length === 0) return 0;
-  const result = await prisma.evidenceComponent.createMany({
+  const client = tx ?? prisma;
+  const result = await client.evidenceComponent.createMany({
     data: components.map((c) => ({
       rating_id: ratingId,
       session_id: sessionId,
@@ -492,8 +496,12 @@ export const RELIANCE_OPERATIONALIZATION =
   "スパン単位の明示的採択／棄却は未取得のため automation_bias_index は " +
   "correct_self_reliance の補数になる（3指標は独立ではない）。";
 
-export async function recordRelianceMetrics(input: RelianceMetricsInput) {
+export async function recordRelianceMetrics(
+  input: RelianceMetricsInput,
+  tx?: Prisma.TransactionClient
+) {
   const { sessionId, stepId, flawIds, validSpanIds, components } = input;
+  const client = tx ?? prisma;
 
   const detectedFlawIds = new Set(
     components
@@ -518,7 +526,7 @@ export async function recordRelianceMetrics(input: RelianceMetricsInput) {
   const automationBiasIndex = flawCount > 0 ? (flawCount - detected) / flawCount : null;
   const correctAiReliance = validCount > 0 ? (validCount - overCalled) / validCount : null;
 
-  return await prisma.relianceMetrics.upsert({
+  return await client.relianceMetrics.upsert({
     where: { session_id_step_id: { session_id: sessionId, step_id: stepId } },
     update: {
       correct_ai_reliance: correctAiReliance,
@@ -538,6 +546,21 @@ export async function recordRelianceMetrics(input: RelianceMetricsInput) {
       flaw_span_count: flawCount,
       operationalization: RELIANCE_OPERATIONALIZATION,
     },
+  });
+}
+
+/**
+ * セッションを完了状態として記録する（ended_at を更新する）。[RV-K11]
+ */
+export async function completeSession(
+  sessionId: string,
+  endedAt: Date = new Date(),
+  tx?: Prisma.TransactionClient
+) {
+  const client = tx ?? prisma;
+  return await client.session.update({
+    where: { session_id: sessionId },
+    data: { ended_at: endedAt },
   });
 }
 
