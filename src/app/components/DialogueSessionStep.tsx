@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Quote } from "lucide-react";
 import type { DynamicTaskScenario } from "@/data/dynamic-task";
 import type { ChatMessage, EvidenceTargetState, FocusItem, ProbeMove, PremiseShiftState } from "../types";
@@ -92,10 +92,16 @@ export function DialogueSessionStep({
   const [leftTab, setLeftTab] = useState<"requirements" | "context">("requirements");
   const [codeTab, setCodeTab] = useState<"impl" | "test">("impl");
   const [quoteNotice, setQuoteNotice] = useState<string | null>(null);
+  const [isChatExpanded, setIsChatExpanded] = useState<boolean>(false);
 
   const implTextareaRef = useRef<HTMLTextAreaElement>(null);
   const testTextareaRef = useRef<HTMLTextAreaElement>(null);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory]);
 
   /** 選択されたコード行をチャット入力欄に Markdown 引用形式で挿入 */
   const handleQuoteCode = () => {
@@ -403,14 +409,28 @@ export function DialogueSessionStep({
       {/* Chat & Prompt Dialogue Pane */}
       <section className="space-y-block rounded-card border border-line bg-surface p-5">
         <header className="flex items-center justify-between border-b border-line pb-2">
-          <h2 className="text-section text-ink">AI同僚との対話・修正指示（マルチターン対話）</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-section text-ink">AI同僚との対話・修正指示（マルチターン対話）</h2>
+            <button
+              type="button"
+              onClick={() => setIsChatExpanded(!isChatExpanded)}
+              className="rounded-chip border border-line px-2 py-0.5 text-label text-ink-3 transition-colors hover:border-line-strong hover:text-ink"
+            >
+              {isChatExpanded ? "標準の高さに戻す" : "縦幅をさらに広げる"}
+            </button>
+          </div>
           <span className="text-caption text-ink-3" data-numeric>
             Turn #{turnCounter}
           </span>
         </header>
 
         {/* Chat Message List */}
-        <div className="max-h-[380px] min-h-[220px] space-y-cell overflow-y-auto pr-2">
+        <div
+          className={cn(
+            "space-y-cell overflow-y-auto pr-2 transition-all duration-150",
+            isChatExpanded ? "min-h-[600px] max-h-[850px]" : "min-h-[440px] max-h-[660px]",
+          )}
+        >
           {chatHistory.map((msg, i) => (
             <div
               key={i}
@@ -440,6 +460,7 @@ export function DialogueSessionStep({
               </div>
             </div>
           ))}
+          <div ref={chatEndRef} />
         </div>
 
         {/* Intent-Action Gap Warning Toast if triggered */}
@@ -456,7 +477,7 @@ export function DialogueSessionStep({
         <div className="flex items-end gap-2 pt-1">
           <textarea
             ref={promptInputRef}
-            rows={2}
+            rows={3}
             value={userPromptInput}
             onChange={(e) => setUserPromptInput(e.target.value)}
             onKeyDown={(e) => {
@@ -470,7 +491,7 @@ export function DialogueSessionStep({
             aria-label="AI同僚への指示・指摘入力"
             placeholder="AI同僚に指示・指摘を入力（Enterで送信、Shift+Enterで改行。コード引用対応）…"
             className={cn(
-              "flex-1 resize-y rounded-chip border border-line-strong bg-surface px-4 py-2.5",
+              "min-h-[76px] flex-1 resize-y rounded-chip border border-line-strong bg-surface px-4 py-2.5",
               "text-caption text-ink focus:border-accent focus:outline-none",
             )}
           />
@@ -478,7 +499,7 @@ export function DialogueSessionStep({
             variant="primary"
             onClick={onSendDialogueTurn}
             disabled={isSubmitting || !userPromptInput.trim()}
-            className="h-[42px]"
+            className="h-[44px]"
           >
             送信
           </Button>
