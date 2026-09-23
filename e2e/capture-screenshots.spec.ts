@@ -186,7 +186,8 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
               rationale_summary: "Redis障害時の耐障害性・単一障害点要件違反を指摘",
             },
           ],
-          scorerModelVersion: "claude-opus-5/extract-v2/score-v2",
+          // 実採点器の既定値（src/lib/llm.ts の DEFAULT_LLM_MODEL と getScorerModelVersion）に合わせる
+          scorerModelVersion: "gpt-5.6-luna/extract-v7/score-v3",
         }),
       });
     });
@@ -207,9 +208,9 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     // 01. 初期画面 (Init Step)
     await page.goto("/");
     // 見出しと副題は別の行に分けてある（`[D-102]`：h1 に括弧付きの長い副題を抱かせない）
-    await expect(page.locator("h1")).toContainText("動的実務演習セッション");
-    await expect(page.getByText("AI同僚協働・レビュー対話")).toBeVisible();
-    await expect(page.getByText("Live Telemetry Monitor")).toBeVisible();
+    await expect(page.locator("h1")).toContainText("実務演習セッション");
+    await expect(page.getByText("AI同僚とのコードレビュー演習")).toBeVisible();
+    await expect(page.getByText("計測ログ", { exact: true })).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: path.join(screenshotsDir, "01-init.png"),
@@ -219,15 +220,15 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     // 02. アンカー出題・段階1（採用可否）[D-83]
     // 共通アンカー評価は独立タブ。出題項目IDは供給源（運用バンク / 同梱サンプル）で
     // 変わるため決め打ちせず、選択済みラジオの value から拾う
-    await page.getByRole("button", { name: /共通アンカー評価/ }).click();
+    await page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: "固定設問（SCT型）" }).click();
     const anchorRadio = page.locator("input[name='anchorItem']:checked");
     await expect(anchorRadio).toBeAttached();
     const selectedAnchorId = await anchorRadio.inputValue();
     await page
-      .getByRole("button", { name: "このアンカー項目を体験する（4段階疑似対話を開始）" })
+      .getByRole("button", { name: "この設問を体験する" })
       .click();
     await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
-    await expect(page.getByText(new RegExp(`共通アンカー項目: ${selectedAnchorId}`))).toBeVisible();
+    await expect(page.getByText(new RegExp(`固定設問: ${selectedAnchorId}`))).toBeVisible();
     await page.locator("input[name='stage1']").nth(1).check();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
@@ -276,13 +277,13 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     });
 
     // アンカー送信 ➔ 動的2ペイン対話セッション
-    await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
-    await expect(page.getByText("共通アンカー項目の記録が完了しました")).toBeVisible();
+    await page.getByRole("button", { name: "回答を送信して記録する" }).click();
+    await expect(page.getByText("固定設問の回答を記録しました")).toBeVisible();
     await page.getByRole("button", { name: "実務演習セッションを体験する" }).click();
 
     // 実務演習セッションタブの初期画面から課題提示へ進む
     await page
-      .getByRole("button", { name: "実務演習セッションを開始する（課題提示へ）" })
+      .getByRole("button", { name: "演習を開始する" })
       .click();
 
     // 2ペインの表示確認
@@ -322,13 +323,13 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     // 04. 動的対話画面 (2-Pane Dialogue with Code Quoting)
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
-      path: path.join(screenshotsDir, "04-dialogue-3pane.png"),
+      path: path.join(screenshotsDir, "04-dialogue.png"),
       fullPage: true,
     });
 
     // 05. CFF暫定判断 (Force Decision First & Mandatory Justification)
     await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
-    await expect(page.getByText("CFF: Force Decision First & Mandatory Justification")).toBeVisible();
+    await expect(page.getByText("場面4：意思決定")).toBeVisible();
     await page.locator("input[value='remand']").check();
     const justificationTextarea = page.getByPlaceholder(
       /進行役の要約に補足や微調整がある場合のみ入力/
@@ -338,18 +339,18 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     );
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
-      path: path.join(screenshotsDir, "05-cff.png"),
+      path: path.join(screenshotsDir, "05-decision.png"),
       fullPage: true,
     });
 
     // 06. 構造化採点パイプライン 2段階採点結果（XAIレポート）
-    await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
-    await expect(page.getByText("構造化採点パイプライン 2段階評価結果（XAIレポート）")).toBeVisible();
+    await page.getByRole("button", { name: "判定を確定して採点する" }).click();
+    await expect(page.getByText("XAI診断（構造化採点パイプラインによる2段階採点）")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Band 3: 前提摘発・要件検証行動" })).toBeVisible();
     await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
-    await expect(page.getByText("判定根拠（Evidence Summary）")).toBeVisible();
-    await expect(page.getByText("形成的診断アドバイス（Diagnostic Feedback）")).toBeVisible();
-    await expect(page.getByText("抽出された受講者の検証行動スパン")).toBeVisible();
+    await expect(page.getByText("判定の根拠", { exact: true })).toBeVisible();
+    await expect(page.getByText("次に伸ばすところ")).toBeVisible();
+    await expect(page.getByText(/抽出された検証行動（採点パイプライン第1段の出力）/)).toBeVisible();
 
     // 異議申立導線の入力
     await page.locator("input[value='too_low']").check();
@@ -365,7 +366,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     });
 
     // 07. 組織・受講管理ダッシュボード（Viability・モックUI）
-    const dashboardTabBtn = page.getByRole("button", { name: /① 組織.*ダッシュボード/ });
+    const dashboardTabBtn = page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /組織ダッシュボード/ });
     await dashboardTabBtn.click();
     await expect(page.locator("h1")).toContainText("組織・受講管理ダッシュボード");
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -375,7 +376,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     });
 
     // 08. 受講者スキルカルテ（Viability・モックUI）
-    const profileTabBtn = page.getByRole("button", { name: /② 受講者スキルカルテ/ });
+    const profileTabBtn = page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /受講者カルテ/ });
     await profileTabBtn.click();
     await expect(page.locator("h1")).toContainText("佐藤 拓也 さんのスキルカルテ");
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -385,7 +386,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     });
 
     // 09. シナリオ分析＆エキスパート事後講評（デブリーフィング）
-    const galleryTabBtn = page.getByRole("button", { name: /③ エキスパート事後講評/ });
+    const galleryTabBtn = page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /事後講評/ });
     await galleryTabBtn.click();
     await expect(page.locator("h1")).toContainText("シナリオ分析＆エキスパート検証戦略");
     await page.evaluate(() => window.scrollTo(0, 0));

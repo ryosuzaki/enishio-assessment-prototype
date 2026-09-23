@@ -94,7 +94,7 @@ function StageHeader({
 }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line pb-3">
-      <Badge tone="accent">共通アンカー項目: {anchorId}</Badge>
+      <Badge tone="accent">固定設問: {anchorId}</Badge>
       {/*
         総段数を出さない。「段階 1 / 5」と出せば、その項目に段階3'（新情報を含まない反論）が
         あることが最初から分かる。どの項目に反論が来るか読めないことが測度の前提である [D-83]。
@@ -355,7 +355,7 @@ export function AnchorQuestionStep({
             {isSubmitting ? (
               <RefreshCw className="h-4 w-4 animate-spin" aria-label="送信中" />
             ) : (
-              "アンカー回答を送信・記録する"
+              "回答を送信して記録する"
             )}
           </Button>
         </div>
@@ -369,7 +369,7 @@ export function AnchorQuestionStep({
       <div className={PANEL}>
         <div className="border-b border-line pb-3">
           <h2 className="text-title tracking-tight text-ink">
-            共通アンカー項目の記録が完了しました
+            固定設問の回答を記録しました
           </h2>
           <p className="text-caption text-ink-3">この区間は採点されません。結果も返りません。</p>
         </div>
@@ -381,30 +381,30 @@ export function AnchorQuestionStep({
         */}
         <div className="space-y-2 rounded-card border border-dashed border-line-strong bg-surface-sunken p-4">
           <p className="text-section text-ink">
-            設計注記（プロトタイプ表示・受検者には出さない）
+            設計メモ（審査・開発向けの表示。本番では受講者に出さない）
           </p>
           <ul className="list-outside list-disc space-y-1 pl-4 text-caption text-ink-2">
             <li>
               <span className="font-mono text-ink">anchor_status = pretest</span> ／{" "}
-              <span className="font-mono text-ink">format_version = v2-sct</span>（尺度較正用・無得点運用）
+              <span className="font-mono text-ink">format_version = v2-sct</span>（試行項目のため得点化しない）
             </li>
             <li>
-              段階1・2 は決定論的キー、段階3 は専門家パネルの応答分布で採点する（正答鍵は無い）
+              段階1・2 は決まった正答キーで、段階3 は専門家パネルの回答分布で採点する（LLMは使わない）
             </li>
             <li>
               段階3のパネルは{" "}
               <span className="font-mono text-ink">status = {currentAnchor.stage3.panel_status}</span>（n ={" "}
               {currentAnchor.stage3.panel_n}）。
               {currentAnchor.stage3.panel_status === "mock" &&
-                " ダミー分布のため採点値は算出していない（[D-82] 決定3：技術判断の専門家10〜15名の組成が前提）。"}
+                " いまのパネルはダミー分布なので、採点値は出していない（技術判断の専門家10〜15名でパネルを組むのが前提）。"}
             </li>
-            <li>正誤もパネル分布も受検者へ返さない。返せば固定基準点そのものが動く</li>
+            <li>正誤もパネル分布も受講者へは返さない。返すと、それが学習材料になって基準点そのものが動く</li>
             {currentAnchor.stage3b && (
               <li>
                 この項目には<strong className="font-semibold text-ink">段階3&apos;（新情報を含まない反論）</strong>
                 が含まれる。採点は<span className="font-mono text-ink">stage3b − stage3</span>の差分のみで、
-                <strong className="font-semibold text-ink">専門家パネルを必要としない</strong>——0
-                なら圧力下での立場の保持、提案側へ動けば迎合（過剰依存 P(R_accept | A_i)）である [D-83]
+                <strong className="font-semibold text-ink">専門家パネルを必要としない</strong>。差が0なら圧力に対して立場を保てており、
+                AI側の提案へ動けば迎合（AIへの過剰依存）と見る
               </li>
             )}
             {bankSource && (
@@ -418,15 +418,15 @@ export function AnchorQuestionStep({
         <div className="space-y-1.5 rounded-card border border-line bg-surface-sunken p-4">
           <p className="text-section text-ink">次のステップへの案内:</p>
           <p className="text-caption text-ink-2">
-            共通アンカー項目は、全員に共通する「固定のものさし」として測定精度を担保する仕組みです。
-            続けて別のアンカー項目を試すか、2ペイン画面による動的実務演習セッションへ進んでください。
+            固定設問は、全員に共通する「固定のものさし」です。
+            別の設問を試すか、実務演習セッションへ進んでください。
           </p>
         </div>
 
         <div className="flex flex-col items-stretch justify-between gap-3 pt-1 sm:flex-row sm:items-center">
           {onResetAnchorFlow && (
             <Button variant="secondary" onClick={onResetAnchorFlow}>
-              別のアンカー項目を試す
+              別の設問を試す
             </Button>
           )}
           <Button
@@ -446,9 +446,9 @@ export function AnchorQuestionStep({
     <div className={PANEL}>
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3">
         <div className="space-y-0.5">
-          <p className="text-caption text-ink-3">IRT 項目応答理論 / 尺度等化モジュール</p>
+          <p className="text-caption text-ink-3">第2層：LLMを通さない外部基準</p>
           <h1 className="text-title tracking-tight text-ink">
-            共通アンカー項目評価（Standard Benchmark Anchor）
+            固定設問（SCT型）
           </h1>
         </div>
         <span data-testid="anchor-bank-source-badge">
@@ -465,35 +465,36 @@ export function AnchorQuestionStep({
       {bankSource === "demo_sample_v2" && (
         <div className="space-y-1 rounded-card border border-caution/25 bg-caution-wash p-3.5 text-caption text-ink-2">
           <p className="font-semibold text-ink">
-            出題する共通アンカー項目（全{anchorList.length}項目から選択）
+            公開用サンプル {anchorList.length} 問から選べます
           </p>
           <p>
-            運用中の共通アンカー項目バンクは、受検者への事前露出を避けるため公開していません。
-            ここではリポジトリ同梱の公開デモ用サンプルを表示しています。
-            （※類型C（仕込んだ不備が無い項目）が含まれます）
+            運用中の設問バンクは、受講者が事前に目にしないよう公開していません。
+            ここではリポジトリに同梱した公開用サンプルを表示しています。
+            （類型C＝仕込んだ不備が無い設問を含みます）
           </p>
         </div>
       )}
 
       <div className="space-y-2 rounded-card border border-line bg-surface-sunken p-4 text-caption text-ink-2">
         <p className="text-section text-ink">
-          共通アンカー項目とは何か（審査員・受講者向け解説）
+          固定設問とは
         </p>
         <p>
-          動的対話セッションでは受講者ごとに異なる会話が展開されるため、全員が同じ条件で答える
-          <strong className="font-semibold text-ink">「固定のものさし（共通アンカー）」</strong>
-          を組み合わせて測定することで、異なる課題や評価回の間で公平に実力を比較（等化）します。
+          実務演習は受講者ごとに会話の展開が変わり、評点はLLM判定器の判断に依存します。そこで全員が同じ条件で答える
+          <strong className="font-semibold text-ink">「固定のものさし」</strong>
+          を別に置き、LLMを通さずに採点します。固定設問の成績が変わらないのに演習の評点だけが動いたら、
+          動いたのは受講者ではなく判定器だと見分けられます。
         </p>
         <p className="text-ink-3">
-          本プロトタイプでは、医学教育の臨床推論評価で確立された
-          <strong className="font-semibold text-ink-2">SCT形式（Script Concordance Test）4段階構成</strong>
-          を採用し、「全体判断（採用可否）&rarr; 懸念の所在 &rarr; 前提変化への適応（判断更新）&rarr;
-          反論への応答（迎合測定）」を段階的に開示して動的コンピテンシーを測定します。
+          形式は、医学教育で不確実な状況下の臨床推論を測るのに使われる
+          <strong className="font-semibold text-ink-2">SCT（Script Concordance Test）</strong>
+          をIT向けに組み直したもので、「全体判断 &rarr; 懸念の所在 &rarr; 前提変化での判断更新 &rarr;
+          反論への応答」を1段ずつ開示して答えてもらいます。
         </p>
       </div>
 
       <div className="space-y-row">
-        <p className="text-section text-ink">体験するアンカー項目を選択してください</p>
+        <p className="text-section text-ink">体験する設問を選んでください</p>
         <div className="space-y-2">
           {anchorList.map((item) => (
             <Option
@@ -522,7 +523,7 @@ export function AnchorQuestionStep({
           {isSubmitting ? (
             <RefreshCw className="h-4 w-4 animate-spin" aria-label="読み込み中" />
           ) : (
-            "このアンカー項目を体験する（4段階疑似対話を開始）"
+            "この設問を体験する"
           )}
         </Button>
       </div>

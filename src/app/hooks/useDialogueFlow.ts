@@ -320,7 +320,7 @@ export function useDialogueFlow({
     setPrelimError(null);
     setCurrentStep("preliminary_judgement");
     addTelemetry(
-      "Review completed. Advancing to Force Decision First (CFF) - Preliminary Judgement"
+      "Review completed. Advancing to scene 4 (decision before scoring)"
     );
   };
 
@@ -361,7 +361,7 @@ export function useDialogueFlow({
       addTelemetry(`Preliminary judgement recorded: ${prelimAction}`);
 
       // 2. Trigger 2-Stage Structured Scoring Pipeline (W4)
-      addTelemetry("Triggering 構造化採点パイプライン (Axis 4)...");
+      addTelemetry("Triggering structured scoring pipeline (2-stage)...");
       const evalRes = await fetch("/api/dialogue/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -26,19 +26,19 @@ interface PreliminaryJudgementStepProps {
 const DECISIONS: { value: "remand" | "comment" | "approve"; label: string; detail: string }[] = [
   {
     value: "remand",
-    label: "修正を要求 (Request Changes)",
+    label: "修正を要求する",
     detail:
       "重大な障害リスクや規程違反（P0ブロッカー）が残っており、本番リリース不可と判定。修正を指示。",
   },
   {
     value: "comment",
-    label: "条件付きで進める (Comment)",
+    label: "条件付きで承認する",
     detail:
       "主要設計には合意。ステージング環境での追加検証や運用監視（アラート設定）の追加を条件として許可。",
   },
   {
     value: "approve",
-    label: "承認する (Approve)",
+    label: "承認する",
     detail: "要件およびチーム運用基準を満たしており、このまま本番デプロイ可能と判定。",
   },
 ];
@@ -86,22 +86,15 @@ export function PreliminaryJudgementStep({
     <div className="space-y-block">
       <header className="space-y-2 border-b border-line pb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="accent">
-            CFF: Force Decision First &amp; Mandatory Justification (進行役ミラーリング [D-80])
-          </Badge>
-          <Badge tone="neutral">白紙再作文の恒久禁止</Badge>
+          <Badge tone="accent">場面4：意思決定</Badge>
         </div>
         <h2 className="text-title tracking-tight text-ink">
-          成果物の最終判定と判断理由の言語化（進行役論点要約・GitHub PRレビュー形式）
+          PRへの最終判定を確定する
         </h2>
         <p className="max-w-4xl text-caption text-ink-2">
-          AIによる自動採点およびXAIレポートを開示する前に、受講者自身の最終判定をコミットさせます（Force
-          Decision First）。
-          <strong className="font-semibold text-ink">
-            白紙textareaへの長文再作文は恒久的に廃止されました（[D-80]）。
-          </strong>
-          進行役が対話ログから整理した以下の論点要約を確認し、GitHub
-          PRレビュー形式で［承認］［条件付き承認］［修正要求］の意思決定をワンクリックで確定してください。
+          AIの採点を見る前に、自分の判定を先に確定します。後から採点に合わせて判断を変えられないようにするためです。
+          進行役が対話ログから整理したあなたの論点を確認し、GitHubのPRレビューと同じ
+          ［修正要求］［条件付き承認］［承認］から選んでください。
         </p>
       </header>
 
@@ -115,8 +108,8 @@ export function PreliminaryJudgementStep({
       )}
 
       <Card
-        title="進行役（メディエーター）による対話論点のミラーリング要約"
-        meta="※ 対話ログから受講者の主張を抽出・整理済み（先回り正答開示なし）"
+        title="進行役が整理したあなたの論点"
+        meta="対話ログからあなたの主張だけを整理しています（正解は含みません）"
       >
         <div className="space-y-cell">
           {synthesizedPoints.length > 0 ? (
@@ -127,7 +120,7 @@ export function PreliminaryJudgementStep({
                   className="flex flex-col gap-1.5 rounded-chip border border-line bg-surface-sunken p-2.5 text-caption sm:flex-row sm:gap-2.5"
                 >
                   <span className="shrink-0 font-medium text-ink-3" data-numeric>
-                    {pt.num}（Turn {pt.turnSeq}）
+                    {pt.num}（ターン {pt.turnSeq}）
                   </span>
                   <span className="min-w-0 leading-relaxed text-ink-2">
                     <strong className="font-semibold text-ink">{pt.title}: </strong>
@@ -239,7 +232,7 @@ export function PreliminaryJudgementStep({
               評価実行中（Stage 1 抽出 ➔ Stage 2 採点）…
             </>
           ) : (
-            "暫定判断を確定し、AI評価を実行する"
+            "判定を確定して採点する"
           )}
         </Button>
       </div>

@@ -10,6 +10,8 @@ interface TelemetryPanelProps {
   sessionId: string;
   sessionSeq: number;
   telemetryLog: string[];
+  /** 採点APIが返した実際の版。採点前は null（直書きの版を出すと実際の採点器と食い違う） */
+  scorerModelVersion?: string | null;
   onToggleCollapse?: () => void;
   // Socratic Mediator State
   mediationStateEstimate?: EvidenceTargetState[] | null;
@@ -42,6 +44,7 @@ export function TelemetryPanel({
   sessionId,
   sessionSeq,
   telemetryLog,
+  scorerModelVersion,
   onToggleCollapse,
   mediationStateEstimate,
   lastProbeMove,
@@ -53,10 +56,10 @@ export function TelemetryPanel({
   return (
     <div className="space-y-block">
       <Card
-        title="Live Telemetry Monitor"
+        title="計測ログ"
         meta={
           <span className="flex items-center gap-2">
-            <Badge tone="positive">Connected</Badge>
+            <Badge tone="positive">記録中</Badge>
             {onToggleCollapse && (
               <button
                 type="button"
@@ -71,16 +74,16 @@ export function TelemetryPanel({
         }
       >
         <dl>
-          <Reading label="Learner ID">
-            <span title={learnerId}>{learnerId ? learnerId.slice(0, 16) + "…" : "Not initialized"}</span>
+          <Reading label="受講者ID">
+            <span title={learnerId}>{learnerId ? learnerId.slice(0, 16) + "…" : "未開始"}</span>
           </Reading>
-          <Reading label="Session Seq">{sessionId ? `#${sessionSeq}` : "—"}</Reading>
-          <Reading label="Target Axis">動的コンピテンシー（4領域総合）</Reading>
-          <Reading label="Scorer Version">configurable LLM / extract-v6 / score-v3</Reading>
+          <Reading label="セッション番号">{sessionId ? `#${sessionSeq}` : "—"}</Reading>
+          <Reading label="測定対象">AI時代の実務判断力（4観点）</Reading>
+          <Reading label="採点器の版">{scorerModelVersion ?? "採点後に表示"}</Reading>
         </dl>
 
         <div className="mt-block space-y-row">
-          <p className="text-label text-ink-3">Telemetry Event Stream</p>
+          <p className="text-label text-ink-3">イベント記録</p>
           {/* 機械が吐いたログなので等幅で出す。読み物の本文には等幅を使わない */}
           {/* 空のときに枠だけが大きく空くのを避け、記録が溜まってから伸ばす */}
           <div
@@ -111,19 +114,19 @@ export function TelemetryPanel({
         />
       )}
 
-      <Card title="検証・テレメトリ仕様準拠">
+      <Card title="この画面で動いているもの">
         <ul className="list-outside list-disc space-y-row pl-4 text-caption text-ink-2">
           <li>
             データモデル: <code className="font-mono text-data text-ink">learners</code>,{" "}
             <code className="font-mono text-data text-ink">sessions</code>,{" "}
             <code className="font-mono text-data text-ink">ratings</code>,{" "}
             <code className="font-mono text-data text-ink">prompt_turns</code>,{" "}
-            <code className="font-mono text-data text-ink">learner_preliminary_judgements</code> 本番準拠
+            <code className="font-mono text-data text-ink">learner_preliminary_judgements</code> へ実DB記録
           </li>
-          <li>構造化採点パイプライン: 自由記述CoTを排した2段階構造化採点（設定可能モデル）</li>
-          <li>CFF機能: Force Decision First &amp; Mandatory Justification</li>
+          <li>構造化採点パイプライン: 証拠抽出 → ルーブリック採点の2段階（実LLM）</li>
+          <li>意思決定: AIの採点を見る前に判定と理由を確定</li>
           <li>2ペイン演習: 課題要件・成果物エディタ ＆ コード引用連動チャット</li>
-          <li>XAIレポート: 根拠スパンの可視化と異議申立導線（MVP 4.5）</li>
+          <li>XAI診断: 採点根拠の発言をハイライトし、異議申立を受け付ける</li>
         </ul>
       </Card>
     </div>

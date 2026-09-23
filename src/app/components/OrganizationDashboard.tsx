@@ -313,10 +313,10 @@ export function OrganizationDashboard({
         <div className="space-y-1">
           <div className="flex flex-wrap items-baseline gap-cell">
             <h1 className="text-display tracking-tight text-ink">組織・受講管理ダッシュボード</h1>
-            <Badge tone="neutral">Viability</Badge>
+            <Badge tone="neutral">モック</Badge>
           </div>
           <p className="max-w-3xl text-body text-ink-2">
-            企業向けの育成・管理ポータルです。受講者個人の学習進捗と動的コンピテンシー（4領域）の成長推移を一元管理し、
+            企業向けの育成・管理ポータルです。受講者ごとの学習進捗とAI時代の実務判断力（4観点）の推移をまとめて把握し、
             演習によるバイアス克服成果の実証と、現場マネージャーの育成フォロー（1on1・推奨課題配信）を支援します。
           </p>
         </div>
@@ -359,7 +359,7 @@ export function OrganizationDashboard({
           role="status"
           className="rounded-card border border-accent/25 bg-accent-wash p-3.5 text-caption text-ink"
         >
-          非同期エラー検証の強化対象メンバーへ、推奨課題「T-06b（キャッシュ不整合の検知）」を一括配信しました。
+          非同期エラー検証の強化対象メンバーへ、推奨課題「キャッシュ不整合の検知」を一括配信しました。
         </p>
       )}
 
@@ -419,7 +419,7 @@ export function OrganizationDashboard({
         <div className="lg:col-span-3">
           <Card
             title="受講者一覧・スキル到達度カルテ"
-            description="各エンジニアの受講進捗、動的コンピテンシー4領域Band、成長度を確認できます。行をクリックするとカルテ要約を表示します。"
+            description="各エンジニアの受講進捗、4観点のバンド、成長度を確認できます。行をクリックするとカルテ要約を表示します。"
             meta={
               <span data-numeric>
                 表示: <strong className="font-semibold text-ink">{filteredLearners.length}名</strong>
@@ -682,7 +682,7 @@ export function OrganizationDashboard({
                   </Button>
                 </div>
                 <p className="text-caption text-ink-2">
-                  フロントエンドチーム向けに、演習課題「T-06b（キャッシュ不整合の是正）」の受講を推奨。
+                  フロントエンドチーム向けに、演習課題「キャッシュ不整合の是正」の受講を推奨。
                 </p>
               </div>
 
@@ -796,11 +796,11 @@ export function OrganizationDashboard({
       <div className="flex flex-col items-start justify-between gap-4 rounded-card border border-line bg-surface-sunken p-6 sm:flex-row sm:items-center">
         <div className="space-y-1">
           <div className="flex flex-wrap items-baseline gap-cell">
-            <h3 className="text-title text-ink">中核評価エンジンによる実務ロールプレイング演習を体験</h3>
-            <Badge tone="neutral">Feasibility</Badge>
+            <h3 className="text-title text-ink">実際に動く演習セッションを体験する</h3>
+            <Badge tone="positive">実稼働</Badge>
           </div>
           <p className="max-w-2xl text-caption text-ink-2">
-            AI同僚との動的対話、ソクラテス型深掘り・What-if注入、CFF事前暫定判断、および構造化採点パイプラインによる2段階根拠抽出＆動的コンピテンシー解析を実際に動かせます。
+            AI同僚との対話、進行役による深掘り、採点前の意思決定、構造化採点パイプラインによる2段階採点とXAI診断までを、実LLM・実DBで動かせます。
           </p>
         </div>
 

@@ -30,14 +30,15 @@ export default function RootLayout({
               <span className="text-label text-ink-3">Prototype v0.1</span>
             </div>
 
-            {/* 計器の状態表示。点滅はさせない——動作中であることは静的な表示で足りる */}
+            {/* 凡例。タブ側の「モック」表示と対になる——どこまでが実稼働かを最初に読ませる */}
             <div className="hidden items-center gap-block text-label text-ink-2 sm:flex">
               <span className="flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-positive" aria-hidden />
-                Telemetry Active
+                実稼働（実LLM・実DB）
               </span>
-              <span className="border-l border-line pl-block text-ink-3">
-                Axis 4 (Epistemic &amp; Ethical)
+              <span className="flex items-center gap-1.5 border-l border-line pl-block text-ink-3">
+                <span className="h-1.5 w-1.5 rounded-full border border-ink-3" aria-hidden />
+                モック（静的データ）
               </span>
             </div>
           </div>

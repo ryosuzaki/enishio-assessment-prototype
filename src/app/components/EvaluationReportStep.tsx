@@ -161,13 +161,13 @@ export function EvaluationReportStep({
             {evaluation.isPendingHumanReview ? "—" : evaluation.ratingCategory}
           </span>
           <div className="space-y-0.5">
-            <p className="text-caption text-ink-3">構造化採点パイプライン 2段階評価結果（XAIレポート）</p>
+            <p className="text-caption text-ink-3">XAI診断（構造化採点パイプラインによる2段階採点）</p>
             <h2 className="text-title tracking-tight text-ink">
               {evaluation.isPendingHumanReview ? "評点保留（人間の確認待ち）" : evaluation.levelLabel}
             </h2>
           </div>
         </div>
-        <span className="font-mono text-data text-ink-3">{evaluation.scorerModelVersion}</span>
+        <span className="font-mono text-data text-ink-3" title="採点器の版">{evaluation.scorerModelVersion}</span>
       </header>
 
       {/* 暫定値ラベル [D-22]。スコア表示には必ず併記する */}
@@ -214,10 +214,10 @@ export function EvaluationReportStep({
       {/* 共通アンカー課題（別の測定量・並置提示） [D-60, P-16] */}
       <div data-testid="anchor-parallel-report-block">
         <Card
-          title="共通アンカー課題（別の測定量・並置提示）"
+          title="固定設問の回答（演習の採点とは別に記録）"
           meta={
             <span className="flex flex-wrap items-center gap-2">
-              <Badge tone="accent">固定刺激（無得点記録・尺度較正用）</Badge>
+              <Badge tone="accent">第2層の外部基準</Badge>
               {anchorStatus && <Badge tone="neutral">status: {anchorStatus}</Badge>}
             </span>
           }
@@ -240,7 +240,7 @@ export function EvaluationReportStep({
                 </p>
               </div>
               <div className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3">
-                <p className="text-caption text-ink-3">受検者回答（段階1〜3）</p>
+                <p className="text-caption text-ink-3">回答（段階1〜3）</p>
                 <p className="text-data font-semibold text-ink" data-numeric>
                   1: {stage1Choice || "—"} ／ 2: {stage2Choice || "—"} ／ 3:{" "}
                   {stage3Choice === null || stage3Choice === undefined
@@ -251,7 +251,7 @@ export function EvaluationReportStep({
                 </p>
               </div>
               <div className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3">
-                <p className="text-caption text-ink-3">自己評定確信度</p>
+                <p className="text-caption text-ink-3">自己評定の確信度</p>
                 <p className="text-data font-semibold text-ink" data-numeric>
                   {confidence ? `${confidence} / 5` : "—"}
                   <span className="ml-1.5 font-sans text-caption font-normal text-ink-2">
@@ -275,15 +275,13 @@ export function EvaluationReportStep({
 
             <div className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3.5 text-caption text-ink-2">
               <p className="text-section text-ink">
-                尺度連結および並置提示に関する設計上の原則（[P-16] [D-60]）
+                演習の評点と並べて表示している理由
               </p>
               <p>
-                共通アンカー課題は<strong className="font-semibold text-ink">固定刺激</strong>であり、
-                <strong className="font-semibold text-ink">対話セッションの評点とは別の測定量</strong>
-                です。両者を同一尺度へ等化・合算していません。 &theta; 尺度の較正には項目バンク全体で{" "}
-                <span className="text-ink">N &ge; 150〜200</span>{" "}
-                の応答が必要であり、
-                <strong className="font-semibold text-ink">本プロトタイプでは &theta; を算出していません</strong>。
+                固定設問は全受講者が同じ条件で解く<strong className="font-semibold text-ink">LLMを通さない外部基準</strong>で、
+                演習の評点とは<strong className="font-semibold text-ink">別の測定量</strong>です。
+                ここでは両者を足し合わせていません。両者を突き合わせて採点器のズレを見張り、
+                受講者を1本の尺度に並べるのは、事業期間中に実装する共通尺度化エンジンの役割です。
               </p>
             </div>
           </div>
@@ -293,28 +291,28 @@ export function EvaluationReportStep({
       {/* CFF Discrepancy Highlighting [MVP 2.5, Buçinca et al. 2021, D-80] */}
       <div data-testid="discrepancy-highlighting-block">
         <Card
-          title="認知強制機能（CFF）：事前採否判断とAI検証結果の対照"
-          meta={<Badge tone="neutral">Discrepancy Highlighting</Badge>}
+          title="あなたの判定と、AIが抽出した検証行動の対照"
+          meta={<Badge tone="neutral">場面4の意思決定</Badge>}
         >
           <div className="space-y-cell">
             {/* 採否判断 vs 抽出された検証行動 */}
             <div className="space-y-2 rounded-chip border border-line bg-surface-sunken p-3.5">
-              <p className="text-section text-ink">採否判断と抽出された検証行動の対照</p>
+              <p className="text-section text-ink">判定と検証行動の対照</p>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-3 rounded-chip border border-line bg-surface p-2">
                   <span className="text-caption text-ink-2">
-                    受講者の事前採否判断（Force Decision First）:
+                    採点前に確定した判定:
                   </span>
                   <span
                     className="text-data font-semibold text-ink"
                     data-testid="prelim-action-display"
                   >
                     {prelimAction === "approve"
-                      ? "承認 (Approve)"
+                      ? "承認"
                       : prelimAction === "remand"
-                      ? "修正要求 (Request Changes)"
+                      ? "修正要求"
                       : prelimAction === "comment"
-                      ? "条件付き承認 (Comment)"
+                      ? "条件付き承認"
                       : "未選択"}
                   </span>
                 </div>
@@ -353,10 +351,10 @@ export function EvaluationReportStep({
             {/* 動的コンピテンシー4領域の観測サマリー */}
             <div className="space-y-2 rounded-chip border border-line bg-surface-sunken p-3.5">
               <p className="text-section text-ink">
-                動的コンピテンシー 4領域の観測サマリー（提案書準拠）
+                AI時代の実務判断力：4観点の観測
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <AxisCell title="① 評価的判断力 (Evaluative Judgement)">
+                <AxisCell title="① 評価的判断力">
                   仕込み不備検出:{" "}
                   <span
                     className={cn(
@@ -369,17 +367,19 @@ export function EvaluationReportStep({
                   </span>
                   {matchedFlaws.length > 0 ? ` (${matchedFlaws.join(", ")})` : " (検出なし)"}
                 </AxisCell>
-                <AxisCell title="② 高次認知・動的思考 (Higher-Order Reasoning)">
-                  前提トレードオフの言語化と、過剰指摘の回避（正常箇所の正当な弁別）
+                <AxisCell title="② 高次認知・動的思考">
+                  見る行動: 前提トレードオフの言語化、正常箇所への過剰指摘の回避
+                  <span className="block text-ink-3">観点別の集計は未実装（上の総合評点に含む）</span>
                 </AxisCell>
-                <AxisCell title="③ 対話的共創力 (Collaborative Co-Creation)">
+                <AxisCell title="③ 対話的共創力">
                   AI同僚への建設的指示。対話ターン数{" "}
                   <span className="font-semibold text-ink" data-numeric>
                     {chatHistory.filter((m) => m.role === "user").length}ターン
                   </span>
                 </AxisCell>
-                <AxisCell title="④ メタ認知・適応力 (Metacognition &amp; Adaptability)">
-                  緊急仕様変更（前提変化）への適応と、反論への応答（迎合回避）
+                <AxisCell title="④ メタ認知・適応力">
+                  見る行動: 緊急仕様変更への方針の組み直し、反論に流されない応答
+                  <span className="block text-ink-3">観点別の集計は未実装（上の総合評点に含む）</span>
                 </AxisCell>
               </div>
             </div>
@@ -390,7 +390,7 @@ export function EvaluationReportStep({
                 data-testid="prelim-justification-display"
               >
                 <p className="text-caption text-ink-3">
-                  受講者の事前理由記述（Mandatory Justification）:
+                  判定の理由（採点前に記入）:
                 </p>
                 <p className="border-l-2 border-l-line-strong pl-2 text-caption text-ink">
                   &quot;{prelimJustification}&quot;
@@ -403,17 +403,17 @@ export function EvaluationReportStep({
 
       {/* Rationale & Feedback */}
       <div className="space-y-block">
-        <Card title="判定根拠（Evidence Summary）">
+        <Card title="判定の根拠">
           <p className="text-caption text-ink-2">{evaluation.evidenceSummary}</p>
         </Card>
 
-        <Card title="形成的診断アドバイス（Diagnostic Feedback）">
+        <Card title="次に伸ばすところ">
           <p className="text-caption text-ink-2">{evaluation.diagnosticFeedback}</p>
         </Card>
 
         {evaluation.probeConsistency && (
           <div data-testid="probe-consistency-block">
-            <Card title="深掘りへの応答の一貫性（Probe Consistency）">
+            <Card title="深掘りへの応答の一貫性">
               {evaluation.probeConsistency.score === null ? (
                 <p className="text-caption text-ink-2">
                   このセッションでは深掘り（ソクラテス型深掘り・What-if注入）が発生しなかったため、
@@ -457,10 +457,10 @@ export function EvaluationReportStep({
             );
             const speakerLabel =
               msg.role === "user"
-                ? "You (受講者)"
+                ? "あなた（受講者）"
                 : msg.role === "mediator"
-                  ? "進行役（媒介プローブ）"
-                  : "AI Peer (同僚エージェント)";
+                  ? "進行役（深掘り）"
+                  : "AI同僚";
             return (
               <div
                 key={i}
@@ -475,7 +475,7 @@ export function EvaluationReportStep({
               >
                 <span className="mb-1 flex items-baseline gap-2 text-label text-ink-3">
                   <span>{speakerLabel}</span>
-                  <span data-numeric>Turn {msg.turnSeq}</span>
+                  <span data-numeric>ターン {msg.turnSeq}</span>
                 </span>
                 <div
                   className={cn(
@@ -496,15 +496,15 @@ export function EvaluationReportStep({
       </Card>
 
       {/* Evidence Components Highlight Spans */}
-      <Card title="抽出された受講者の検証行動スパン（Stage 1 構造化出力）">
+      <Card title="抽出された検証行動（採点パイプライン第1段の出力）">
         <div className="space-y-row">
           {evaluation.evidenceComponents.map((comp, i) => (
             <div key={i} className="space-y-1.5 rounded-chip border border-line bg-surface-sunken p-3.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono text-data font-semibold text-ink-2" data-numeric>
-                  [Turn {comp.turn_index}] {comp.component_type}
+                  [ターン {comp.turn_index}] {comp.component_type}
                 </span>
-                {comp.injected_flaw_id && <Badge tone="accent">Match: {comp.injected_flaw_id}</Badge>}
+                {comp.injected_flaw_id && <Badge tone="accent">仕込み不備 {comp.injected_flaw_id} に対応</Badge>}
               </div>
               <p className="rounded-chip border border-line bg-surface p-2 font-mono text-data leading-relaxed text-ink">
                 &quot;{comp.quoted_span}&quot;
@@ -516,10 +516,10 @@ export function EvaluationReportStep({
       </Card>
 
       {/* Score Feedback & Dispute Section [MVP 4.5] */}
-      <Card title="評点に対する異議申立・フィードバック（MVP 4.5 準拠）">
+      <Card title="評点への異議申立">
         {disputeSubmitted ? (
           <p className="rounded-chip border border-positive/25 bg-positive-wash p-3 text-caption text-positive">
-            異議申立が `score_feedback` テーブルへ記録されました。SME評価者による再検証対象となります。
+            異議申立を記録しました（score_feedback）。専門家による再確認の対象になります。
           </p>
         ) : (
           <div className="space-y-row">
@@ -578,10 +578,10 @@ export function EvaluationReportStep({
         <div className="flex flex-col items-start justify-between gap-3 rounded-card border border-line bg-surface-sunken p-4 sm:flex-row sm:items-center">
           <div className="space-y-0.5">
             <p className="text-section text-ink">
-              このシナリオのエキスパート事後講評（デブリーフィング）を見る
+              この課題の事後講評を見る（モック）
             </p>
             <p className="text-caption text-ink-2">
-              AIトラップ構造の解剖、上位者の攻略ルート、動的コンピテンシー別の客観的行動と自身の伸び代を振り返ることができます。
+              AIが仕掛けた誤りの構造や、上位者がどう攻略したかと自分の行動を見比べて振り返る画面です。
             </p>
           </div>
           <Button variant="primary" onClick={onViewBenchmarkGallery} className="shrink-0">
@@ -592,9 +592,8 @@ export function EvaluationReportStep({
 
       <div className="flex items-center justify-between gap-4 border-t border-line pt-4">
         <Button variant="quiet" onClick={onResetToInit}>
-          ← トップへ戻り最初からやり直す
+          ← 最初からやり直す
         </Button>
-        <span className="text-caption text-ink-2">W1〜W5 全フロー縦切り動作完了</span>
       </div>
     </div>
   );

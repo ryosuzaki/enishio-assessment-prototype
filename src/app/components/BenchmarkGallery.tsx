@@ -119,7 +119,7 @@ export function BenchmarkGallery({
           <h1 className="text-display tracking-tight text-ink">
             シナリオ分析＆エキスパート検証戦略
           </h1>
-          <Badge tone="neutral">Viability</Badge>
+          <Badge tone="neutral">モック</Badge>
         </div>
         <p className="max-w-3xl text-body text-ink-2">
           AIが仕掛けた欺瞞トリックの解剖、上位者が採用した複数の攻略ルート、そして観測された客観的行動ログ（テレメトリ）を対比します。
@@ -134,7 +134,7 @@ export function BenchmarkGallery({
       >
         <p>
           <strong className="font-semibold text-ink">【画面仕様に関するご案内】</strong>{" "}
-          本画面（エキスパート事後講評＆デブリーフィング）は、受検後の振り返り体験を検証するためのモック展示層（Viability）です。
+          この画面は、受講後の振り返り体験を示すためのモックUIです。
           掲載されているエキスパート検証戦略・行動ログ・採用率は設計モックデータであり、実DBとの永続化結合は行っていません。
         </p>
       </aside>
@@ -323,12 +323,12 @@ export function BenchmarkGallery({
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          第3層：動的コンピテンシー別・上位者アクション突合 (Competency Debriefing)
+          観点ごとに、上位者の行動と自分の行動を見比べる
          ───────────────────────────────────────────────────────────── */}
       <section className="rounded-card border border-line bg-surface p-6">
         <LayerHeader
           layer="Layer 03"
-          title="動的コンピテンシー別・上位者アクションと観測事実"
+          title="観点別：上位者の行動と観測された事実"
           aside={
             <div className="flex flex-wrap items-center gap-1.5">
               {FILTERS.map((f) => (

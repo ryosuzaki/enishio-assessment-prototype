@@ -165,18 +165,18 @@ export function DialogueSessionStep({
         <div className="flex flex-col items-start justify-between gap-3 rounded-card border border-caution/40 bg-caution-wash p-4 sm:flex-row sm:items-center">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="caution">場面3：前提変化（緊急仕様変更 発生中）</Badge>
+              <Badge tone="caution">場面3：前提変化</Badge>
               <span className="text-section text-ink">
                 緊急仕様変更・追加要件が通知されました
               </span>
               <span className="text-caption text-ink-3" data-numeric>
-                Turn #{premiseShiftState.injectedAtTurn ?? 2} 注入
+                ターン {premiseShiftState.injectedAtTurn ?? 2} で通知
               </span>
             </div>
             <h3 className="text-section text-ink">{premiseShiftState.title}</h3>
             <p className="text-caption text-ink-2">{premiseShiftState.announcement}</p>
           </div>
-          <span className="shrink-0 whitespace-nowrap text-caption text-ink-2">適応行動・方針更新を観測中</span>
+          <span className="shrink-0 whitespace-nowrap text-caption text-ink-2">方針の組み直しを観測中</span>
         </div>
       ) : IS_DEV_BUILD && selectedTask.premise_shift ? (
         /*
@@ -457,7 +457,7 @@ export function DialogueSessionStep({
             </button>
           </div>
           <span className="text-caption text-ink-3" data-numeric>
-            Turn #{turnCounter}
+            ターン {turnCounter}
           </span>
         </header>
 
@@ -478,10 +478,10 @@ export function DialogueSessionStep({
             >
               <span className="mb-1 text-caption text-ink-3">
                 {msg.role === "user"
-                  ? "You (受講者)"
+                  ? "あなた（受講者）"
                   : msg.role === "mediator"
-                    ? "進行役（媒介プローブ）"
-                    : "AI Peer (同僚エージェント)"}
+                    ? "進行役（深掘り）"
+                    : "AI同僚"}
               </span>
               <div
                 className={cn(

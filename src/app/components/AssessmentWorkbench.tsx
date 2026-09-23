@@ -18,7 +18,7 @@ import { useLearnerSession } from "../hooks/useLearnerSession";
 import { useWindowBlurTelemetry } from "../hooks/useWindowBlurTelemetry";
 import { useAnchorFlow } from "../hooks/useAnchorFlow";
 import { useDialogueFlow } from "../hooks/useDialogueFlow";
-import { Button, cn } from "./ui";
+import { Badge, Button, cn } from "./ui";
 
 export interface AssessmentWorkbenchProps {
   initialTaskId?: string;
@@ -90,18 +90,18 @@ export function AssessmentWorkbench({
     setActiveTab("session");
   };
 
-  const TABS: { id: AppTab; label: string }[] = [
-    { id: "session", label: "実務演習セッション（2ペイン動的対話）" },
-    { id: "anchor", label: "共通アンカー評価（固定尺度・SCT型）" },
-    { id: "org_dashboard", label: "① 組織・受講管理ダッシュボード" },
-    { id: "learner_profile", label: "② 受講者スキルカルテ" },
-    { id: "benchmark_gallery", label: "③ エキスパート事後講評" },
+  const TABS: { id: AppTab; label: string; mock: boolean }[] = [
+    { id: "session", label: "実務演習セッション", mock: false },
+    { id: "anchor", label: "固定設問（SCT型）", mock: false },
+    { id: "org_dashboard", label: "組織ダッシュボード", mock: true },
+    { id: "learner_profile", label: "受講者カルテ", mock: true },
+    { id: "benchmark_gallery", label: "事後講評", mock: true },
   ];
 
   return (
     <div className="mx-auto max-w-[1536px] space-y-section px-6 py-section">
       {/* 2-Layer Navigation Tab Bar ([D-79]: Viability & Feasibility) */}
-      <div className="flex flex-col gap-row border-b border-line sm:flex-row sm:items-end sm:justify-between">
+      <div className="border-b border-line">
         <nav className="-mb-px flex flex-wrap items-end gap-x-block gap-y-row" aria-label="画面の切り替え">
           {TABS.map((tab) => (
             <button
@@ -110,20 +110,17 @@ export function AssessmentWorkbench({
               onClick={() => setActiveTab(tab.id)}
               aria-current={activeTab === tab.id ? "page" : undefined}
               className={cn(
-                "border-b-2 pb-2.5 text-label transition-colors",
+                "flex items-center gap-1.5 border-b-2 pb-2.5 text-label transition-colors",
                 activeTab === tab.id
                   ? "border-accent font-semibold text-ink"
                   : "border-transparent text-ink-3 hover:text-ink-2",
               )}
             >
               {tab.label}
+              {tab.mock && <Badge tone="neutral">モック</Badge>}
             </button>
           ))}
         </nav>
-
-        <span className="hidden pb-2.5 text-label text-ink-3 xl:block">
-          2層構造プロトタイプ（Viability / Feasibility）
-        </span>
       </div>
 
       {/* Tab 1: Organization Analytics Dashboard */}
@@ -194,9 +191,9 @@ export function AssessmentWorkbench({
               <Button
                 variant="secondary"
                 onClick={() => setShowTelemetry(true)}
-                title="テレメトリモニターを展開する"
+                title="計測ログを表示する"
               >
-                Live Telemetry を表示
+                計測ログを表示
               </Button>
             </div>
           )}
@@ -294,6 +291,7 @@ export function AssessmentWorkbench({
                   sessionId={sessionId}
                   sessionSeq={sessionSeq}
                   telemetryLog={telemetryLog}
+                  scorerModelVersion={dialogue.evaluation?.scorerModelVersion ?? null}
                   onToggleCollapse={() => setShowTelemetry(false)}
                   mediationStateEstimate={dialogue.mediationStateEstimate}
                   lastProbeMove={dialogue.lastProbeMove}
