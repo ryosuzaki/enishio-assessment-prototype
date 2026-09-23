@@ -41,7 +41,6 @@ import { POST as sessionBlur } from "@/app/api/session/blur/route";
 import { POST as dialogueStart } from "@/app/api/dialogue/start/route";
 import { POST as dialogueTurn } from "@/app/api/dialogue/turn/route";
 import { POST as dialogueProbe } from "@/app/api/dialogue/probe/route";
-import { POST as dialogueFocus } from "@/app/api/dialogue/focus/route";
 import { POST as preliminaryJudgement } from "@/app/api/dialogue/preliminary-judgement/route";
 import { POST as dialogueEvaluate } from "@/app/api/dialogue/evaluate/route";
 import { POST as feedback } from "@/app/api/feedback/route";
@@ -305,26 +304,7 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     expect(mediatorTurn.content).toBe(PROBE_SELECTION.probe_text);
   });
 
-  it("5. 検証対象として選んだ箇所と順序が残る", async () => {
-    const res = await post(dialogueFocus, {
-      sessionId,
-      focusItems: [
-        { focusSeq: 1, lineStart: 10, lineEnd: 14, selectedText: "verifyToken(token)", note: "失効" },
-        { focusSeq: 2, selectedText: "x-key-version", note: "鍵バージョン" },
-      ],
-    });
-
-    expect(res.status).toBe(200);
-
-    const rows = await prisma.verificationFocusSequence.findMany({
-      where: { session_id: sessionId },
-      orderBy: { focus_seq: "asc" },
-    });
-    expect(rows.map((r) => r.focus_seq)).toEqual([1, 2]);
-    expect(rows[0].line_start).toBe(10);
-  });
-
-  it("6. 画面外滞在時間は加算されるだけで、判定には使われない", async () => {
+  it("5. 画面外滞在時間は加算されるだけで、判定には使われない", async () => {
     await post(sessionBlur, { sessionId, deltaSec: 30 });
     await post(sessionBlur, { sessionId, deltaSec: 12 });
 
@@ -332,7 +312,7 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     expect(session.window_blur_duration_sec).toBe(42);
   });
 
-  it("6b. 異常な滞在時間は記録せず、セッションも壊さない", async () => {
+  it("5b. 異常な滞在時間は記録せず、セッションも壊さない", async () => {
     const res = await post(sessionBlur, { sessionId, deltaSec: 60 * 60 * 5 });
     const body = await json(res);
 
@@ -341,7 +321,7 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     expect(session.window_blur_duration_sec).toBe(42);
   });
 
-  it("7. CFF の事前判断は理由つきで記録され、理由が空なら保存されない", async () => {
+  it("6. CFF の事前判断は理由つきで記録され、理由が空なら保存されない", async () => {
     const rejected = await post(preliminaryJudgement, {
       sessionId,
       stepId: STEP_ID,
@@ -366,7 +346,7 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     expect(rows[0].justification).toBe("失効の扱いだけ条件付きで通す");
   });
 
-  it("8. 構造化採点パイプライン が評点・根拠要素・適正依存指標を同じセッションへ書き切る", async () => {
+  it("7. 構造化採点パイプライン が評点・根拠要素・適正依存指標を同じセッションへ書き切る", async () => {
     createMock
       .mockResolvedValueOnce(llmResponse(EVIDENCE))
       .mockResolvedValueOnce(llmResponse(scoring(0.82, 3)));
@@ -411,7 +391,7 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     expect(metrics.operationalization).toContain("独立ではない");
   });
 
-  it("8b. LLM 呼び出しの使用量とレイテンシがセッション単位で残る（原価をログから答えられる）", async () => {
+  it("7b. LLM 呼び出しの使用量とレイテンシがセッション単位で残る（原価をログから答えられる）", async () => {
     const calls = await prisma.llmCall.findMany({
       where: { session_id: sessionId },
       orderBy: { created_at: "asc" },
@@ -433,7 +413,7 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     expect(calls.length).toBeGreaterThanOrEqual(4);
   });
 
-  it("9. 異議申立が評点へ紐づいて残る", async () => {
+  it("8. 異議申立が評点へ紐づいて残る", async () => {
     const res = await post(feedback, {
       ratingId,
       sessionId,

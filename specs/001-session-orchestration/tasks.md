@@ -18,11 +18,11 @@
 ### Phase 2: 2ペイン動的対話演習・テレメトリ (Dialogue & Telemetry)
 - [x] T006 [US3] `src/app/components/DialogueSessionStep.tsx`: 2ペイン演習（課題要件・エディタ）＋要件/コード引用連動チャットUI実装
 - [x] T007 [US3] `src/app/api/dialogue/turn/route.ts`: 対話ターンAPI実装（AI同僚応答、PromptTurn永続化）
-- [x] T008 [US3] `src/app/api/dialogue/focus/route.ts`: 行フォーカス追跡API実装（VerificationFocusSequence保存）
+- [~] T008 [US3] ~~`src/app/api/dialogue/focus/route.ts`: 行フォーカス追跡API実装（VerificationFocusSequence保存）~~ → **廃止**。第3ペイン撤廃に伴い着眼ログを `prompt_turns` へ一本化し、APIとテストを削除（二重記録の解消）。
 - [x] T009 [P] [US3] `src/lib/edit-distance.ts`: 成果物コード編集距離（Levenshtein距離）計算ロジック実装
 - [x] T010 [P] [US3] `src/lib/edit-distance.test.ts`: 編集距離計算ロジックの単体テスト作成
 - [x] T011 [US3] `src/app/api/dialogue/turn/route.test.ts`: 対話ターンAPI単体・結合テスト作成
-- [x] T012 [US3] `src/app/api/dialogue/focus/route.test.ts`: 行フォーカスAPI単体・結合テスト作成
+- [~] T012 [US3] ~~`src/app/api/dialogue/focus/route.test.ts`: 行フォーカスAPI単体・結合テスト作成~~ → **廃止**（T008 に同じ）。
 
 ### Phase 3: CFF事前判定・評価レポート・異議申立 (Judgement & Report)
 - [x] T013 [US4] `src/app/components/PreliminaryJudgementStep.tsx`: CFF認知先行判断UI実装（承認/差し戻し、理由必須入力の強制）

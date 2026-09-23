@@ -55,6 +55,12 @@ export function AssessmentWorkbench({
   });
 
   // URLクエリによる初期タブの反映（?tab=dashboard / ?tab=learner / ?tab=session）
+  //
+  // マウント時の1回だけで、以後このeffectは走らない。`useSearchParams` で
+  // レンダー中に決める方法もあるが、それはこのツリー全体を Suspense 境界の下へ
+  // 押し込み、初期HTMLの生成範囲を変える。表示タブの初期値ひとつのために
+  // プリレンダリングの形を変えるほどのものではない。
+  /* eslint-disable react-hooks/set-state-in-effect -- マウント時の初期化に限る */
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -73,6 +79,7 @@ export function AssessmentWorkbench({
       setActiveTab("anchor");
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   /** 別タブの「この課題を演習する」から演習タブへ移る */
   const goToSessionWithTask = (taskId?: string) => {
@@ -215,31 +222,22 @@ export function AssessmentWorkbench({
                 />
               )}
 
-              {/* STEP 1: Dynamic 3-Pane Dialogue Session (W3) */}
+              {/* STEP 1: 2ペイン動的対話セッション（W3）。
+                  ソクラテス媒介の計器は右の TelemetryPanel 側にある。 */}
               {dialogue.currentStep === "dialogue_session" && (
                 <DialogueSessionStep
                   selectedTask={dialogue.selectedTask}
                   artifactCode={dialogue.artifactCode}
                   setArtifactCode={dialogue.setArtifactCode}
-                  focusItems={dialogue.focusItems}
-                  focusInputText={dialogue.focusInputText}
-                  setFocusInputText={dialogue.setFocusInputText}
                   chatHistory={dialogue.chatHistory}
                   turnCounter={dialogue.turnCounter}
                   userPromptInput={dialogue.userPromptInput}
                   setUserPromptInput={dialogue.setUserPromptInput}
                   cffActiveWarning={dialogue.cffActiveWarning}
                   isSubmitting={dialogue.isSubmitting}
-                  mediationStateEstimate={dialogue.mediationStateEstimate}
-                  lastProbeMove={dialogue.lastProbeMove}
-                  lastSelectionRationale={dialogue.lastSelectionRationale}
-                  probesIssued={dialogue.probesIssued}
-                  isProbing={dialogue.isProbing}
                   premiseShiftState={dialogue.premiseShiftState}
                   onForcePremiseShiftForDebug={dialogue.forcePremiseShiftForDebug}
                   onProceedToPreliminaryJudgement={dialogue.proceedToPreliminaryJudgement}
-                  onAddFocusItem={dialogue.addFocusItem}
-                  onRemoveFocusItem={dialogue.removeFocusItem}
                   onSendDialogueTurn={dialogue.sendDialogueTurn}
                 />
               )}
@@ -247,7 +245,6 @@ export function AssessmentWorkbench({
               {/* STEP 5.5: CFF Force Decision First & Facilitator Mirroring Summary [MVP 2.5, T-17b, D-80] */}
               {dialogue.currentStep === "preliminary_judgement" && (
                 <PreliminaryJudgementStep
-                  taskId={selectedTaskId}
                   chatHistory={dialogue.chatHistory}
                   prelimAction={dialogue.prelimAction}
                   setPrelimAction={dialogue.setPrelimAction}

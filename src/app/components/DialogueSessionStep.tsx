@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Quote } from "lucide-react";
 import type { DynamicTaskScenario } from "@/data/dynamic-task";
-import type { ChatMessage, EvidenceTargetState, FocusItem, ProbeMove, PremiseShiftState } from "../types";
+import type { ChatMessage, PremiseShiftState } from "../types";
 import { Badge, Button, cn } from "./ui";
 
 /**
@@ -33,17 +33,6 @@ interface DialogueSessionStepProps {
   onForcePremiseShiftForDebug?: () => void;
   onProceedToPreliminaryJudgement: () => void;
   onSendDialogueTurn: () => void;
-  // 互換性のためのオプショナルProps
-  focusItems?: FocusItem[];
-  focusInputText?: string;
-  setFocusInputText?: (text: string) => void;
-  onAddFocusItem?: (textSnippet?: string, noteText?: string) => void;
-  onRemoveFocusItem?: (seq: number) => void;
-  mediationStateEstimate?: EvidenceTargetState[] | null;
-  lastProbeMove?: ProbeMove | null;
-  lastSelectionRationale?: string | null;
-  probesIssued?: number;
-  isProbing?: boolean;
 }
 
 /** ペインの器。2枚が並ぶ縦積みレイアウトを持つ。 */

@@ -6,7 +6,6 @@ import type { ChatMessage } from "../types";
 import { Badge, Button, Card, cn } from "./ui";
 
 interface PreliminaryJudgementStepProps {
-  taskId?: string;
   chatHistory?: ChatMessage[];
   prelimAction: "approve" | "remand" | "comment" | "";
   setPrelimAction: (action: "approve" | "remand" | "comment" | "") => void;
@@ -45,7 +44,6 @@ const DECISIONS: { value: "remand" | "comment" | "approve"; label: string; detai
 ];
 
 export function PreliminaryJudgementStep({
-  taskId = "TASK-FINTECH-AUTH-01",
   chatHistory = [],
   prelimAction,
   setPrelimAction,
@@ -252,11 +250,11 @@ export function PreliminaryJudgementStep({
 /**
  * [D-80]: 白紙再作文を行わない場合のフォールバック論点要約テキスト生成
  * 進行役がまとめた対話論点＋受講者発言引用を統合し、DB記録用の理由テキストとして返す（事前ネタバレ排除）
+ *
+ * 要約は受講者自身の発言だけから作るため、**課題には依存しない。**
+ * 課題ごとに定型文を出し分けると、受講者が書いていない論点を理由欄に混ぜることになる。
  */
-export function getDefaultMirroringSummary(
-  taskId: string = "",
-  chatHistory: ChatMessage[] = []
-): string {
+export function getDefaultMirroringSummary(chatHistory: ChatMessage[] = []): string {
   const userMessages = chatHistory.filter((m) => m.role === "user");
   if (userMessages.length === 0) {
     return "対話ログに基づく受講者判定（直接確定）";

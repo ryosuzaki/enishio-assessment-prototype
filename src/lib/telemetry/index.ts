@@ -180,7 +180,7 @@ export interface RecordRatingParams {
     | "promotion"
     | "selection"
     | "verification";
-  stimulusFeatures: Record<string, any>;
+  stimulusFeatures: Prisma.InputJsonObject;
   scoringConfidence?: number | null;
   /**
    * ソクラテス型深掘り（MVP 2.1 ステップ7）への応答の一貫性（MVP 4.4）。
@@ -393,35 +393,11 @@ export async function recordPreliminaryJudgement(params: RecordPreliminaryJudgem
   });
 }
 
-export interface VerificationFocusItem {
-  focusSeq: number;
-  lineStart?: number | null;
-  lineEnd?: number | null;
-  selectedText: string;
-  note?: string | null;
-}
-
-/**
- * Record verification focus sequence (selected code/artifact spans in order of examination) [MVP 4.4, T-17b]
- */
-export async function recordVerificationFocusSequence(
-  sessionId: string,
-  items: VerificationFocusItem[]
-) {
-  if (!items || items.length === 0) return 0;
-  const result = await prisma.verificationFocusSequence.createMany({
-    data: items.map((item) => ({
-      session_id: sessionId,
-      focus_seq: item.focusSeq,
-      line_start: item.lineStart ?? null,
-      line_end: item.lineEnd ?? null,
-      selected_text: item.selectedText,
-      note: item.note ?? null,
-    })),
-    skipDuplicates: true,
-  });
-  return result.count;
-}
+// 着眼の記録（旧 `recordVerificationFocusSequence` / `verification_focus_sequences`）は
+// ここには無い。第3ペインの検証パネル廃止に伴い、着眼ログは対話ターン（`prompt_turns`）へ
+// 一本化した——受講者が要件やコードを引用して発話した時点で、着眼は対話ログに残る。
+// 別経路でもう一度書くと同じ行動が二重に記録される。テーブル定義だけは過去セッション分の
+// データを失わないために `prisma/schema.prisma` に残してある。
 
 
 /**
@@ -590,7 +566,7 @@ export interface MediationProbeRecord {
   turnSeq: number;
   probeMove: string;
   probeText: string;
-  stateEstimate: Record<string, any>;
+  stateEstimate: Prisma.InputJsonObject;
   selectionRationale: string;
   mediatorModelVersion: string;
 }

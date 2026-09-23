@@ -9,7 +9,6 @@ import type {
   ChatMessage,
   EvaluationResult,
   EvidenceTargetState,
-  FocusItem,
   PremiseShiftState,
   ProbeMove,
   StepType,
@@ -58,11 +57,6 @@ export function useDialogueFlow({
   const [lastSelectionRationale, setLastSelectionRationale] = useState<string | null>(null);
   const [probesIssued, setProbesIssued] = useState<number>(0);
   const [isProbing, setIsProbing] = useState<boolean>(false);
-
-  // Verification Focus Panel State (W3 3rd-Pane) [MVP 4.4, T-17b]
-  const [focusItems, setFocusItems] = useState<FocusItem[]>([]);
-  const [focusInputText, setFocusInputText] = useState<string>("");
-  const [focusInputNote, setFocusInputNote] = useState<string>("");
 
   // CFF: Force Decision First & Mandatory Justification State [MVP 2.5, T-17b, D-80]
   const [prelimAction, setPrelimAction] = useState<"approve" | "remand" | "comment" | "">("");
@@ -176,7 +170,7 @@ export function useDialogueFlow({
       ]);
       setTurnCounter(data.injectedAtTurn + 1);
       addTelemetry(
-        `⚡ 前提変化を注入${data.forced ? "（手動 / dev）" : "（進行役判定）"}: Turn #${data.injectedAtTurn} / ${data.title}`
+        `前提変化を注入${data.forced ? "（手動 / dev）" : "（進行役判定）"}: Turn #${data.injectedAtTurn} / ${data.title}`
       );
       return true;
     } catch (e: unknown) {
@@ -316,33 +310,6 @@ export function useDialogueFlow({
     }
   };
 
-  // Verification Focus Panel Handlers [MVP 4.4, T-17b]
-  const addFocusItem = (textSnippet?: string, noteText?: string) => {
-    const text = (textSnippet ?? focusInputText).trim();
-    if (!text) return;
-    const nextSeq = focusItems.length + 1;
-    setFocusItems((prev) => [
-      ...prev,
-      {
-        focusSeq: nextSeq,
-        selectedText: text,
-        note: (noteText ?? focusInputNote).trim() || undefined,
-      },
-    ]);
-    setFocusInputText("");
-    setFocusInputNote("");
-    addTelemetry(`Verification focus item #${nextSeq} added to panel`);
-  };
-
-  const removeFocusItem = (seq: number) => {
-    setFocusItems((prev) =>
-      prev
-        .filter((item) => item.focusSeq !== seq)
-        .map((item, idx) => ({ ...item, focusSeq: idx + 1 }))
-    );
-    addTelemetry(`Verification focus item #${seq} removed from panel`);
-  };
-
   // Advance to CFF: Force Decision First & Mandatory Justification Step [MVP 2.5, T-17b]
   const proceedToPreliminaryJudgement = () => {
     setErrorMessage(null);
@@ -366,7 +333,7 @@ export function useDialogueFlow({
     // [D-80]: 白紙再作文の強制撤廃。受講者が微調整を入力しなかった場合は
     // 進行役のミラーリング要約を採用する
     const effectiveJustification =
-      prelimJustification.trim() || getDefaultMirroringSummary(selectedTaskId, chatHistory);
+      prelimJustification.trim() || getDefaultMirroringSummary(chatHistory);
 
     setPrelimError(null);
     setErrorMessage(null);
@@ -393,24 +360,7 @@ export function useDialogueFlow({
       }
       addTelemetry(`Preliminary judgement recorded: ${prelimAction}`);
 
-      // 2. Record verification focus sequence if any items selected
-      if (focusItems.length > 0) {
-        await fetch("/api/dialogue/focus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: sessionIdInUse,
-            focusItems: focusItems.map((f) => ({
-              focusSeq: f.focusSeq,
-              selectedText: f.selectedText,
-              note: f.note,
-            })),
-          }),
-        });
-        addTelemetry(`Verification focus sequence recorded (${focusItems.length} items)`);
-      }
-
-      // 3. Trigger 2-Stage Structured Scoring Pipeline (W4)
+      // 2. Trigger 2-Stage Structured Scoring Pipeline (W4)
       addTelemetry("Triggering 構造化採点パイプライン (Axis 4)...");
       const evalRes = await fetch("/api/dialogue/evaluate", {
         method: "POST",
@@ -494,9 +444,6 @@ export function useDialogueFlow({
     lastSelectionRationale,
     probesIssued,
     isProbing,
-    focusItems,
-    focusInputText,
-    setFocusInputText,
     prelimAction,
     setPrelimAction,
     prelimJustification,
@@ -513,8 +460,6 @@ export function useDialogueFlow({
     startSession,
     forcePremiseShiftForDebug,
     sendDialogueTurn,
-    addFocusItem,
-    removeFocusItem,
     proceedToPreliminaryJudgement,
     confirmPreliminaryAndEvaluate,
     submitDispute,

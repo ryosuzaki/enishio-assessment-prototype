@@ -62,7 +62,7 @@ function fixUnambiguousLinks() {
       let decodedPath = pathPart;
       try {
         decodedPath = decodeURIComponent(pathPart);
-      } catch (e) {}
+      } catch {}
 
       // Handle file:/// absolute paths
       if (decodedPath.startsWith("file:///c:/Users/ryo/Desktop/enishio-business/") || decodedPath.startsWith("file:///C:/Users/ryo/Desktop/enishio-business/")) {

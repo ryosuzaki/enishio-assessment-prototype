@@ -162,16 +162,6 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       });
     });
 
-    await page.route("**/api/dialogue/focus", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-        }),
-      });
-    });
-
     await page.route("**/api/dialogue/evaluate", async (route) => {
       await route.fulfill({
         status: 200,
@@ -285,7 +275,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       fullPage: true,
     });
 
-    // アンカー送信 ➔ 動的2ペイン対話セッション (Dynamic 3-Pane Dialogue)
+    // アンカー送信 ➔ 動的2ペイン対話セッション
     await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
     await expect(page.getByText("共通アンカー項目の記録が完了しました")).toBeVisible();
     await page.getByRole("button", { name: "実務演習セッションを体験する" }).click();

@@ -1,6 +1,6 @@
 # Technical Implementation Plan: [機能名称]
 
-> **対応仕様書**: [.specs/xxx.md へのリンク]  
+> **対応仕様書**: [specs/<機能>/spec.md へのリンク]  
 > **アーキテクチャ制約**: [Constitution Principle I〜V への適合確認]
 
 ---

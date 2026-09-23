@@ -1,6 +1,6 @@
-# Technical Implementation Plan: 構造化採点パイプライン (002-autoscore-pipeline)
+# Technical Implementation Plan: 構造化採点パイプライン (002-structured-scoring-pipeline)
 
-> **対応仕様書**: [specs/002-autoscore-pipeline/spec.md](spec.md)  
+> **対応仕様書**: [specs/002-structured-scoring-pipeline/spec.md](spec.md)  
 > **全体アーキテクチャ・ER図**: [specs/README.md](../README.md)  
 > **アーキテクチャ制約**: Constitution Principle I（2層分離）, Principle III（完全性と追跡可能性・フォールバック禁止）適合確認済み
 

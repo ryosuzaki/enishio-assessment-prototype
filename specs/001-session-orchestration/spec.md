@@ -78,7 +78,7 @@
 
 * **実稼働（Feasibility）の範囲**:
   * セッションライフサイクル（Init → Anchor → Dialogue → Judgement → Report）の全遷移。
-  * `/api/session/start`, `/api/session/blur`, `/api/anchor`, `/api/dialogue/turn`, `/api/dialogue/focus`, `/api/dialogue/preliminary-judgement`, `/api/dialogue/evaluate`, `/api/feedback`。
+  * `/api/session/start`, `/api/session/blur`, `/api/anchor`, `/api/dialogue/turn`, `/api/dialogue/preliminary-judgement`, `/api/dialogue/evaluate`, `/api/feedback`。
   * PostgreSQL DB への Prisma 16モデルの永続化。
 * **モック（Viability）の範囲**:
   * 組織ダッシュボード（`OrganizationDashboard`）、受講者カルテ（`LearnerProfile`）、ベンチマーク（`BenchmarkGallery`）は静的モックデータで描画し、セッション進行エンジンとは疎結合とする。

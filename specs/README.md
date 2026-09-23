@@ -16,7 +16,7 @@
 │  ┌─────────────────────────────┐    ┌───────────────────────────────┐  │
 │  │   UI Layer ("use client")   │    │   API Layer (Route Handlers)  │  │
 │  │  - Session Orchestration    │    │  - Session & Telemetry        │  │
-│  │  - 3-Pane Dynamic Dialogue  │───>│  - Dynamic Task & Flaws (Svr) │  │
+│  │  - 2-Pane Dynamic Dialogue  │───>│  - Dynamic Task & Flaws (Svr) │  │
 │  │  - Viability Mocks          │    │  - 構造化採点パイプライン (2-Stage) │  │
 │  └─────────────────────────────┘    │  - Socratic Mediator          │  │
 │                                     └──────────────┬────────────────┘  │
@@ -73,11 +73,11 @@ erDiagram
 * **管理する API エンドポイント (8本)**: `/api/session/start`, `/api/session/blur`, `/api/anchor` (GET/POST), `/api/dialogue/start`, `/api/dialogue/turn`, `/api/dialogue/focus`, `/api/dialogue/preliminary-judgement`, `/api/feedback`
 * **ドキュメント**: [spec.md](001-session-orchestration/spec.md) / [plan.md](001-session-orchestration/plan.md) / [tasks.md](001-session-orchestration/tasks.md)
 
-### [002-autoscore-pipeline](002-autoscore-pipeline/)
+### [002-structured-scoring-pipeline](002-structured-scoring-pipeline/)
 * **責務**: 構造化採点パイプライン（2段階採点エンジン）、客観的根拠要素抽出、ルーブリック規準評定、適正依存3指標算出、HITL閾値判定、および LLM 呼出監査。
 * **管理する DB モデル (4モデル)**: `Rating`, `EvidenceComponent`, `RelianceMetrics`, `LlmCall`
 * **管理する API エンドポイント (1本)**: `/api/dialogue/evaluate`
-* **ドキュメント**: [spec.md](002-autoscore-pipeline/spec.md) / [plan.md](002-autoscore-pipeline/plan.md) / [tasks.md](002-autoscore-pipeline/tasks.md)
+* **ドキュメント**: [spec.md](002-structured-scoring-pipeline/spec.md) / [plan.md](002-structured-scoring-pipeline/plan.md) / [tasks.md](002-structured-scoring-pipeline/tasks.md)
 
 ### [003-socratic-mediator](003-socratic-mediator/)
 * **責務**: ソクラテス型問いかけ（プローブ）自律生成、正答鍵完全遮断、5つの状態推定、および場面3前提変化（緊急仕様変更）の動的注入。

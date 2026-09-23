@@ -141,16 +141,6 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
       });
     });
 
-    await page.route("**/api/dialogue/focus", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-        }),
-      });
-    });
-
     await page.route("**/api/dialogue/evaluate", async (route) => {
       await route.fulfill({
         status: 200,
