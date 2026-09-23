@@ -14,8 +14,10 @@
     "seed": "tsx scripts/seed-demo.ts",
     "seed:anchors": "tsx scripts/seed-anchors.ts",
     "check:no-leak": "node scripts/check-no-leaked-secrets.mjs",
+    "check:ui": "node scripts/check-ui-tokens.mjs",
     "check:flaw-detection": "tsx scripts/check-flaw-detection-resistance.ts",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test --project=chromium",
     "capture:screenshots": "playwright test --project=capture"
   },

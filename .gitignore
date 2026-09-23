@@ -41,3 +41,12 @@ next-env.d.ts
 # v1 (anchors.json) は [D-83] で退役。較正・等化に用いない。
 /src/data/anchors.json
 /src/data/anchors.v2.json
+
+# skills CLI がシンボリックリンクとして .agents/skills/ へ配る公開skill。
+# Windows の Git はリンクを辿って中身を実体としてコミットしてしまうため、
+# .claude/skills/ 側では実体ファイル（自作の ui-design）だけを追跡し、
+# CLI 由来のリンクは各開発者の環境で `npx skills experimental_install` から
+# 復元させる（skills-lock.json が正）。
+/.claude/skills/emil-design-eng/
+/.claude/skills/frontend-design/
+/.claude/skills/web-design-guidelines/

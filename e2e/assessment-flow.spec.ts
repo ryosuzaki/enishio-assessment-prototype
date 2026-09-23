@@ -61,6 +61,43 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
       });
     });
 
+    // 前提変化（場面3）は受講者ではなくサーバ側が撃つ。1回目は「まだ撃たない」、
+    // 2回目で注入を返し、**発火時点がクライアント操作では動かない**ことを固定する [D-100]。
+    let premiseShiftCalls = 0;
+    await page.route("**/api/dialogue/premise-shift", async (route) => {
+      premiseShiftCalls += 1;
+      if (premiseShiftCalls < 2) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            success: true,
+            injected: false,
+            reason: "trigger_turn_not_reached",
+            userTurnCount: 1,
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          success: true,
+          injected: true,
+          injectedAtTurn: 5,
+          forced: false,
+          shiftId: "shift-fintech-vip-fallback",
+          title: "【緊急仕様変更】セール時の最優先（VIP）加盟店フォールバック特例",
+          announcement: "【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知",
+          newRequirement: "VIP加盟店に限り最大30秒の縮退運転を許可すること",
+          notification:
+            "【⚡ 緊急仕様変更・追加要件の通知】\n【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知\n\nこれに伴い、以下の追加要件を満たす必要があります：\n「VIP加盟店に限り最大30秒の縮退運転を許可すること」",
+          userTurnCount: 2,
+        }),
+      });
+    });
+
     await page.route("**/api/dialogue/probe", async (route) => {
       await route.fulfill({
         status: 200,
@@ -170,7 +207,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("動的コンピテンシー アセスメント＆テレメトリ基盤")).toBeVisible();
 
     // 5タブナビゲーションの存在確認
-    await expect(page.getByRole("button", { name: "実務演習セッション（3ペイン動的対話）" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "実務演習セッション（2ペイン動的対話）" })).toBeVisible();
     await expect(page.getByRole("button", { name: "共通アンカー評価（固定尺度・SCT型）" })).toBeVisible();
     await expect(page.getByRole("button", { name: /① 組織.*ダッシュボード/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /② 受講者スキルカルテ/ })).toBeVisible();
@@ -188,8 +225,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
   });
 
   test("同梱サンプルへフォールバックした場合、運用バンクではないことが画面に明示される", async ({ page }) => {
-    // 運用バンク（src/data/anchors.json）を持たない環境＝公開リポジトリのcloneを再現する。
-    // サンプル2項目を運用20項目に見せてはならない（README「主張を増やさない」）。
+    // 運用バンク（src/data/anchors.v2.json / src/data/anchors.json）を持たない環境＝公開リポジトリのcloneを再現する。
+    // サンプル項目（公開デモ用）を運用20項目に見せてはならない（README「主張を増やさない」）。
     await page.route("**/api/anchor?*", async (route) => await route.continue());
     await page.route("**/api/anchor", async (route) => {
       if (route.request().method() !== "GET") return await route.fallback();
@@ -360,7 +397,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.locator("input[name='stage3b']")).toHaveCount(0);
   });
 
-  test("動的3ペイン対話（セッション内前提変化含む） → CFF暫定判断 → AutoSCORE採点 → XAIレポート表示の全フローが完走する", async ({ page }) => {
+  test("動的2ペイン対話・コード引用（セッション内前提変化含む） → CFF暫定判断 → 構造化採点パイプライン → XAIレポート表示の全フローが完走する", async ({ page }) => {
     await page.goto("/");
 
     // 1. 実務演習セッションを直接開始
@@ -368,39 +405,75 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(startSessionBtn).toBeVisible();
     await startSessionBtn.click();
 
-    // 3ペインの表示確認
+    // 2ペインの表示確認（第2ペインは廃止され2ペイン＋チャット引用に刷新）
     await expect(page.getByText("【第1ペイン】開発Issue ＆ チーム情報")).toBeVisible();
     await expect(page.getByText("【第2ペイン】成果物ドラフト")).toBeVisible();
-    await expect(page.getByText("【第3ペイン】検証パネル")).toBeVisible();
+    await expect(page.getByText("【第2ペイン】検証パネル")).toHaveCount(0);
     await expect(page.getByText("AI同僚との対話・修正指示（マルチターン対話）")).toBeVisible();
 
-    // 検証パネルへコードスパンを追加
-    const focusInput = page.getByPlaceholder("検証対象とするコード断片・キーワード");
-    await focusInput.fill("redis.get(merchantId)");
-    await page.getByRole("button", { name: "検証パネルへ追加" }).click();
-    await expect(page.locator("span.bg-purple-500\\/20", { hasText: "#1" })).toBeVisible();
-    await expect(page.getByText("redis.get(merchantId)")).toBeVisible();
+    // 第1ペイン（要件引用機能）の確認
+    const quoteReqBtn = page.getByTestId("quote-requirement-btn");
+    await expect(quoteReqBtn).toBeVisible();
 
-    // 場面3 前提変化（緊急仕様変更・追加要件）の注入テスト
-    const shiftBtn = page.getByRole("button", { name: /緊急仕様変更を発生させる/ });
-    await expect(shiftBtn).toBeVisible();
-    await shiftBtn.click();
-    await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toBeVisible();
-    await expect(page.getByText(/【⚡ 緊急仕様変更・追加要件の通知】/)).toBeVisible();
+    // 未選択時は案内トーストが表示されること
+    await quoteReqBtn.click();
+    await expect(page.getByText("要件またはコンテキストの文字列を選択してから押してください")).toBeVisible();
 
-    // AI同僚へメッセージ送信
+    // 要件選択時にチャット欄へ引用行が挿入されること
+    await page.getByText("受入基準（Acceptance Criteria）:").evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    });
+    await quoteReqBtn.click();
+    await expect(page.getByText("要件テキストをチャット欄に引用しました")).toBeVisible();
+
+    // 第2ペイン（コード引用機能）の確認
+    const quoteBtn = page.getByTestId("quote-code-btn");
+    await expect(quoteBtn).toBeVisible();
+
+    // 未選択時は案内トーストが表示されること
+    await quoteBtn.click();
+    await expect(page.getByText("エディタ内のコード行を選択してから押してください")).toBeVisible();
+
+    // コード選択時にチャット欄へ引用行が挿入されること
+    const codeEditor = page.getByTestId("draft-code-editor");
+    await codeEditor.evaluate((el: HTMLTextAreaElement) => {
+      el.setSelectionRange(0, 35);
+    });
+    await quoteBtn.click();
+    await expect(page.getByText("コードをチャット欄に引用しました")).toBeVisible();
+
+    // 場面3 前提変化：**受講者が発生させるボタンは存在しない** [D-100]
+    await expect(page.getByRole("button", { name: /緊急仕様変更を発生させる/ })).toHaveCount(0);
+
+    // AI同僚へメッセージ送信（1回目）
     const promptInput = page.getByPlaceholder(/AI同僚に指示・指摘を入力/);
     await promptInput.fill("Redisの単一障害点について考慮が必要です");
     await page.getByRole("button", { name: "送信" }).click();
 
     // AI同僚の返答が表示されたことを確認
-    await expect(page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時")).toBeVisible();
+    await expect(
+      page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時").first()
+    ).toBeVisible();
 
-    // 媒介プローブの確認
+    // 媒介プローブの確認（右サイドバーの TelemetryPanel 内に移設表示）
     await expect(page.getByTestId("mediation-state-panel")).toBeVisible();
     await expect(page.getByText("その指摘は業務要件のどの部分から来ていますか？")).toBeVisible();
     await expect(page.getByText("進行役（媒介プローブ）")).toBeVisible();
     await expect(page.getByText(/この推定を踏まえて選んだ手/)).toBeVisible();
+
+    // この時点ではまだ前提変化は撃たれていない（サーバ側がしきい値未達と判定した）
+    await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toHaveCount(0);
+
+    // 2回目の発話で、進行役側の判定により前提変化が自動注入される
+    await promptInput.fill("フェイルクローズの方針で修正してください。PCI DSS要件を優先します");
+    await page.getByRole("button", { name: "送信" }).click();
+
+    await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toBeVisible();
+    await expect(page.getByText(/【⚡ 緊急仕様変更・追加要件の通知】/)).toBeVisible();
 
     // 2. レビュー完了 ➔ 暫定判断（CFF）へ進む
     await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
@@ -419,7 +492,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
 
     // 4. XAIレポート画面の確認
-    await expect(page.getByText("AutoSCORE 2段階評価結果（XAIレポート）")).toBeVisible();
+    await expect(page.getByText("構造化採点パイプライン 2段階評価結果（XAIレポート）")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Band 3: 前提摘発・要件検証行動" })).toBeVisible();
     await expect(page.getByText("これは開発中の推定器による「暫定値」です")).toBeVisible();
     await expect(page.getByText("判定根拠（Evidence Summary）")).toBeVisible();

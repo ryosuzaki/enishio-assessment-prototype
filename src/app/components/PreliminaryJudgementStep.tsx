@@ -1,20 +1,9 @@
 "use client";
 
 import React, { useMemo } from "react";
-import {
-  FileCheck,
-  AlertCircle,
-  RefreshCw,
-  Award,
-  Bot,
-  GitPullRequest,
-  CheckCircle2,
-  AlertTriangle,
-  Quote,
-  ShieldCheck,
-  MessageSquare,
-} from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import type { ChatMessage } from "../types";
+import { Badge, Button, Card, cn } from "./ui";
 
 interface PreliminaryJudgementStepProps {
   taskId?: string;
@@ -28,6 +17,32 @@ interface PreliminaryJudgementStepProps {
   onBackToDialogue: () => void;
   onConfirmPreliminaryAndEvaluate: () => void;
 }
+
+/**
+ * GitHub PR レビュー形式の3択。
+ *
+ * **選択肢そのものには色を付けない。**「承認は緑・修正要求は赤」と塗ると、まだ選んでいない
+ * 段階で画面が結論を示唆してしまう。選んだものだけを枠と地色で示す。
+ */
+const DECISIONS: { value: "remand" | "comment" | "approve"; label: string; detail: string }[] = [
+  {
+    value: "remand",
+    label: "修正を要求 (Request Changes)",
+    detail:
+      "重大な障害リスクや規程違反（P0ブロッカー）が残っており、本番リリース不可と判定。修正を指示。",
+  },
+  {
+    value: "comment",
+    label: "条件付きで進める (Comment)",
+    detail:
+      "主要設計には合意。ステージング環境での追加検証や運用監視（アラート設定）の追加を条件として許可。",
+  },
+  {
+    value: "approve",
+    label: "承認する (Approve)",
+    detail: "要件およびチーム運用基準を満たしており、このまま本番デプロイ可能と判定。",
+  },
+];
 
 export function PreliminaryJudgementStep({
   taskId = "TASK-FINTECH-AUTH-01",
@@ -70,223 +85,165 @@ export function PreliminaryJudgementStep({
   }, [chatHistory]);
 
   return (
-    <div className="glass-panel p-8 rounded-2xl border border-slate-800 bg-slate-900/80 shadow-2xl space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-        <div className="flex items-center gap-2.5">
-          <GitPullRequest className="w-6 h-6 text-indigo-400" />
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                CFF: Force Decision First & Mandatory Justification (進行役ミラーリング [D-80])
-              </span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3" /> 白紙再作文の恒久禁止
-              </span>
-            </div>
-            <h2 className="text-lg font-bold text-white mt-1">
-              成果物の最終判定と判断理由の言語化（進行役論点要約・GitHub PRレビュー形式）
-            </h2>
-          </div>
+    <div className="space-y-block">
+      <header className="space-y-2 border-b border-line pb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="accent">
+            CFF: Force Decision First &amp; Mandatory Justification (進行役ミラーリング [D-80])
+          </Badge>
+          <Badge tone="neutral">白紙再作文の恒久禁止</Badge>
         </div>
-      </div>
-
-      {/* Explanation Banner */}
-      <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
-        AIによる自動採点およびXAIレポートを開示する前に、受講者自身の最終判定をコミットさせます（Force Decision First）。
-        <strong>白紙textareaへの長文再作文は恒久的に廃止されました（[D-80]）。</strong>
-        進行役が対話ログから整理した以下の論点要約を確認し、GitHub PRレビュー形式で［承認］［条件付き承認］［修正要求］の意思決定をワンクリックで確定してください。
-      </p>
+        <h2 className="text-title tracking-tight text-ink">
+          成果物の最終判定と判断理由の言語化（進行役論点要約・GitHub PRレビュー形式）
+        </h2>
+        <p className="max-w-4xl text-caption text-ink-2">
+          AIによる自動採点およびXAIレポートを開示する前に、受講者自身の最終判定をコミットさせます（Force
+          Decision First）。
+          <strong className="font-semibold text-ink">
+            白紙textareaへの長文再作文は恒久的に廃止されました（[D-80]）。
+          </strong>
+          進行役が対話ログから整理した以下の論点要約を確認し、GitHub
+          PRレビュー形式で［承認］［条件付き承認］［修正要求］の意思決定をワンクリックで確定してください。
+        </p>
+      </header>
 
       {prelimError && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-          <span>{prelimError}</span>
+        <div
+          role="alert"
+          className="rounded-card border border-critical/30 bg-critical-wash px-4 py-3 text-caption text-critical"
+        >
+          {prelimError}
         </div>
       )}
 
-      {/* Mirroring Synthesis Card */}
-      <div className="p-4 rounded-xl bg-slate-950/70 border border-indigo-500/30 space-y-3 shadow-inner">
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-          <div className="flex items-center gap-2 text-xs font-bold text-indigo-300">
-            <Bot className="w-4 h-4 text-indigo-400" />
-            <span>進行役（メディエーター）による対話論点のミラーリング要約</span>
-          </div>
-          <span className="text-[10px] text-slate-400 font-mono">
-            ※ 対話ログから受講者の主張を抽出・整理済み（先回り正答開示なし）
-          </span>
-        </div>
-
-        <div className="space-y-2">
+      <Card
+        title="進行役（メディエーター）による対話論点のミラーリング要約"
+        meta="※ 対話ログから受講者の主張を抽出・整理済み（先回り正答開示なし）"
+      >
+        <div className="space-y-cell">
           {synthesizedPoints.length > 0 ? (
-            synthesizedPoints.map((pt) => (
-              <div
-                key={pt.num}
-                className="flex items-start gap-2.5 text-xs text-slate-200 bg-slate-900/50 p-2.5 rounded-lg border border-slate-800/60"
-              >
-                <span className="font-bold text-indigo-400 shrink-0 font-mono text-[11px] bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-800/40">
-                  {pt.num} (Turn {pt.turnSeq})
-                </span>
-                <div className="flex-1 min-w-0">
-                  <span className="font-semibold text-slate-100">{pt.title}: </span>
-                  <span className="text-slate-300">{pt.detail}</span>
-                </div>
-              </div>
-            ))
+            <ol className="space-y-2">
+              {synthesizedPoints.map((pt) => (
+                <li
+                  key={pt.num}
+                  className="flex flex-col gap-1.5 rounded-chip border border-line bg-surface-sunken p-2.5 text-caption sm:flex-row sm:gap-2.5"
+                >
+                  <span className="shrink-0 font-medium text-ink-3" data-numeric>
+                    {pt.num}（Turn {pt.turnSeq}）
+                  </span>
+                  <span className="min-w-0 leading-relaxed text-ink-2">
+                    <strong className="font-semibold text-ink">{pt.title}: </strong>
+                    {pt.detail}
+                  </span>
+                </li>
+              ))}
+            </ol>
           ) : (
-            <div className="text-xs text-slate-400 bg-slate-900/40 p-3 rounded-lg border border-slate-800/60 italic">
-              ※ 対話ログに受講者からの指摘・指示発言が記録されていません。対話を経ずに判断に進む場合は、以下の「判断理由（必須）」欄に成果物に対する具体的な理由を直接記述してください。
+            <p className="rounded-chip border border-line bg-surface-sunken p-3 text-caption text-ink-2">
+              ※
+              対話ログに受講者からの指摘・指示発言が記録されていません。対話を経ずに判断に進む場合は、以下の「判断理由（必須）」欄に成果物に対する具体的な理由を直接記述してください。
+            </p>
+          )}
+
+          {userQuotes.length > 0 && (
+            <div className="space-y-1.5 border-t border-line pt-3">
+              <p className="text-caption text-ink-3">受講者の主要な対話発言（引用スパン）:</p>
+              <ul className="flex flex-wrap gap-1.5">
+                {userQuotes.map((q, idx) => (
+                  <li
+                    key={idx}
+                    className="rounded-chip border border-line bg-surface-sunken px-2 py-1 text-caption text-ink-2"
+                  >
+                    &ldquo;{q.length > 50 ? q.slice(0, 50) + "…" : q}&rdquo;
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
+      </Card>
 
-        {userQuotes.length > 0 && (
-          <div className="pt-1 border-t border-slate-800/60">
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 mb-1">
-              <Quote className="w-3 h-3 text-slate-400" />
-              <span>受講者の主要な対話発言（引用スパン）:</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {userQuotes.map((q, idx) => (
-                <span
-                  key={idx}
-                  className="text-[11px] text-slate-300 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800 italic"
-                >
-                  &ldquo;{q.length > 50 ? q.slice(0, 50) + "…" : q}&rdquo;
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 1. GitHub PR Review Decision Action */}
-      <div className="space-y-3">
-        <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block flex items-center justify-between">
-          <span>① このプルリクエストに対する最終意思決定（GitHub PRレビュー形式・必須）</span>
-          <span className="text-indigo-400 text-[10px] font-normal">※ 選択するだけでワンクリック確定可能</span>
-        </label>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <label
-            className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
-              prelimAction === "remand"
-                ? "bg-amber-600/15 border-amber-500 text-white shadow-lg shadow-amber-500/10"
-                : "bg-slate-950/40 border-slate-800 text-slate-300 hover:border-slate-700"
-            }`}
-          >
-            <input
-              type="radio"
-              name="prelim_action"
-              value="remand"
-              checked={prelimAction === "remand"}
-              onChange={() => setPrelimAction("remand")}
-              className="mt-1 text-amber-600 focus:ring-0"
-            />
-            <div>
-              <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                <AlertTriangle className="w-4 h-4" /> ⚠️ 修正を要求 (Request Changes)
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                重大な障害リスクや規程違反（P0ブロッカー）が残っており、本番リリース不可と判定。修正を指示。
-              </p>
-            </div>
-          </label>
-
-          <label
-            className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
-              prelimAction === "comment"
-                ? "bg-sky-600/15 border-sky-500 text-white shadow-lg shadow-sky-500/10"
-                : "bg-slate-950/40 border-slate-800 text-slate-300 hover:border-slate-700"
-            }`}
-          >
-            <input
-              type="radio"
-              name="prelim_action"
-              value="comment"
-              checked={prelimAction === "comment"}
-              onChange={() => setPrelimAction("comment")}
-              className="mt-1 text-sky-600 focus:ring-0"
-            />
-            <div>
-              <div className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
-                <MessageSquare className="w-4 h-4" /> 💬 条件付きで進める (Comment)
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                主要設計には合意。ステージング環境での追加検証や運用監視（アラート設定）の追加を条件として許可。
-              </p>
-            </div>
-          </label>
-
-          <label
-            className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all cursor-pointer ${
-              prelimAction === "approve"
-                ? "bg-emerald-600/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/10"
-                : "bg-slate-950/40 border-slate-800 text-slate-300 hover:border-slate-700"
-            }`}
-          >
-            <input
-              type="radio"
-              name="prelim_action"
-              value="approve"
-              checked={prelimAction === "approve"}
-              onChange={() => setPrelimAction("approve")}
-              className="mt-1 text-emerald-600 focus:ring-0"
-            />
-            <div>
-              <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4" /> ✅ 承認する (Approve)
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                要件およびチーム運用基準を満たしており、このまま本番デプロイ可能と判定。
-              </p>
-            </div>
-          </label>
+      <fieldset className="space-y-row">
+        <legend className="flex w-full flex-wrap items-baseline justify-between gap-2 pb-1">
+          <span className="text-section text-ink">
+            ① このプルリクエストに対する最終意思決定（GitHub PRレビュー形式・必須）
+          </span>
+          <span className="text-caption text-ink-3">※ 選択するだけでワンクリック確定可能</span>
+        </legend>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {DECISIONS.map((d) => (
+            <label
+              key={d.value}
+              className={cn(
+                "flex cursor-pointer items-start gap-2.5 rounded-card border p-3 transition-colors",
+                prelimAction === d.value
+                  ? "border-accent bg-accent-wash"
+                  : "border-line bg-surface hover:border-line-strong",
+              )}
+            >
+              <input
+                type="radio"
+                name="prelim_action"
+                value={d.value}
+                checked={prelimAction === d.value}
+                onChange={() => setPrelimAction(d.value)}
+                className="mt-1 shrink-0 accent-[var(--color-accent)]"
+              />
+              <span className="space-y-1">
+                <span className="block text-section text-ink">{d.label}</span>
+                <span className="block text-caption text-ink-2">{d.detail}</span>
+              </span>
+            </label>
+          ))}
         </div>
-      </div>
+      </fieldset>
 
-      {/* 2. Optional Adjustment & Notes (White-space essay is permanently forbidden [D-80]) */}
+      {/* 白紙再作文は恒久的に廃止されている（[D-80]）ため、この欄はあくまで任意の微調整である */}
       <div className="space-y-2">
-        <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block flex items-center justify-between">
-          <span>② 進行役の要約に対する補足・微調整（任意・省略可）</span>
-          <span className="text-slate-400 text-[10px] font-mono">※ 省略時は上記要約がそのまま記録されます</span>
+        <label
+          htmlFor="prelim-justification"
+          className="flex flex-wrap items-baseline justify-between gap-2"
+        >
+          <span className="text-section text-ink">
+            ② 進行役の要約に対する補足・微調整（任意・省略可）
+          </span>
+          <span className="text-caption text-ink-3">※ 省略時は上記要約がそのまま記録されます</span>
         </label>
         <textarea
+          id="prelim-justification"
           value={prelimJustification}
           onChange={(e) => setPrelimJustification(e.target.value)}
-          placeholder="進行役の要約に補足や微調整がある場合のみ入力してください（省略可。例: 承認または差し戻しと判断した具体的な根拠・理由を記述）"
-          className="w-full bg-slate-950 text-xs text-slate-100 p-3 rounded-xl border border-slate-800 h-20 focus:outline-none focus:border-indigo-500 resize-none leading-relaxed"
+          placeholder="進行役の要約に補足や微調整がある場合のみ入力してください（省略可。例: 承認または差し戻しと判断した具体的な根拠・理由を記述）…"
+          className={cn(
+            "h-20 w-full resize-none rounded-chip border border-line-strong bg-surface p-3",
+            "text-caption text-ink focus:border-accent focus:outline-none",
+          )}
         />
-        <p className="text-[11px] text-slate-400">
-          ※ 白紙からの再作文は不要です。入力がない場合も、進行役がまとめた論点要約がそのまま正式な判断理由（Mandatory Justification）として安全に記録されます。
+        <p className="text-caption text-ink-3">
+          ※
+          白紙からの再作文は不要です。入力がない場合も、進行役がまとめた論点要約がそのまま正式な判断理由（Mandatory
+          Justification）として安全に記録されます。
         </p>
       </div>
 
-      {/* Action Footers */}
-      <div className="pt-4 flex justify-between items-center border-t border-slate-800">
-        <button
-          onClick={onBackToDialogue}
-          disabled={isEvaluating}
-          className="text-xs text-slate-400 hover:text-slate-200 underline"
-        >
+      <div className="flex items-center justify-between gap-4 border-t border-line pt-4">
+        <Button variant="quiet" onClick={onBackToDialogue} disabled={isEvaluating}>
           ← 対話画面へ戻る
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
           onClick={onConfirmPreliminaryAndEvaluate}
           disabled={isEvaluating || !prelimAction}
-          className="inline-flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold hover:from-emerald-500 hover:to-teal-500 transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-40 cursor-pointer"
         >
           {isEvaluating ? (
             <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              評価実行中（Stage 1 抽出 ➔ Stage 2 採点）...
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              評価実行中（Stage 1 抽出 ➔ Stage 2 採点）…
             </>
           ) : (
-            <>
-              暫定判断を確定し、AI評価を実行する
-              <Award className="w-4 h-4" />
-            </>
+            "暫定判断を確定し、AI評価を実行する"
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );

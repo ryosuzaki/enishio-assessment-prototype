@@ -1,5 +1,7 @@
 import { prisma } from "../db";
+import type { Prisma } from "@prisma/client";
 import { prismaErrorCode } from "@/lib/error-message";
+import type { LlmUsage } from "@/lib/llm";
 import { v5 as uuidv5 } from "uuid";
 
 // Enishio standard namespace for learner_id generation [D-28, D-42]
@@ -17,12 +19,22 @@ export function generateLearnerId(tenantNamespace: string, rawUserId: string): s
  * Start a new session for a learner and assign the next incremental session_seq.
  * sessions has a unique constraint on (learner_id, session_seq); a concurrent start
  * loses the race and is retried rather than silently producing a duplicate seq.
+ *
+ * `tenantNamespace` は `learnerId` の採番根拠そのものである（`generateLearnerId`）。
+ * **同じものを `tenants` 側にも残す。**識別子の中にだけ畳み込まれていると、
+ * どの組織の受講者かを後から復元できない。
  */
-export async function startSession(learnerId: string) {
+export async function startSession(learnerId: string, tenantNamespace: string) {
+  const tenant = await prisma.tenant.upsert({
+    where: { tenant_namespace: tenantNamespace },
+    update: {},
+    create: { tenant_namespace: tenantNamespace },
+  });
+
   await prisma.learner.upsert({
     where: { learner_id: learnerId },
     update: {},
-    create: { learner_id: learnerId },
+    create: { learner_id: learnerId, tenant_id: tenant.tenant_id },
   });
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -182,7 +194,7 @@ export interface RecordRatingParams {
  * Record a rating entry (ratings is the single source of truth for evaluation)
  * Enforces anchor_id and anchor_status when stimulus_type === 'anchor' [D-50, D-51]
  */
-export async function recordRating(params: RecordRatingParams) {
+export async function recordRating(params: RecordRatingParams, tx?: Prisma.TransactionClient) {
   if (params.stimulusType === "anchor") {
     if (!params.anchorId || !params.anchorStatus) {
       throw new Error(
@@ -203,7 +215,8 @@ export async function recordRating(params: RecordRatingParams) {
     );
   }
 
-  return await prisma.rating.create({
+  const client = tx ?? prisma;
+  return await client.rating.create({
     data: {
       session_id: params.sessionId,
       learner_id: params.learnerId,
@@ -430,10 +443,12 @@ export interface EvidenceComponentRecord {
 export async function recordEvidenceComponents(
   ratingId: string,
   sessionId: string,
-  components: EvidenceComponentRecord[]
+  components: EvidenceComponentRecord[],
+  tx?: Prisma.TransactionClient
 ) {
   if (!components || components.length === 0) return 0;
-  const result = await prisma.evidenceComponent.createMany({
+  const client = tx ?? prisma;
+  const result = await client.evidenceComponent.createMany({
     data: components.map((c) => ({
       rating_id: ratingId,
       session_id: sessionId,
@@ -481,8 +496,12 @@ export const RELIANCE_OPERATIONALIZATION =
   "スパン単位の明示的採択／棄却は未取得のため automation_bias_index は " +
   "correct_self_reliance の補数になる（3指標は独立ではない）。";
 
-export async function recordRelianceMetrics(input: RelianceMetricsInput) {
+export async function recordRelianceMetrics(
+  input: RelianceMetricsInput,
+  tx?: Prisma.TransactionClient
+) {
   const { sessionId, stepId, flawIds, validSpanIds, components } = input;
+  const client = tx ?? prisma;
 
   const detectedFlawIds = new Set(
     components
@@ -507,7 +526,7 @@ export async function recordRelianceMetrics(input: RelianceMetricsInput) {
   const automationBiasIndex = flawCount > 0 ? (flawCount - detected) / flawCount : null;
   const correctAiReliance = validCount > 0 ? (validCount - overCalled) / validCount : null;
 
-  return await prisma.relianceMetrics.upsert({
+  return await client.relianceMetrics.upsert({
     where: { session_id_step_id: { session_id: sessionId, step_id: stepId } },
     update: {
       correct_ai_reliance: correctAiReliance,
@@ -527,6 +546,21 @@ export async function recordRelianceMetrics(input: RelianceMetricsInput) {
       flaw_span_count: flawCount,
       operationalization: RELIANCE_OPERATIONALIZATION,
     },
+  });
+}
+
+/**
+ * セッションを完了状態として記録する（ended_at を更新する）。[RV-K11]
+ */
+export async function completeSession(
+  sessionId: string,
+  endedAt: Date = new Date(),
+  tx?: Prisma.TransactionClient
+) {
+  const client = tx ?? prisma;
+  return await client.session.update({
+    where: { session_id: sessionId },
+    data: { ended_at: endedAt },
   });
 }
 
@@ -573,4 +607,32 @@ export async function recordMediationProbe(record: MediationProbeRecord) {
       mediator_model_version: record.mediatorModelVersion,
     },
   });
+}
+
+/**
+ * LLM 呼び出し1回ぶんの使用量とレイテンシを記録する。
+ *
+ * **採点だけでなく対話・深掘りも記録する。**毎ターン全対話ログを再送する対話側が
+ * 実際には最大の費目であり、採点分だけ数えると原価を取り違える。
+ *
+ * 記録に失敗しても本処理は止めない。**課金の記録のために採点結果を失うほうが損である。**
+ */
+export async function recordLlmCall(sessionId: string, usage: LlmUsage) {
+  try {
+    return await prisma.llmCall.create({
+      data: {
+        session_id: sessionId,
+        purpose: usage.purpose,
+        model: usage.model,
+        prompt_tokens: usage.promptTokens,
+        completion_tokens: usage.completionTokens,
+        reasoning_tokens: usage.reasoningTokens,
+        total_tokens: usage.totalTokens,
+        latency_ms: usage.latencyMs,
+      },
+    });
+  } catch (e) {
+    console.error("LLM 使用量の記録に失敗しました（本処理は継続します）:", e);
+    return null;
+  }
 }

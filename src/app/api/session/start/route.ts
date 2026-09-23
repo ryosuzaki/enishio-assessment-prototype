@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const rawUserId = body.userId || "founder-test-01";
 
     const learnerId = generateLearnerId(tenantNamespace, rawUserId);
-    const session = await startSession(learnerId);
+    const session = await startSession(learnerId, tenantNamespace);
 
     return NextResponse.json({
       success: true,

@@ -1,29 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  Building2,
-  Users,
-  TrendingUp,
-  ShieldCheck,
-  ArrowUpRight,
-  ArrowRight,
-  BarChart3,
-  CheckCircle2,
-  Sparkles,
-  Filter,
-  Info,
-  ChevronRight,
-  TrendingDown,
-  Search,
-  Download,
-  FileText,
-  Clock,
-  Send,
-  AlertCircle,
-  Award,
-  ExternalLink,
-} from "lucide-react";
+import { Badge, Button, Card, cn, thresholdTone, toneChip, type Tone } from "./ui";
 
 interface OrganizationDashboardProps {
   onStartSession: () => void;
@@ -200,6 +178,85 @@ const TEAMS_SUMMARY: TeamSummary[] = [
   },
 ];
 
+/**
+ * KPI の1枚。
+ *
+ * 上端の色帯や指標ごとのアイコンは置かない——4 枚が別々の色を持つと、どれが重いのかが
+ * 色の派手さで決まってしまう。主役は数値そのものなので、大きさと桁揃えで見せる（[D-101]）。
+ */
+function KpiCard({
+  label,
+  value,
+  unit,
+  delta,
+  deltaTone = "neutral",
+  note,
+}: {
+  label: string;
+  value: React.ReactNode;
+  unit?: string;
+  /** 前期との差や達成率。**符号ではなく指標ごとの良い向きで色を決める** */
+  delta?: string;
+  deltaTone?: Tone;
+  note: string;
+}) {
+  return (
+    <div className="space-y-2 rounded-card border border-line bg-surface p-5">
+      <p className="text-caption text-ink-3">{label}</p>
+      <p className="flex flex-wrap items-baseline gap-2">
+        <span className="text-display tracking-tight text-ink" data-numeric>
+          {value}
+        </span>
+        {unit && <span className="text-caption text-ink-2">{unit}</span>}
+        {delta && (
+          <span className={cn("ml-auto text-section font-semibold", toneChip(deltaTone))} data-numeric>
+            {delta}
+          </span>
+        )}
+      </p>
+      <p className="text-caption text-ink-2">{note}</p>
+    </div>
+  );
+}
+
+/** Before / After の対比バー。改善後だけがアクセントを持ち、改善前は罫線色で沈める。 */
+function BeforeAfterBar({
+  label,
+  summary,
+  before,
+  after,
+}: {
+  label: string;
+  summary: string;
+  before?: number;
+  after: number;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex justify-between gap-3 text-caption">
+        <span className="font-medium text-ink">{label}</span>
+        <span className="font-semibold text-ink" data-numeric>
+          {summary}
+        </span>
+      </div>
+      {before !== undefined && (
+        <div className="flex items-center gap-2">
+          <span className="w-10 shrink-0 text-caption text-ink-3">初回</span>
+          <div className="h-2 flex-1 overflow-hidden rounded-chip bg-surface">
+            <div className="h-full rounded-chip bg-line-strong" style={{ width: `${before}%` }} />
+          </div>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <span className="w-10 shrink-0 text-caption text-ink-3">直近</span>
+        <div className="h-2 flex-1 overflow-hidden rounded-chip bg-surface">
+          <div className="h-full rounded-chip bg-positive" style={{ width: `${after}%` }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function OrganizationDashboard({
   onStartSession,
   onViewLearnerProfile,
@@ -224,36 +281,14 @@ export function OrganizationDashboard({
     return matchesTeam && matchesStatus && matchesSearch;
   });
 
-  const getBandBadgeClass = (score: number) => {
-    if (score >= 4.0) return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
-    if (score >= 3.0) return "bg-blue-500/15 text-blue-400 border-blue-500/30";
-    if (score >= 2.5) return "bg-amber-500/15 text-amber-400 border-amber-500/30";
-    return "bg-rose-500/15 text-rose-400 border-rose-500/30";
-  };
-
+  /**
+   * 受講状況。**これは状態なので意味色を割り当てる**——到達 Band のような連続量の
+   * 序列付けには使わない（数値そのものが序列を示す）。
+   */
   const getStatusBadge = (status: LearnerItem["status"]) => {
-    if (status === "completed") {
-      return (
-        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-          <CheckCircle2 className="w-3 h-3" />
-          <span>修了済み</span>
-        </span>
-      );
-    }
-    if (status === "active") {
-      return (
-        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
-          <Clock className="w-3 h-3" />
-          <span>受講中</span>
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium">
-        <AlertCircle className="w-3 h-3" />
-        <span>要フォロー</span>
-      </span>
-    );
+    if (status === "completed") return <Badge tone="positive">修了済み</Badge>;
+    if (status === "active") return <Badge tone="neutral">受講中</Badge>;
+    return <Badge tone="caution">要フォロー</Badge>;
   };
 
   const handleSendReminder = () => {
@@ -272,75 +307,60 @@ export function OrganizationDashboard({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-section">
       {/* Header & Meta Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-800/80 pb-6">
-        <div>
-          <div className="flex items-center gap-2.5 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2">
-            <Building2 className="w-4 h-4" />
-            <span>企業向け育成・管理ポータル（B2B SaaS 構想モックUI）</span>
-            <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px]">
-              Viability
-            </span>
+      <header className="flex flex-col gap-4 border-b border-line pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-baseline gap-cell">
+            <h1 className="text-display tracking-tight text-ink">組織・受講管理ダッシュボード</h1>
+            <Badge tone="neutral">Viability</Badge>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-            組織・受講管理ダッシュボード
-          </h1>
-          <p className="text-slate-400 text-sm mt-1 max-w-3xl leading-relaxed">
-            受講者個人の学習進捗と動的コンピテンシー（4領域）の成長推移を一元管理し、
+          <p className="max-w-3xl text-body text-ink-2">
+            企業向けの育成・管理ポータルです。受講者個人の学習進捗と動的コンピテンシー（4領域）の成長推移を一元管理し、
             演習によるバイアス克服成果の実証と、現場マネージャーの育成フォロー（1on1・推奨課題配信）を支援します。
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={handleExportCsv}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
-          >
-            <Download className="w-3.5 h-3.5 text-blue-400" />
-            <span>助成金用受講ログCSV</span>
-          </button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button variant="secondary" onClick={handleExportCsv}>
+            助成金用受講ログCSV
+          </Button>
           {onViewBenchmarkGallery && (
-            <button
-              onClick={() => onViewBenchmarkGallery()}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-700/60 text-indigo-200 text-xs font-semibold transition-all"
-            >
-              <Award className="w-3.5 h-3.5 text-amber-400" />
-              <span>エキスパート事後講評</span>
-            </button>
+            <Button variant="secondary" onClick={() => onViewBenchmarkGallery()}>
+              エキスパート事後講評
+            </Button>
           )}
-          <button
-            onClick={onStartSession}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 transition-all"
-          >
-            <span>実務演習を直接体験</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <Button variant="primary" onClick={onStartSession}>
+            実務演習を直接体験
+          </Button>
         </div>
-      </div>
+      </header>
 
       {/* Global Notifications / Toasts */}
       {csvExportSuccess && (
-        <div className="p-3.5 rounded-xl bg-blue-950/80 border border-blue-700/60 text-blue-200 text-xs flex items-center justify-between animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
-            <span>
-              【助成金申請用ログ出力完了】厚生労働省 人材開発支援助成金（リスキリング支援コース）提出用受講時間・出席ログ（142名分・12時間構成CSV）をダウンロードしました。
-            </span>
-          </div>
-        </div>
+        <p
+          role="status"
+          className="rounded-card border border-accent/25 bg-accent-wash p-3.5 text-caption text-ink"
+        >
+          【助成金申請用ログ出力完了】厚生労働省
+          人材開発支援助成金（リスキリング支援コース）提出用受講時間・出席ログ（142名分・12時間構成CSV）をダウンロードしました。
+        </p>
       )}
       {remindSuccess && (
-        <div className="p-3.5 rounded-xl bg-amber-950/80 border border-amber-700/60 text-amber-200 text-xs flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
-          <span>受講停滞メンバー（30日以上未受講）へ、Slackおよびメールで演習リマインドを配信しました。</span>
-        </div>
+        <p
+          role="status"
+          className="rounded-card border border-accent/25 bg-accent-wash p-3.5 text-caption text-ink"
+        >
+          受講停滞メンバー（30日以上未受講）へ、Slackおよびメールで演習リマインドを配信しました。
+        </p>
       )}
       {recommendSuccess && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-700/60 text-emerald-200 text-xs flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>非同期エラー検証の強化対象メンバーへ、推奨課題「T-06b（キャッシュ不整合の検知）」を一括配信しました。</span>
-        </div>
+        <p
+          role="status"
+          className="rounded-card border border-accent/25 bg-accent-wash p-3.5 text-caption text-ink"
+        >
+          非同期エラー検証の強化対象メンバーへ、推奨課題「T-06b（キャッシュ不整合の検知）」を一括配信しました。
+        </p>
       )}
 
       {/*
@@ -348,488 +368,382 @@ export function OrganizationDashboard({
         本プロトタイプの目的は B2B SaaS としての画面設計（Viability）を示すことであり、
         効果量の測定は採択後の PoC で行う。実際に動く評価エンジンは「実務演習セッション」側にある。
       */}
-      <div className="p-3.5 rounded-xl bg-slate-900/80 border border-amber-600/30 text-amber-200/90 text-xs flex items-start gap-2">
-        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-px" />
-        <span>
-          本画面はモックUIです。受講者名・受講状況・各指標はすべて画面設計を示すためのダミー値であり、稼働実績ではありません。
-          実際に動作する評価エンジンは「実務演習セッション」タブでご確認いただけます。
-        </span>
-      </div>
+      <p className="rounded-card border border-caution/30 bg-caution-wash p-3.5 text-caption text-ink-2">
+        本画面はモックUIです。受講者名・受講状況・各指標はすべて画面設計を示すためのダミー値であり、稼働実績ではありません。
+        実際に動作する評価エンジンは「実務演習セッション」タブでご確認いただけます。
+      </p>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Completion */}
-        <div className="glass-panel p-5 rounded-xl border border-slate-800 bg-slate-900/60 relative overflow-hidden">
-          <div className="absolute top-0 left-0 h-1 w-full bg-blue-500" />
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>受検完了エンジニア</span>
-            <Users className="w-4 h-4 text-blue-400" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-white tracking-tight">142</span>
-            <span className="text-xs text-slate-400">/ 161 名</span>
-            <span className="ml-auto inline-flex items-center text-xs text-emerald-400 font-semibold">
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              88.2%
-            </span>
-          </div>
-          <p className="mt-2 text-xs text-slate-400 leading-snug">
-            受講完了率が前期比 +12% 向上。月次演習の定着が進んでいます。
-          </p>
-        </div>
-
-        {/* Card 2: Average Band Growth */}
-        <div className="glass-panel p-5 rounded-xl border border-slate-800 bg-slate-900/60 relative overflow-hidden">
-          <div className="absolute top-0 left-0 h-1 w-full bg-emerald-500" />
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>組織平均 到達Band</span>
-            <BarChart3 className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-emerald-400 tracking-tight">Band 3.4</span>
-            <span className="text-xs text-slate-400">/ 5.0</span>
-            <span className="ml-auto inline-flex items-center text-xs text-emerald-400 font-semibold">
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              +1.1 pt
-            </span>
-          </div>
-          <p className="mt-2 text-xs text-slate-400 leading-snug">
-            受講開始時の平均 Band 2.3 から「Band 3: 前提・トレードオフ検証」へ向上。
-          </p>
-        </div>
-
-        {/* Card 3: Bias Overcome Rate */}
-        <div className="glass-panel p-5 rounded-xl border border-slate-800 bg-slate-900/60 relative overflow-hidden">
-          <div className="absolute top-0 left-0 h-1 w-full bg-indigo-500" />
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>盲従バイアス克服率</span>
-            <ShieldCheck className="w-4 h-4 text-indigo-400" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-indigo-400 tracking-tight">74.2%</span>
-            <span className="text-xs text-slate-400">克服</span>
-            <span className="ml-auto inline-flex items-center text-xs text-emerald-400 font-semibold">
-              <TrendingDown className="w-3.5 h-3.5" />
-              -28.4 pt
-            </span>
-          </div>
-          <p className="mt-2 text-xs text-slate-400 leading-snug">
-            初回演習時の無検証承認率 38.2% が直近 9.8% まで劇的に解消。
-          </p>
-        </div>
-
-        {/* Card 4: Study Hours for Subsidy */}
-        <div className="glass-panel p-5 rounded-xl border border-slate-800 bg-slate-900/60 relative overflow-hidden">
-          <div className="absolute top-0 left-0 h-1 w-full bg-amber-500" />
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>累計受講・演習時間</span>
-            <Clock className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-amber-400 tracking-tight">1,704</span>
-            <span className="text-xs text-slate-400">時間</span>
-            <span className="ml-auto text-xs text-amber-300 font-semibold">
-              平均 10.6h / 名
-            </span>
-          </div>
-          <p className="mt-2 text-xs text-slate-400 leading-snug">
-            人材開発支援助成金の10〜12時間訓練要件を 86.4% の受講者が達成。
-          </p>
-        </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          label="受検完了エンジニア"
+          value="142"
+          unit="/ 161 名"
+          delta="88.2%"
+          deltaTone={thresholdTone(88.2, { good: 85, poor: 70 })}
+          note="受講完了率が前期比 +12% 向上。月次演習の定着が進んでいます。"
+        />
+        <KpiCard
+          label="組織平均 到達Band"
+          value="Band 3.4"
+          unit="/ 5.0"
+          delta="+1.1 pt"
+          deltaTone={thresholdTone(1.1, { good: 1.0, poor: 0.3 })}
+          note="受講開始時の平均 Band 2.3 から「Band 3: 前提・トレードオフ検証」へ向上。"
+        />
+        <KpiCard
+          label="盲従バイアス克服率"
+          value="74.2%"
+          unit="克服"
+          delta="-28.4 pt"
+          /* 無検証承認率が下がったという良い変化。**符号は負だが方向は正しい** */
+          deltaTone={thresholdTone(-28.4, { good: -10, poor: 0, higherIsBetter: false })}
+          note="初回演習時の無検証承認率 38.2% が直近 9.8% まで劇的に解消。"
+        />
+        <KpiCard
+          label="累計受講・演習時間"
+          value="1,704"
+          unit="時間"
+          delta="平均 10.6h / 名"
+          /* 助成金の訓練要件は10時間以上。跨いでいるかどうかがこの数字の意味 */
+          deltaTone={thresholdTone(10.6, { good: 10, poor: 8 })}
+          note="人材開発支援助成金の10〜12時間訓練要件を 86.4% の受講者が達成。"
+        />
       </div>
 
       {/* Main Section: Learner List Table (2/3 Width) & Growth/Action Panels (1/3 Width) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Table: Learner Roster & Skill Profile (2 Cols) */}
-        <div className="lg:col-span-2 glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-400" />
-                <h2 className="text-lg font-bold text-white tracking-tight">
-                  受講者一覧・スキル到達度カルテ
-                </h2>
-              </div>
-              <p className="text-xs text-slate-400 mt-1">
-                各エンジニアの受講進捗、動的コンピテンシー4領域Band、成長度を確認できます。行をクリックするとカルテ要約を表示します。
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-400 font-medium">表示:</span>
-              <span className="text-xs font-bold font-mono text-white bg-slate-800 px-2.5 py-1 rounded-md border border-slate-700">
-                {filteredLearners.length}名
+      {/* 左右の高さ差が開くと受講者一覧の下に大きな空白が残るため、比率を 3:2 にして
+          右カラムの行数を減らし、`items-start` で無理に引き伸ばさない */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-5">
+        {/* Main Table: Learner Roster & Skill Profile */}
+        <div className="lg:col-span-3">
+          <Card
+            title="受講者一覧・スキル到達度カルテ"
+            description="各エンジニアの受講進捗、動的コンピテンシー4領域Band、成長度を確認できます。行をクリックするとカルテ要約を表示します。"
+            meta={
+              <span data-numeric>
+                表示: <strong className="font-semibold text-ink">{filteredLearners.length}名</strong>
               </span>
-            </div>
-          </div>
-
-          {/* Filter Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="氏名・所属・役職で検索..."
-                className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <select
-                value={selectedTeam}
-                onChange={(e) => setSelectedTeam(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-              >
-                <option value="all">すべての部署</option>
-                <option value="決済基盤チーム">決済基盤チーム</option>
-                <option value="コアAPIプラットフォーム">コアAPIプラットフォーム</option>
-                <option value="SRE / インフラチーム">SRE / インフラチーム</option>
-                <option value="データ分析基盤チーム">データ分析基盤チーム</option>
-                <option value="モバイル・フロントエンドチーム">モバイル・フロントエンドチーム</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-              >
-                <option value="all">すべての受講状況</option>
-                <option value="completed">修了済み（12回）</option>
-                <option value="active">受講中（順調）</option>
-                <option value="stalled">要フォロー（停滞）</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-800 text-xs font-semibold uppercase text-slate-400 tracking-wider">
-                  <th className="py-3 px-3">氏名・所属</th>
-                  <th className="py-3 px-2 text-center">進捗</th>
-                  <th className="py-3 px-2 text-center">現在Band</th>
-                  <th className="py-3 px-2 text-center">① 評価</th>
-                  <th className="py-3 px-2 text-center">② 高次</th>
-                  <th className="py-3 px-2 text-center">③ 共創</th>
-                  <th className="py-3 px-2 text-center">④ 適応</th>
-                  <th className="py-3 px-2 text-center">成長</th>
-                  <th className="py-3 px-3 text-center">状況</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {filteredLearners.map((learner) => (
-                  <tr
-                    key={learner.id}
-                    onClick={() => setActiveLearner(learner)}
-                    className={`cursor-pointer transition-colors hover:bg-slate-800/40 ${
-                      activeLearner.id === learner.id ? "bg-blue-950/30" : ""
-                    }`}
-                  >
-                    <td className="py-3 px-3">
-                      <div>
-                        <div className="font-semibold text-slate-200 flex items-center gap-2">
-                          <span>{learner.name}</span>
-                          {learner.overallBand >= 4.0 && (
-                            <Award className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          )}
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
-                          <span>{learner.team}</span>
-                          <span>•</span>
-                          <span>{learner.role}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      <div className="flex flex-col items-center">
-                        <span className="font-mono text-xs text-slate-300">
-                          {learner.progress.completed} / {learner.progress.total}
-                        </span>
-                        <div className="w-14 h-1.5 bg-slate-800 rounded-full mt-1 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${
-                              learner.progress.completed === learner.progress.total
-                                ? "bg-emerald-500"
-                                : learner.status === "stalled"
-                                ? "bg-rose-500"
-                                : "bg-blue-500"
-                            }`}
-                            style={{
-                              width: `${(learner.progress.completed / learner.progress.total) * 100}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-xs font-bold font-mono border ${getBandBadgeClass(
-                          learner.overallBand
-                        )}`}
-                      >
-                        {learner.overallBand.toFixed(1)}
-                      </span>
-                    </td>
-                    <td className="py-3 px-2 text-center font-mono text-xs text-slate-300">
-                      {learner.scores.epistemic.toFixed(1)}
-                    </td>
-                    <td className="py-3 px-2 text-center font-mono text-xs text-slate-300">
-                      {learner.scores.metacognition.toFixed(1)}
-                    </td>
-                    <td className="py-3 px-2 text-center font-mono text-xs text-slate-300">
-                      {learner.scores.dialogue.toFixed(1)}
-                    </td>
-                    <td className="py-3 px-2 text-center font-mono text-xs text-slate-300">
-                      {learner.scores.adaptation.toFixed(1)}
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      <span className="text-xs font-mono font-semibold text-emerald-400">
-                        +{(learner.overallBand - learner.initialBand).toFixed(1)}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      {getStatusBadge(learner.status)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Selected Learner Quick Summary Card */}
-          <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">
-                  選択中: {activeLearner.name} さん
-                </span>
-                <span className="text-xs text-slate-400">
-                  （{activeLearner.team} / {activeLearner.role}）
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 font-medium">
-                  {activeLearner.biasLabel}
-                </span>
+            }
+          >
+            <div className="space-y-block">
+              {/* Filter Bar */}
+              <div className="grid grid-cols-1 gap-3 rounded-card border border-line bg-surface-sunken p-3 sm:grid-cols-3">
+                <input
+                  type="search"
+                  name="learner-search"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="氏名・所属・役職で検索…"
+                  aria-label="受講者の検索"
+                  className={cn(
+                    "w-full rounded-chip border border-line-strong bg-surface px-3 py-1.5",
+                    "text-caption text-ink focus:border-accent focus:outline-none",
+                  )}
+                />
+                <select
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  aria-label="部署で絞り込む"
+                  className={cn(
+                    "w-full rounded-chip border border-line-strong bg-surface px-2.5 py-1.5",
+                    "text-caption text-ink focus:border-accent focus:outline-none",
+                  )}
+                >
+                  <option value="all">すべての部署</option>
+                  <option value="決済基盤チーム">決済基盤チーム</option>
+                  <option value="コアAPIプラットフォーム">コアAPIプラットフォーム</option>
+                  <option value="SRE / インフラチーム">SRE / インフラチーム</option>
+                  <option value="データ分析基盤チーム">データ分析基盤チーム</option>
+                  <option value="モバイル・フロントエンドチーム">モバイル・フロントエンドチーム</option>
+                </select>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  aria-label="受講状況で絞り込む"
+                  className={cn(
+                    "w-full rounded-chip border border-line-strong bg-surface px-2.5 py-1.5",
+                    "text-caption text-ink focus:border-accent focus:outline-none",
+                  )}
+                >
+                  <option value="all">すべての受講状況</option>
+                  <option value="completed">修了済み（12回）</option>
+                  <option value="active">受講中（順調）</option>
+                  <option value="stalled">要フォロー（停滞）</option>
+                </select>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
-                {activeLearner.biasNote}
-              </p>
-            </div>
 
-            <button
-              onClick={() => {
-                if (onViewLearnerProfile) {
-                  onViewLearnerProfile(activeLearner.id);
-                } else {
-                  onStartSession();
-                }
-              }}
-              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow transition-all"
-            >
-              <span>受講者カルテ詳細を開く</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </button>
-          </div>
+              {/* Table */}
+              <p className="text-label text-ink-3">
+                ① 評価的判断力 ／ ② 高次認知・動的思考 ／ ③ 対話的共創力 ／ ④ メタ認知・適応力
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-body">
+                  <thead>
+                    <tr className="border-b border-line text-caption text-ink-3">
+                      <th className="px-3 py-2.5 font-medium">氏名・所属</th>
+                      <th className="px-2 py-2.5 text-center font-medium">進捗</th>
+                      <th className="px-2 py-2.5 text-center font-medium">現在Band</th>
+                      <th className="px-2 py-2.5 text-center font-medium">①</th>
+                      <th className="px-2 py-2.5 text-center font-medium">②</th>
+                      <th className="px-2 py-2.5 text-center font-medium">③</th>
+                      <th className="px-2 py-2.5 text-center font-medium">④</th>
+                      <th className="px-2 py-2.5 text-center font-medium">成長</th>
+                      <th className="px-3 py-2.5 text-center font-medium">状況</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {filteredLearners.map((learner) => (
+                      <tr
+                        key={learner.id}
+                        onClick={() => setActiveLearner(learner)}
+                        className={cn(
+                          "cursor-pointer border-l-2 transition-colors",
+                          learner.status === "stalled" ? "border-l-caution" : "border-l-transparent",
+                          activeLearner.id === learner.id ? "bg-accent-wash" : "hover:bg-surface-sunken",
+                        )}
+                      >
+                        <td className="max-w-[13rem] px-3 py-2.5">
+                          <span className="block whitespace-nowrap font-semibold text-ink">{learner.name}</span>
+                          {/* 所属は参照情報。長くても行の高さを崩さないよう1行で切る（全文は title で読める） */}
+                          <span
+                            className="mt-0.5 block truncate text-label text-ink-3"
+                            title={`${learner.team}（${learner.role}）`}
+                          >
+                            {learner.team}（{learner.role}）
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5">
+                          <div className="flex flex-col items-center">
+                            <span className="text-data text-ink-2" data-numeric>
+                              {learner.progress.completed} / {learner.progress.total}
+                            </span>
+                            <div className="mt-1 h-1.5 w-14 overflow-hidden rounded-chip bg-surface-sunken">
+                              <div
+                                className="h-full rounded-chip bg-accent"
+                                style={{
+                                  width: `${(learner.progress.completed / learner.progress.total) * 100}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span className="text-data font-semibold text-ink" data-numeric>
+                            {learner.overallBand.toFixed(1)}
+                          </span>
+                        </td>
+                        {/* Band 3 に届いていない領域を拾えるようにする。手当ての対象はここから決まる */}
+                        {(
+                          [
+                            learner.scores.epistemic,
+                            learner.scores.metacognition,
+                            learner.scores.dialogue,
+                            learner.scores.adaptation,
+                          ] as const
+                        ).map((score, i) => (
+                          <td key={i} className="px-2 py-2.5 text-center text-data" data-numeric>
+                            <span
+                              className={cn(
+                                "font-semibold",
+                                toneChip(thresholdTone(score, { good: 4.0, poor: 3.0 })),
+                              )}
+                            >
+                              {score.toFixed(1)}
+                            </span>
+                          </td>
+                        ))}
+                        <td className="px-2 py-2.5 text-center text-data" data-numeric>
+                          <span
+                            className={cn(
+                              "font-semibold",
+                              toneChip(
+                                thresholdTone(learner.overallBand - learner.initialBand, {
+                                  good: 1.0,
+                                  poor: 0.5,
+                                }),
+                              ),
+                            )}
+                          >
+                            +{(learner.overallBand - learner.initialBand).toFixed(1)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-center">{getStatusBadge(learner.status)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Selected Learner Quick Summary Card */}
+              <div className="flex flex-col justify-between gap-4 rounded-card border border-line bg-surface-sunken p-4 sm:flex-row sm:items-center">
+                <div className="space-y-1">
+                  <p className="flex flex-wrap items-center gap-2">
+                    <span className="text-section text-ink">
+                      選択中: {activeLearner.name} さん
+                    </span>
+                    <span className="text-caption text-ink-3">
+                      （{activeLearner.team} / {activeLearner.role}）
+                    </span>
+                    <Badge tone="neutral">{activeLearner.biasLabel}</Badge>
+                  </p>
+                  <p className="max-w-2xl text-caption text-ink-2">{activeLearner.biasNote}</p>
+                </div>
+
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    if (onViewLearnerProfile) {
+                      onViewLearnerProfile(activeLearner.id);
+                    } else {
+                      onStartSession();
+                    }
+                  }}
+                  className="shrink-0"
+                >
+                  受講者カルテ詳細を開く
+                </Button>
+              </div>
+            </div>
+          </Card>
         </div>
 
         {/* Right Side: Efficacy Before/After & Manager Action Recommendations */}
-        <div className="space-y-6 flex flex-col justify-between">
+        <div className="space-y-section lg:col-span-2">
           {/* Card A: Bias Overcome & Efficacy (Before vs After) */}
-          <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-base font-bold text-white tracking-tight">
-                  バイアス克服・教育成果（Before / After）
-                </h3>
+          <Card
+            title="バイアス克服・教育成果（Before / After）"
+            meta={<Badge tone="caution">ダミー値</Badge>}
+          >
+            <div className="space-y-cell">
+              <p className="text-caption text-ink-2">
+                受講者全員の初期演習（初回〜2回目）と直近演習の比較を想定した画面です。AI出力を批判的に検証する行動の定着を、この形で提示します。
+              </p>
+              <p className="rounded-chip border border-caution/25 bg-caution-wash px-3 py-2 text-caption text-ink-2">
+                本カードの数値は画面設計を示すためのダミー値であり、実測値ではありません。効果量の測定は採択後のPoCで行います。
+              </p>
+
+              <div className="space-y-cell pt-1">
+                <BeforeAfterBar
+                  label="AI盲従（無検証即時承認率）"
+                  summary="38.2% → 9.8% (-28.4 pt)"
+                  before={38.2}
+                  after={9.8}
+                />
+                <BeforeAfterBar
+                  label="正常コード過剰指摘率（手戻り要因）"
+                  summary="27.5% → 11.2% (-16.3 pt)"
+                  before={27.5}
+                  after={11.2}
+                />
+                <BeforeAfterBar
+                  label="適切差し戻し・是正率（Band 3以上）"
+                  summary="34.3% → 79.0% (+44.7 pt)"
+                  before={34.3}
+                  after={79.0}
+                />
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                ダミー値
-              </span>
+
+              <p className="rounded-chip border border-line bg-surface-sunken p-3 text-caption text-ink-2">
+                成果物を鵜呑みにせず、隠れた前提や例外系を対話で修正できるエンジニアが全体の約8割に達しました。
+              </p>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              受講者全員の初期演習（初回〜2回目）と直近演習の比較を想定した画面です。AI出力を批判的に検証する行動の定着を、この形で提示します。
-            </p>
-            <p className="text-[11px] text-amber-300/80 leading-relaxed border border-amber-500/20 bg-amber-500/5 rounded-lg px-3 py-2">
-              本カードの数値は画面設計を示すためのダミー値であり、実測値ではありません。効果量の測定は採択後のPoCで行います。
-            </p>
-
-            <div className="space-y-3.5 pt-1">
-              {/* Metric 1: AI Over-reliance */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-300 font-medium">AI盲従（無検証即時承認率）</span>
-                  <span className="font-mono text-emerald-400 font-bold">
-                    38.2% → 9.8% (-28.4 pt)
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
-                  <div className="h-full bg-rose-500/80 w-[38%]" title="初回 38.2%" />
-                  <div className="h-full bg-slate-800 flex-1" />
-                </div>
-                <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
-                  <div className="h-full bg-emerald-500 w-[9.8%]" title="直近 9.8%" />
-                  <div className="h-full bg-slate-800 flex-1" />
-                </div>
-              </div>
-
-              {/* Metric 2: Excessive Nitpicking */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-300 font-medium">正常コード過剰指摘率（手戻り要因）</span>
-                  <span className="font-mono text-emerald-400 font-bold">
-                    27.5% → 11.2% (-16.3 pt)
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
-                  <div className="h-full bg-amber-500/80 w-[27.5%]" />
-                  <div className="h-full bg-slate-800 flex-1" />
-                </div>
-                <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
-                  <div className="h-full bg-emerald-500 w-[11.2%]" />
-                  <div className="h-full bg-slate-800 flex-1" />
-                </div>
-              </div>
-
-              {/* Metric 3: Proper Verification Rate */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-300 font-medium">適切差し戻し・是正率（Band 3以上）</span>
-                  <span className="font-mono text-blue-400 font-bold">
-                    34.3% → 79.0% (+44.7 pt)
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex">
-                  <div className="h-full bg-blue-500 w-[79%]" />
-                  <div className="h-full bg-slate-800 flex-1" />
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 text-[11px] text-emerald-300 leading-relaxed">
-              ✓ 成果物を鵜呑みにせず、隠れた前提や例外系を対話で修正できるエンジニアが全体の約8割に達しました。
-            </div>
-          </div>
+          </Card>
 
           {/* Card B: Manager Coaching Prescriptions */}
-          <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <h3 className="text-base font-bold text-white tracking-tight">
-                マネージャー向け推奨育成アクション
-              </h3>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              受講データに基づき、マネージャー（EM）が現場ですぐに打てる育成フォローを提案します。
-            </p>
-
-            <div className="space-y-3">
-              {/* Action 1: Reminder */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-rose-400" />
-                    <span>30日以上未受講（4名）</span>
-                  </span>
-                  <button
-                    onClick={handleSendReminder}
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors"
-                  >
+          <Card
+            title="マネージャー向け推奨育成アクション"
+            description="受講データに基づき、マネージャー（EM）が現場ですぐに打てる育成フォローを提案します。"
+          >
+            <div className="space-y-cell">
+              <div className="space-y-2 rounded-card border border-line bg-surface-sunken p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-section text-ink">30日以上未受講（4名）</span>
+                  <Button variant="secondary" onClick={handleSendReminder} className="px-2 py-1 text-caption">
                     リマインド送信
-                  </button>
+                  </Button>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-snug">
+                <p className="text-caption text-ink-2">
                   小林大樹さん、高橋さん他2名が未受講。月次目標達成に向けてリマインドを推奨。
                 </p>
               </div>
 
-              {/* Action 2: Task Recommendation */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                    <Send className="w-3.5 h-3.5 text-blue-400" />
-                    <span>非同期例外の重点演習</span>
-                  </span>
-                  <button
+              <div className="space-y-2 rounded-card border border-line bg-surface-sunken p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-section text-ink">非同期例外の重点演習</span>
+                  <Button
+                    variant="secondary"
                     onClick={handleSendRecommendation}
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+                    className="px-2 py-1 text-caption"
                   >
                     一括推奨配信
-                  </button>
+                  </Button>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-snug">
+                <p className="text-caption text-ink-2">
                   フロントエンドチーム向けに、演習課題「T-06b（キャッシュ不整合の是正）」の受講を推奨。
                 </p>
               </div>
 
-              {/* Action 3: 1on1 Advice */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
-                <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                  <Award className="w-3.5 h-3.5 text-amber-400" />
-                  <span>1on1指導ヒント</span>
-                </span>
-                <p className="text-[11px] text-slate-400 leading-snug">
+              <div className="space-y-1 rounded-card border border-line bg-surface-sunken p-3">
+                <p className="text-section text-ink">1on1指導ヒント</p>
+                <p className="text-caption text-ink-2">
                   佐藤拓也さんはWhat-if前提変化への適応がBand 4に到達。チーム内のPR設計レビュアー推薦が有効です。
                 </p>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
 
       {/* Bottom Section: Department Sub-summary (Left) & Export/Audit Proof (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Left: Department Operations Sub-summary */}
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-blue-400" />
-              <h3 className="text-base font-bold text-white tracking-tight">
-                部門別 運用・定着サマリー（サブ集計）
-              </h3>
-            </div>
-            <span className="text-[10px] text-slate-400 font-mono">全5部門集計</span>
-          </div>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            各部門の受講完了率とアクティブ率を可視化し、研修の形骸化や受講格差を防止します。
-          </p>
-
+        <Card
+          title="部門別 運用・定着サマリー（サブ集計）"
+          description="各部門の受講完了率とアクティブ率を可視化し、研修の形骸化や受講格差を防止します。"
+          meta="全5部門集計"
+        >
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-caption">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase">
-                  <th className="py-2.5 px-2">対象部門</th>
-                  <th className="py-2.5 px-2 text-center">人数</th>
-                  <th className="py-2.5 px-2 text-center">完了率</th>
-                  <th className="py-2.5 px-2 text-center">アクティブ率</th>
-                  <th className="py-2.5 px-2 text-center">平均時間</th>
+                <tr className="border-b border-line text-ink-3">
+                  <th className="px-2 py-2.5 font-medium">対象部門</th>
+                  <th className="px-2 py-2.5 text-center font-medium">人数</th>
+                  <th className="px-2 py-2.5 text-center font-medium">完了率</th>
+                  <th className="px-2 py-2.5 text-center font-medium">アクティブ率</th>
+                  <th className="px-2 py-2.5 text-center font-medium">平均時間</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              <tbody className="divide-y divide-line">
                 {TEAMS_SUMMARY.map((team) => (
-                  <tr key={team.name} className="hover:bg-slate-800/30">
-                    <td className="py-2.5 px-2 font-medium text-slate-200">
-                      {team.name}
-                    </td>
-                    <td className="py-2.5 px-2 text-center font-mono text-slate-400">
+                  <tr key={team.name}>
+                    <td className="px-2 py-2.5 font-medium text-ink">{team.name}</td>
+                    <td className="px-2 py-2.5 text-center text-ink-2" data-numeric>
                       {team.memberCount}名
                     </td>
-                    <td className="py-2.5 px-2 text-center font-mono">
-                      <span className={team.completionRate >= 90 ? "text-emerald-400 font-bold" : "text-slate-300"}>
+                    <td className="px-2 py-2.5 text-center" data-numeric>
+                      <span
+                        className={cn(
+                          "font-semibold",
+                          toneChip(thresholdTone(team.completionRate, { good: 90, poor: 80 })),
+                        )}
+                      >
                         {team.completionRate.toFixed(1)}%
                       </span>
                     </td>
-                    <td className="py-2.5 px-2 text-center font-mono">
-                      <span className={team.activeRate >= 85 ? "text-blue-400" : "text-amber-400"}>
+                    <td className="px-2 py-2.5 text-center" data-numeric>
+                      <span
+                        className={cn(
+                          "font-semibold",
+                          toneChip(thresholdTone(team.activeRate, { good: 90, poor: 75 })),
+                        )}
+                      >
                         {team.activeRate.toFixed(1)}%
                       </span>
                     </td>
-                    <td className="py-2.5 px-2 text-center font-mono text-slate-400">
+                    <td className="px-2 py-2.5 text-center text-ink-2" data-numeric>
                       {team.avgHours.toFixed(1)}h
                     </td>
                   </tr>
@@ -837,78 +751,62 @@ export function OrganizationDashboard({
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
 
         {/* Right: Subsidy & Internal Compliance Export */}
-        <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4 flex flex-col justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-indigo-400" />
-              <h3 className="text-base font-bold text-white tracking-tight">
-                受講履歴・学習時間データ（助成金・社内報告用CSV）
-              </h3>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              厚生労働省「人材開発支援助成金（事業展開等リスキリング支援コース）」の申請要件である「10時間以上の訓練」「出席率80%以上」を証明する改ざん不能な受講ログデータです。
-            </p>
-          </div>
+        <Card
+          title="受講履歴・学習時間データ（助成金・社内報告用CSV）"
+          description="厚生労働省「人材開発支援助成金（事業展開等リスキリング支援コース）」の申請要件である「10時間以上の訓練」「出席率80%以上」を証明する改ざん不能な受講ログデータです。"
+        >
+          <div className="space-y-block">
+            <dl className="space-y-2 rounded-card border border-line bg-surface-sunken p-4">
+              <div className="flex justify-between gap-3 text-caption">
+                <dt className="text-ink-2">対象プログラム</dt>
+                <dd className="text-right font-semibold text-ink">
+                  生成AI協働・動的検証演習（12時間構成）
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3 text-caption">
+                <dt className="text-ink-2">受講者数・ログ件数</dt>
+                <dd className="text-right text-ink" data-numeric>
+                  142名 / 累計 1,704セッション
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3 text-caption">
+                <dt className="text-ink-2">助成金要件クリア率（出席率80%以上）</dt>
+                <dd className="text-right font-semibold text-ink" data-numeric>
+                  86.4%（123名達成）
+                </dd>
+              </div>
+            </dl>
 
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5">
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-300">対象プログラム</span>
-              <span className="text-white font-semibold">生成AI協働・動的検証演習（12時間構成）</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-300">受講者数・ログ件数</span>
-              <span className="font-mono text-white">142名 / 累計 1,704セッション</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-300">助成金要件クリア率（出席率80%以上）</span>
-              <span className="font-mono text-emerald-400 font-bold">86.4%（123名達成）</span>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button variant="primary" onClick={handleExportCsv} className="flex-1">
+                助成金提出用受講ログCSV
+              </Button>
+              <Button variant="secondary" onClick={handleExportCsv} className="flex-1">
+                経営報告用サマリーPDF
+              </Button>
             </div>
           </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <button
-              onClick={handleExportCsv}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow transition-all"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>助成金提出用受講ログCSV</span>
-            </button>
-            <button
-              onClick={handleExportCsv}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>経営報告用サマリーPDF</span>
-            </button>
-          </div>
-        </div>
+        </Card>
       </div>
 
       {/* Bottom CTA to Interactive Session */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900/80 border border-blue-500/30 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="flex flex-col items-start justify-between gap-4 rounded-card border border-line bg-surface-sunken p-6 sm:flex-row sm:items-center">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-blue-400 text-xs font-bold">
-            <Sparkles className="w-4 h-4" />
-            <span>コア技術の稼働（Feasibility）を確認する</span>
+          <div className="flex flex-wrap items-baseline gap-cell">
+            <h3 className="text-title text-ink">中核評価エンジンによる実務ロールプレイング演習を体験</h3>
+            <Badge tone="neutral">Feasibility</Badge>
           </div>
-          <h3 className="text-lg font-bold text-white">
-            中核評価エンジンによる実務ロールプレイング演習を体験
-          </h3>
-          <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-            AI同僚との動的対話、ソクラテス型深掘り・What-if注入、CFF事前暫定判断、およびAutoSCOREによる2段階根拠抽出＆動的コンピテンシー解析を実際に動かせます。
+          <p className="max-w-2xl text-caption text-ink-2">
+            AI同僚との動的対話、ソクラテス型深掘り・What-if注入、CFF事前暫定判断、および構造化採点パイプラインによる2段階根拠抽出＆動的コンピテンシー解析を実際に動かせます。
           </p>
         </div>
 
-        <button
-          onClick={onStartSession}
-          className="shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.02]"
-        >
-          <span>演習セッションを開始</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
+        <Button variant="primary" onClick={onStartSession} className="shrink-0">
+          演習セッションを開始
+        </Button>
       </div>
     </div>
   );

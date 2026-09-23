@@ -22,11 +22,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI, Type } from "@google/genai";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { DEFAULT_LLM_MODEL } from "../src/lib/llm";
 import { DYNAMIC_TASKS, type DynamicTaskScenario } from "../src/data/dynamic-task";
 import { getInjectedFlaws, type InjectedFlaw } from "../src/data/dynamic-task.server";
 
 function getOpenAIModel(): string {
-  return process.env.OPENAI_MODEL || "gpt-5.6-luna";
+  return process.env.OPENAI_MODEL || DEFAULT_LLM_MODEL;
 }
 
 function getClaudeModel(): string {

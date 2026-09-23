@@ -1,7 +1,9 @@
 "use client";
 
 import React from "react";
-import { Zap, ShieldCheck, PanelRightClose } from "lucide-react";
+import type { EvidenceTargetState, ProbeMove } from "../types";
+import { MediationStatePanel } from "./MediationStatePanel";
+import { Badge, Card, cn } from "./ui";
 
 interface TelemetryPanelProps {
   learnerId: string;
@@ -9,6 +11,30 @@ interface TelemetryPanelProps {
   sessionSeq: number;
   telemetryLog: string[];
   onToggleCollapse?: () => void;
+  // Socratic Mediator State
+  mediationStateEstimate?: EvidenceTargetState[] | null;
+  lastProbeMove?: ProbeMove | null;
+  lastSelectionRationale?: string | null;
+  probesIssued?: number;
+  maxProbes?: number;
+  isProbing?: boolean;
+}
+
+/**
+ * 計器としての読み値。ラベルは淡く、値は本文の濃さで揃える。
+ *
+ * 値は省略せず折り返す——採点器のバージョンのような「照合のための値」は、
+ * 末尾が切れた時点で用をなさない。
+ */
+function Reading({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-0.5 border-b border-line py-2 last:border-b-0">
+      <dt className="text-label text-ink-3">{label}</dt>
+      <dd className="break-words text-caption text-ink" data-numeric>
+        {children}
+      </dd>
+    </div>
+  );
 }
 
 export function TelemetryPanel({
@@ -17,89 +43,89 @@ export function TelemetryPanel({
   sessionSeq,
   telemetryLog,
   onToggleCollapse,
+  mediationStateEstimate,
+  lastProbeMove,
+  lastSelectionRationale,
+  probesIssued,
+  maxProbes,
+  isProbing,
 }: TelemetryPanelProps) {
   return (
-    <div className="space-y-6">
-      {/* Telemetry Card */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
-            <Zap className="w-4 h-4 text-amber-400" />
-            Live Telemetry Monitor
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Connected
-            </span>
+    <div className="space-y-block">
+      <Card
+        title="Live Telemetry Monitor"
+        meta={
+          <span className="flex items-center gap-2">
+            <Badge tone="positive">Connected</Badge>
             {onToggleCollapse && (
               <button
                 type="button"
                 onClick={onToggleCollapse}
                 title="モニターを閉じて画面を広く使う"
-                className="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-slate-800 transition-colors flex items-center gap-1 text-[11px]"
+                className="rounded-chip px-1 text-label text-ink-3 transition-colors hover:text-ink"
               >
-                <PanelRightClose className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">閉じる</span>
+                閉じる
               </button>
             )}
-          </div>
-        </div>
+          </span>
+        }
+      >
+        <dl>
+          <Reading label="Learner ID">
+            <span title={learnerId}>{learnerId ? learnerId.slice(0, 16) + "…" : "Not initialized"}</span>
+          </Reading>
+          <Reading label="Session Seq">{sessionId ? `#${sessionSeq}` : "—"}</Reading>
+          <Reading label="Target Axis">動的コンピテンシー（4領域総合）</Reading>
+          <Reading label="Scorer Version">configurable LLM / extract-v6 / score-v3</Reading>
+        </dl>
 
-        <div className="space-y-2 text-xs font-mono">
-          <div className="flex justify-between py-1 border-b border-slate-800/60">
-            <span className="text-slate-500">Learner ID:</span>
-            <span className="text-slate-300 truncate max-w-[200px]" title={learnerId}>
-              {learnerId ? learnerId.slice(0, 16) + "..." : "Not initialized"}
-            </span>
-          </div>
-          <div className="flex justify-between py-1 border-b border-slate-800/60">
-            <span className="text-slate-500">Session Seq:</span>
-            <span className="text-blue-400 font-bold">
-              {sessionId ? `#${sessionSeq}` : "-"}
-            </span>
-          </div>
-          <div className="flex justify-between py-1 border-b border-slate-800/60">
-            <span className="text-slate-500">Target Axis:</span>
-            <span className="text-purple-400 font-semibold">動的コンピテンシー（4領域総合）</span>
-          </div>
-          <div className="flex justify-between py-1 border-b border-slate-800/60">
-            <span className="text-slate-500">Scorer Version:</span>
-            <span className="text-slate-400 text-[10px]">configurable LLM / extract-v6 / score-v3</span>
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
-            Telemetry Event Stream
-          </div>
-          <div className="h-[270px] overflow-y-auto bg-slate-950/90 p-3 rounded-lg border border-slate-800/80 font-mono text-[11px] text-slate-300 space-y-1.5">
+        <div className="mt-block space-y-row">
+          <p className="text-label text-ink-3">Telemetry Event Stream</p>
+          {/* 機械が吐いたログなので等幅で出す。読み物の本文には等幅を使わない */}
+          {/* 空のときに枠だけが大きく空くのを避け、記録が溜まってから伸ばす */}
+          <div
+            className={cn(
+              "space-y-1.5 overflow-y-auto rounded-chip border border-line bg-surface-sunken p-3",
+              "font-mono text-data leading-relaxed text-ink-2",
+              telemetryLog.length === 0 ? "min-h-[3rem]" : "h-[220px]",
+            )}
+          >
             {telemetryLog.length === 0 ? (
-              <div className="text-slate-600 italic">待機中... セッションを開始するとイベントが記録されます</div>
+              <p className="text-ink-3">待機中… セッションを開始するとイベントが記録されます</p>
             ) : (
-              telemetryLog.map((log, i) => (
-                <div key={i} className="leading-snug text-slate-300">
-                  {log}
-                </div>
-              ))
+              telemetryLog.map((log, i) => <div key={i}>{log}</div>)
             )}
           </div>
         </div>
-      </div>
+      </Card>
 
-      {/* Audit & Compliance Specs Card */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl space-y-3 text-xs text-slate-400">
-        <div className="flex items-center gap-2 text-slate-200 font-semibold">
-          <ShieldCheck className="w-4 h-4 text-blue-400" />
-          検証・テレメトリ仕様準拠
-        </div>
-        <ul className="space-y-1.5 text-[11px] list-disc list-inside">
-          <li>データモデル: `learners`, `sessions`, `ratings`, `learner_preliminary_judgements`, `verification_focus_sequences` 本番準拠</li>
-          <li>AutoSCORE: 自由記述CoTを排した2段階構造化採点（設定可能モデル）</li>
-          <li>CFF機能: Force Decision First & Mandatory Justification</li>
-          <li>3ペイン: 要件・成果物エディタ・検証パネル（focus_seq 順序追跡）</li>
+      {/* Socratic Mediator State Estimation (Inspector View) */}
+      {(mediationStateEstimate !== undefined || lastProbeMove !== undefined) && (
+        <MediationStatePanel
+          stateEstimate={mediationStateEstimate ?? null}
+          lastProbeMove={lastProbeMove ?? null}
+          selectionRationale={lastSelectionRationale ?? null}
+          probesIssued={probesIssued ?? 0}
+          maxProbes={maxProbes ?? 4}
+          isProbing={isProbing ?? false}
+        />
+      )}
+
+      <Card title="検証・テレメトリ仕様準拠">
+        <ul className="list-outside list-disc space-y-row pl-4 text-caption text-ink-2">
+          <li>
+            データモデル: <code className="font-mono text-data text-ink">learners</code>,{" "}
+            <code className="font-mono text-data text-ink">sessions</code>,{" "}
+            <code className="font-mono text-data text-ink">ratings</code>,{" "}
+            <code className="font-mono text-data text-ink">prompt_turns</code>,{" "}
+            <code className="font-mono text-data text-ink">learner_preliminary_judgements</code> 本番準拠
+          </li>
+          <li>構造化採点パイプライン: 自由記述CoTを排した2段階構造化採点（設定可能モデル）</li>
+          <li>CFF機能: Force Decision First &amp; Mandatory Justification</li>
+          <li>2ペイン演習: 課題要件・成果物エディタ ＆ コード引用連動チャット</li>
           <li>XAIレポート: 根拠スパンの可視化と異議申立導線（MVP 4.5）</li>
         </ul>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -3,11 +3,16 @@ import { apiErrorResponse } from "@/lib/api-error";
 import {
   selectProbe,
   MediationUnavailableError,
-  MEDIATOR_MODEL_VERSION,
+  getMediatorModelVersion,
   MAX_PROBES_PER_SESSION,
   type ProbeMove,
 } from "@/lib/mediator";
-import { recordMediationProbe, recordPromptTurn, resolveSessionContext } from "@/lib/telemetry";
+import {
+  recordMediationProbe,
+  recordPromptTurn,
+  recordLlmCall,
+  resolveSessionContext,
+} from "@/lib/telemetry";
 import { getDynamicTask } from "@/data/dynamic-task";
 import { prisma } from "@/lib/db";
 
@@ -75,6 +80,10 @@ export async function POST(req: Request) {
         type: d.type,
       })),
       probesSoFar,
+      onUsage: (usage) => {
+        // 記録の失敗で深掘りを止めない（recordLlmCall 側で握る）
+        void recordLlmCall(sessionId, usage);
+      },
     });
 
     // 状態推定は「問わない」と判断した場合も残す。**打たなかったことも媒介方針の一部であり、
@@ -86,7 +95,7 @@ export async function POST(req: Request) {
       probeText: selection.probe_text,
       stateEstimate: { targets: selection.state_estimate },
       selectionRationale: selection.selection_rationale,
-      mediatorModelVersion: MEDIATOR_MODEL_VERSION,
+      mediatorModelVersion: getMediatorModelVersion(),
     });
 
     if (selection.probe_move === "none" || !selection.probe_text.trim()) {
@@ -103,7 +112,7 @@ export async function POST(req: Request) {
 
     // 問いは対話ログにも残す。受講者が何に答えたのかが分からないと、
     // 第1エージェントが応答の一貫性を判定できない。
-    await recordPromptTurn(sessionId, turnSeq, "mediator", selection.probe_text, MEDIATOR_MODEL_VERSION);
+    await recordPromptTurn(sessionId, turnSeq, "mediator", selection.probe_text, getMediatorModelVersion());
 
     return NextResponse.json({
       success: true,
@@ -112,7 +121,7 @@ export async function POST(req: Request) {
       probeText: selection.probe_text,
       stateEstimate: selection.state_estimate,
       selectionRationale: selection.selection_rationale,
-      mediatorModelVersion: MEDIATOR_MODEL_VERSION,
+      mediatorModelVersion: getMediatorModelVersion(),
       probeTurnSeq: turnSeq,
       probesSoFar: probesSoFar.length + 1,
     });

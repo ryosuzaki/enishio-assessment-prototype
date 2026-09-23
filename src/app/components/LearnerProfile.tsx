@@ -1,27 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  UserCheck,
-  Award,
-  Calendar,
-  Compass,
-  ArrowRight,
-  CheckCircle2,
-  AlertCircle,
-  History,
-  Sparkles,
-  Target,
-  ShieldCheck,
-  Check,
-  Quote,
-  Sliders,
-  Layers,
-  Zap,
-  TrendingUp,
-  FileText,
-  Lightbulb,
-} from "lucide-react";
+import { Badge, Button, Card, cn, thresholdTone, toneChip } from "./ui";
 
 interface LearnerProfileProps {
   onStartSession: (taskId?: string) => void;
@@ -217,6 +197,88 @@ const SUB_DIMENSIONS: SubDimension[] = [
   },
 ];
 
+/** 演習履歴の1行。数値は `data-numeric` で桁を揃える。 */
+const SESSION_HISTORY: {
+  date: string;
+  task: string;
+  band: number;
+  editDistance: number;
+  evidence: string;
+}[] = [
+  {
+    date: "2026/09/01",
+    task: "[T-06a] 決済トランザクションの冪等性・障害時キャッシュ",
+    band: 3,
+    editDistance: 142,
+    evidence: "3件特定",
+  },
+  {
+    date: "2026/08/24",
+    task: "[T-06b] 高トラフィック通知配信基盤のRate Limit整合性",
+    band: 4,
+    editDistance: 89,
+    evidence: "4件特定",
+  },
+  {
+    date: "2026/08/17",
+    task: "[T-06c] イベント駆動アーキテクチャのデッドレター検証",
+    band: 3,
+    editDistance: 210,
+    evidence: "2件特定",
+  },
+  {
+    date: "2026/08/10",
+    task: "[T-05] 認証トークン失効とPCI DSS監査ログ要件",
+    band: 3,
+    editDistance: 165,
+    evidence: "3件特定",
+  },
+];
+
+/**
+ * 量を表す横バー。
+ *
+ * 既定はアクセント1色。**良し悪しの向きが決まっている指標にだけ** `positive` を渡す
+ * （リスク防御力は高いほど良く、自動化バイアス指数は低いほど良い）。向きのない量に
+ * 色を割り当てると、序列がないところに序列が生まれる（`[D-101]` `[D-103]`）。
+ */
+function Bar({ ratio, tone = "accent" }: { ratio: number; tone?: "accent" | "positive" }) {
+  return (
+    <div className="h-1.5 w-full overflow-hidden rounded-chip bg-surface-sunken">
+      <div
+        className={cn("h-full rounded-chip", tone === "positive" ? "bg-positive" : "bg-accent")}
+        style={{ width: `${Math.max(0, Math.min(100, ratio))}%` }}
+      />
+    </div>
+  );
+}
+
+/** 4領域のサマリー1枚。領域ごとの色分けはしない。 */
+function DomainCard({
+  title,
+  level,
+  description,
+  subPoints,
+}: {
+  title: string;
+  level: string;
+  description: string;
+  subPoints: string;
+}) {
+  return (
+    <div className="space-y-1.5 rounded-card border border-line bg-surface-sunken p-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-section text-ink">{title}</h3>
+        <span className="text-data font-semibold text-ink" data-numeric>
+          {level}
+        </span>
+      </div>
+      <p className="text-caption text-ink-2">{description}</p>
+      <p className="text-caption text-ink-3">下位観点: {subPoints}</p>
+    </div>
+  );
+}
+
 export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
   // Toggle between 4 core domains summary and 12 sub-dimensions breakdown
   const [viewMode, setViewMode] = useState<"summary" | "detailed">("detailed");
@@ -236,269 +298,209 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
       : SUB_DIMENSIONS.filter((s) => s.domainId === selectedDomainFilter);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-section">
       {/* Header & Meta Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-800/80 pb-6">
-        <div>
-          <div className="flex items-center gap-2.5 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-2">
-            <UserCheck className="w-4 h-4" />
-            <span>受講者マイページ・スキルカルテ（B2B SaaS 構想モックUI）</span>
-            <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[10px]">
-              Viability
-            </span>
+      <header className="flex flex-col gap-4 border-b border-line pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-baseline gap-cell">
+            <h1 className="text-display tracking-tight text-ink">
+              佐藤 拓也 さんのスキルカルテ＆実践的自己省察
+            </h1>
+            <Badge tone="neutral">Viability</Badge>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-            佐藤 拓也 さんのスキルカルテ＆実践的自己省察
-          </h1>
-          <p className="text-slate-400 text-sm mt-1 max-w-3xl leading-relaxed">
-            1回15〜30分の実務演習を通じて、AI協働プロセス（検証アプローチ・思考の癖・好手）を可視化し、現場の設計・レビューで即活用できる実践的カルテです。
+          <p className="max-w-3xl text-body text-ink-2">
+            受講者本人のマイページです。1回15〜30分の実務演習を通じて、AI協働プロセス（検証アプローチ・思考の癖・好手）を可視化し、現場の設計・レビューで即活用できる実践的カルテです。
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span>最終演習: 2026/09/01（累計6セッション達成）</span>
-          </div>
-          <button
-            onClick={() => onStartSession()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 transition-all cursor-pointer"
-          >
-            <span>実務演習を開始</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          <span className="text-caption text-ink-2" data-numeric>
+            最終演習: 2026/09/01（累計6セッション達成）
+          </span>
+          <Button variant="primary" onClick={() => onStartSession()}>
+            実務演習を開始
+          </Button>
         </div>
-      </div>
+      </header>
 
       {/* この画面の受講者名・スコア・履歴はすべてダミー値である。稼働実績ではない。 */}
-      <div className="p-3.5 rounded-xl bg-slate-900/80 border border-amber-600/30 text-amber-200/90 text-xs flex items-start gap-2">
-        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-px" />
-        <span>
-          本画面はモックUIです。受講者名・各領域のスコア・演習履歴はすべて画面設計を示すためのダミー値であり、稼働実績ではありません。
-          実際に動作する評価エンジンは「実務演習セッション」タブでご確認いただけます。
-        </span>
-      </div>
+      <p className="rounded-card border border-caution/30 bg-caution-wash p-3.5 text-caption text-ink-2">
+        本画面はモックUIです。受講者名・各領域のスコア・演習履歴はすべて画面設計を示すためのダミー値であり、稼働実績ではありません。
+        実際に動作する評価エンジンは「実務演習セッション」タブでご確認いただけます。
+      </p>
 
       {/* Psychological Safety & Autonomy Notice Banner */}
-      <div className="p-4 rounded-xl bg-indigo-950/25 border border-indigo-500/30 flex items-start gap-3 text-xs text-slate-300 leading-relaxed">
-        <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-        <div>
-          <strong className="text-indigo-200 block mb-0.5 font-semibold">
-            🛡️ 個人専用の自己省察・能力開発スペース（心理的安全性ポリシー）
-          </strong>
+      <div className="space-y-0.5 rounded-card border border-line bg-surface-sunken p-4">
+        <p className="text-section text-ink">
+          個人専用の自己省察・能力開発スペース（心理的安全性ポリシー）
+        </p>
+        <p className="text-caption text-ink-2">
           本カルテは受講者本人の能力開発・自己研鑽のために提供されています。他者との社内ランキングや序列比較は一切行われず、本人の明示的同意のない人事評価への流用も規約上禁止されています。安全な環境で、失敗を恐れずAIとの協働判断を試行錯誤できます。
-        </div>
+        </p>
       </div>
 
       {/* Profile Overview Card */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-indigo-500/20 shrink-0">
-            ST
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-white">佐藤 拓也</h2>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
-                決済基盤チーム / シニアエンジニア
-              </span>
-            </div>
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
-              <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                IRT尺度 較正済み（共通アンカー受検済）
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1 text-blue-300 font-medium">
-                <TrendingUp className="w-3.5 h-3.5" />
-                手戻り指摘率 前月比 18% 改善
-              </span>
+      <Card>
+        <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+          <div className="flex items-center gap-4">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-card bg-accent text-title text-white">
+              ST
+            </span>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-title text-ink">佐藤 拓也</h2>
+                <Badge tone="neutral">決済基盤チーム / シニアエンジニア</Badge>
+              </div>
+              <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-ink-2">
+                <span>IRT尺度 較正済み（共通アンカー受検済）</span>
+                <span className="font-medium text-positive" data-numeric>
+                  手戻り指摘率 前月比 18% 改善
+                </span>
+              </p>
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-3 md:border-l md:border-slate-800 md:pl-6">
-          <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-center min-w-28">
-            <span className="text-[11px] text-slate-400 block">総合到達度</span>
-            <span className="text-lg font-bold text-blue-400 font-mono mt-0.5 block">
-              Band 3
-            </span>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-center min-w-28">
-            <span className="text-[11px] text-slate-400 block">累計演習数</span>
-            <span className="text-lg font-bold text-white font-mono mt-0.5 block">
-              6 回
-            </span>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-center min-w-36">
-            <span className="text-[11px] text-slate-400 block">アプローチ特性</span>
-            <span className="text-xs font-bold text-emerald-400 mt-1 block">
-              堅牢性重視スタイル
-            </span>
-          </div>
+          <dl className="flex flex-wrap items-center gap-3 md:border-l md:border-line md:pl-6">
+            <div className="min-w-28 space-y-0.5 rounded-card border border-line bg-surface-sunken p-3 text-center">
+              <dt className="text-caption text-ink-3">総合到達度</dt>
+              <dd className={cn("text-title font-semibold", toneChip(thresholdTone(3, { good: 4, poor: 3 })))} data-numeric>
+                Band 3
+              </dd>
+            </div>
+            <div className="min-w-28 space-y-0.5 rounded-card border border-line bg-surface-sunken p-3 text-center">
+              <dt className="text-caption text-ink-3">累計演習数</dt>
+              <dd className="text-title text-ink" data-numeric>
+                6 回
+              </dd>
+            </div>
+            <div className="min-w-36 space-y-0.5 rounded-card border border-line bg-surface-sunken p-3 text-center">
+              <dt className="text-caption text-ink-3">アプローチ特性</dt>
+              <dd className="text-section text-ink">堅牢性重視スタイル</dd>
+            </div>
+          </dl>
         </div>
-      </div>
+      </Card>
 
       {/* Section: 4 Domains & 12 Sub-Dimensions Breakdown */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-indigo-400" />
-              <h2 className="text-lg font-bold text-white tracking-tight">
-                動的コンピテンシー到達度（4領域・12サブ観点）
-              </h2>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              大領域の概観と、各領域を構成する3つの具体的観点（下位スキル）ごとの実務行動エビデンス
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
+      <Card
+        title="動的コンピテンシー到達度（4領域・12サブ観点）"
+        description="大領域の概観と、各領域を構成する3つの具体的観点（下位スキル）ごとの実務行動エビデンス"
+        meta={
+          <span className="flex items-center gap-1">
             <button
               onClick={() => setViewMode("summary")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={cn(
+                "rounded-chip border px-2.5 py-1 text-caption transition-colors",
                 viewMode === "summary"
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
+                  ? "border-accent bg-accent-wash font-semibold text-ink"
+                  : "border-transparent text-ink-3 hover:text-ink-2",
+              )}
             >
               4大領域サマリー
             </button>
             <button
               onClick={() => setViewMode("detailed")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={cn(
+                "rounded-chip border px-2.5 py-1 text-caption transition-colors",
                 viewMode === "detailed"
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
+                  ? "border-accent bg-accent-wash font-semibold text-ink"
+                  : "border-transparent text-ink-3 hover:text-ink-2",
+              )}
             >
               12サブ観点 詳細ブレークダウン
             </button>
-          </div>
-        </div>
-
+          </span>
+        }
+      >
         {viewMode === "summary" ? (
           /* 4 Domains Summary View */
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
-            <div className="flex flex-col items-center justify-center p-4">
-              <div className="relative w-56 h-56 my-2">
-                <svg viewBox="0 0 200 200" className="w-full h-full overflow-visible">
+          <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-3">
+            <figure className="flex flex-col items-center justify-center">
+              {/*
+                1 系列のレーダー。系列が 1 本なので凡例は置かず、頂点のラベルが軸名を兼ねる。
+                グリッドと軸は罫線トークンまで落とし、塗りと線だけがアクセントを持つ。
+              */}
+              <div className="relative my-2 h-56 w-56">
+                <svg
+                  viewBox="0 0 200 200"
+                  className="h-full w-full overflow-visible"
+                  role="img"
+                  aria-label="4領域の到達度レーダーチャート。評価的判断力 3.8、高次認知 3.4、対話共創 3.2、適応力 3.6"
+                >
                   {[14, 28, 42, 56, 70].map((r, i) => (
                     <polygon
                       key={i}
                       points={`100,${100 - r} ${100 + r},100 100,${100 + r} ${100 - r},100`}
                       fill="none"
-                      stroke="#1e293b"
+                      stroke="var(--color-line)"
                       strokeWidth="1"
                     />
                   ))}
-                  <line x1="100" y1="30" x2="100" y2="170" stroke="#334155" strokeWidth="1" />
-                  <line x1="30" y1="100" x2="170" y2="100" stroke="#334155" strokeWidth="1" />
+                  <line x1="100" y1="30" x2="100" y2="170" stroke="var(--color-line-strong)" strokeWidth="1" />
+                  <line x1="30" y1="100" x2="170" y2="100" stroke="var(--color-line-strong)" strokeWidth="1" />
                   <polygon
                     points={radarPoints}
-                    fill="rgba(99, 102, 241, 0.25)"
-                    stroke="#818cf8"
-                    strokeWidth="2.5"
+                    fill="var(--color-accent)"
+                    fillOpacity="0.15"
+                    stroke="var(--color-accent)"
+                    strokeWidth="2"
                   />
-                  <circle cx="100" cy="46.8" r="4" fill="#38bdf8" />
-                  <circle cx="147.6" cy="100" r="4" fill="#818cf8" />
-                  <circle cx="100" cy="144.8" r="4" fill="#a855f7" />
-                  <circle cx="49.6" cy="100" r="4" fill="#34d399" />
-                  <text x="100" y="18" textAnchor="middle" fill="#cbd5e1" fontSize="9" fontWeight="bold">
+                  <circle cx="100" cy="46.8" r="4" fill="var(--color-accent)" />
+                  <circle cx="147.6" cy="100" r="4" fill="var(--color-accent)" />
+                  <circle cx="100" cy="144.8" r="4" fill="var(--color-accent)" />
+                  <circle cx="49.6" cy="100" r="4" fill="var(--color-accent)" />
+                  <text x="100" y="18" textAnchor="middle" fill="var(--color-ink-2)" fontSize="9">
                     ① 評価的判断力 (3.8)
                   </text>
-                  <text x="180" y="103" textAnchor="start" fill="#cbd5e1" fontSize="9" fontWeight="bold">
+                  <text x="180" y="103" textAnchor="start" fill="var(--color-ink-2)" fontSize="9">
                     ② 高次認知 (3.4)
                   </text>
-                  <text x="100" y="188" textAnchor="middle" fill="#cbd5e1" fontSize="9" fontWeight="bold">
+                  <text x="100" y="188" textAnchor="middle" fill="var(--color-ink-2)" fontSize="9">
                     ③ 対話共創 (3.2)
                   </text>
-                  <text x="20" y="103" textAnchor="end" fill="#cbd5e1" fontSize="9" fontWeight="bold">
+                  <text x="20" y="103" textAnchor="end" fill="var(--color-ink-2)" fontSize="9">
                     ④ 適応力 (3.6)
                   </text>
                 </svg>
               </div>
-              <span className="text-[11px] text-slate-400 text-center mt-2">
-                4領域すべてで <strong className="text-white">Band 3 (自律的検証水準)</strong> を達成
-              </span>
-            </div>
+              <figcaption className="mt-2 text-center text-caption text-ink-2">
+                4領域すべてで <strong className="font-semibold text-ink">Band 3 (自律的検証水準)</strong> を達成
+              </figcaption>
+            </figure>
 
-            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-blue-400" />
-                    ① 評価的判断力
-                  </span>
-                  <span className="text-xs font-mono font-bold text-blue-400">Level 3.8</span>
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  暗黙前提や非機能要件の不備を見抜く力。正常箇所の弁別精度を高めることでさらに手戻りが削減されます。
-                </p>
-                <div className="text-[11px] text-slate-400 pt-1">
-                  下位観点: 欠陥特定 / 前提看破 / 正常箇所弁別
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-indigo-400" />
-                    ② 高次認知・動的思考
-                  </span>
-                  <span className="text-xs font-mono font-bold text-indigo-400">Level 3.4</span>
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  曖昧な要求の構造化と仮説構築力。トレードオフに直面した際の優先順位判断の言語化が確立されています。
-                </p>
-                <div className="text-[11px] text-slate-400 pt-1">
-                  下位観点: 曖昧性解消 / 仮説駆動アプローチ / トレードオフ決断
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-purple-400" />
-                    ③ 対話的共創力
-                  </span>
-                  <span className="text-xs font-mono font-bold text-purple-400">Level 3.2</span>
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  AI同僚への境界設定と説得力。客観規格を引用してAIの反論を論破・収束させる対話力が秀でています。
-                </p>
-                <div className="text-[11px] text-slate-400 pt-1">
-                  下位観点: 論理的指示設計 / エビデンス納得形成 / 他者視点取得
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                    ④ メタ認知・適応力
-                  </span>
-                  <span className="text-xs font-mono font-bold text-emerald-400">Level 3.6</span>
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  自身の盲点の自覚とWhat-if前提変化への適応。急な要件変更に対して迅速に設計を再調整できています。
-                </p>
-                <div className="text-[11px] text-slate-400 pt-1">
-                  下位観点: 思考客観化 / 前提変化適応 / 学習敏捷性
-                </div>
-              </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:col-span-2">
+              <DomainCard
+                title="① 評価的判断力"
+                level="Level 3.8"
+                description="暗黙前提や非機能要件の不備を見抜く力。正常箇所の弁別精度を高めることでさらに手戻りが削減されます。"
+                subPoints="欠陥特定 / 前提看破 / 正常箇所弁別"
+              />
+              <DomainCard
+                title="② 高次認知・動的思考"
+                level="Level 3.4"
+                description="曖昧な要求の構造化と仮説構築力。トレードオフに直面した際の優先順位判断の言語化が確立されています。"
+                subPoints="曖昧性解消 / 仮説駆動アプローチ / トレードオフ決断"
+              />
+              <DomainCard
+                title="③ 対話的共創力"
+                level="Level 3.2"
+                description="AI同僚への境界設定と説得力。客観規格を引用してAIの反論を論破・収束させる対話力が秀でています。"
+                subPoints="論理的指示設計 / エビデンス納得形成 / 他者視点取得"
+              />
+              <DomainCard
+                title="④ メタ認知・適応力"
+                level="Level 3.6"
+                description="自身の盲点の自覚とWhat-if前提変化への適応。急な要件変更に対して迅速に設計を再調整できています。"
+                subPoints="思考客観化 / 前提変化適応 / 学習敏捷性"
+              />
             </div>
           </div>
         ) : (
           /* 12 Sub-Dimensions Detailed Breakdown View */
-          <div className="space-y-4">
+          <div className="space-y-block">
             {/* Filter Pills */}
-            <div className="flex flex-wrap items-center gap-2 pb-2">
-              <span className="text-xs text-slate-400 flex items-center gap-1 mr-1">
-                <Sliders className="w-3.5 h-3.5" />
-                領域絞り込み:
-              </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="mr-1 text-caption text-ink-3">領域絞り込み:</span>
               {[
                 { id: "all", label: "全12観点" },
                 { id: "eval", label: "① 評価的判断力 (3)" },
@@ -509,11 +511,12 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
                 <button
                   key={f.id}
                   onClick={() => setSelectedDomainFilter(f.id)}
-                  className={`px-2.5 py-1 rounded-lg text-xs transition-all ${
+                  className={cn(
+                    "rounded-chip border px-2.5 py-1 text-caption transition-colors",
                     selectedDomainFilter === f.id
-                      ? "bg-slate-800 text-white border border-indigo-500/50 font-semibold"
-                      : "bg-slate-950/80 text-slate-400 hover:text-slate-200 border border-slate-800"
-                  }`}
+                      ? "border-accent bg-accent-wash font-semibold text-ink"
+                      : "border-line bg-surface text-ink-2 hover:border-line-strong",
+                  )}
                 >
                   {f.label}
                 </button>
@@ -521,54 +524,45 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
             </div>
 
             {/* Sub-Dimensions Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {filteredSubDimensions.map((sub) => (
                 <div
                   key={sub.id}
-                  className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700/80 transition-all space-y-2.5"
+                  className="space-y-row rounded-card border border-line bg-surface-sunken p-4"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] font-semibold text-slate-400 block">
-                        {sub.domainName}
-                      </span>
-                      <h4 className="text-xs font-bold text-white mt-0.5">
-                        {sub.name}
-                      </h4>
+                    <div className="min-w-0">
+                      <p className="text-caption text-ink-3">{sub.domainName}</p>
+                      <h4 className="mt-0.5 text-section text-ink">{sub.name}</h4>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[11px] font-mono font-bold text-blue-400">
+                    {/*
+                      ここにバーは置かない。12 枚並ぶカードでは 1 本あたりの幅が 20px 前後にしかならず、
+                      量を読める大きさにならない。**読めない図は情報ではなく飾りである**——
+                      5 点満点の数値と Band だけで十分に比較できる。
+                    */}
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <span className="text-data font-semibold text-ink" data-numeric>
                         {sub.score.toFixed(1)}
                       </span>
-                      <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold text-[10px] border border-blue-500/30">
+                      <Badge tone={sub.band >= 4 ? "positive" : sub.band >= 3 ? "accent" : "caution"}>
                         Band {sub.band}
-                      </span>
+                      </Badge>
                     </div>
                   </div>
 
-                  {/* Progress Bar */}
-                  <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
-                      style={{ width: `${(sub.score / 5) * 100}%` }}
-                    />
-                  </div>
-
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    {sub.description}
-                  </p>
+                  <p className="text-caption text-ink-2">{sub.description}</p>
 
                   {/* Evidence Box */}
-                  <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800/80 text-[11px] space-y-1">
-                    <div className="flex items-center gap-1.5 text-slate-400 text-[10px]">
-                      <Quote className="w-3 h-3 text-indigo-400" />
-                      <span>演習での行動エビデンス（ターン {sub.observedEvidence.turnIndex}）</span>
-                    </div>
-                    <p className="text-slate-200 font-mono text-[10.5px] italic">
+                  <div className="space-y-1 rounded-chip border border-line bg-surface p-2.5">
+                    <p className="text-caption text-ink-3">
+                      演習での行動エビデンス（ターン {sub.observedEvidence.turnIndex}）
+                    </p>
+                    <p className="border-l-2 border-l-line-strong pl-2 text-caption text-ink">
                       {sub.observedEvidence.quote}
                     </p>
-                    <p className="text-slate-400 text-[10.5px] pt-0.5">
-                      ↳ <span className="text-indigo-300">判定事実:</span> {sub.observedEvidence.analysis}
+                    <p className="text-caption text-ink-2">
+                      <span className="font-semibold text-ink">判定事実:</span>{" "}
+                      {sub.observedEvidence.analysis}
                     </p>
                   </div>
                 </div>
@@ -576,282 +570,200 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Section: Collaboration Profile & Balanced Reliance (No negative labeling) */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-lg font-bold text-white tracking-tight">
-                AI協働アプローチ特性 ＆ 適正依存バランス
-              </h2>
+      <Card
+        title="AI協働アプローチ特性 ＆ 適正依存バランス"
+        description="「リスク防御力（批判的検証）」と「開発生産性（AI提案の活用）」の調和度を定量化"
+        meta={<Badge tone="neutral">特性: 堅牢性重視スタイル（High Resilience）</Badge>}
+      >
+        <div className="space-y-block">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-2 rounded-card border border-line bg-surface-sunken p-4">
+              <div className="flex justify-between gap-2 text-caption">
+                <span className="font-semibold text-ink">リスク防御力 (CSR)</span>
+                <span
+                  className={cn("font-semibold", toneChip(thresholdTone(76, { good: 70, poor: 50 })))}
+                  data-numeric
+                >
+                  76%
+                </span>
+              </div>
+              <Bar ratio={76} tone="positive" />
+              <p className="text-caption text-ink-2">
+                AIの不備・ハルシネーションを見抜いて修正・差し戻しできた割合（品質安全性）。
+              </p>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
-              「リスク防御力（批判的検証）」と「開発生産性（AI提案の活用）」の調和度を定量化
-            </p>
+
+            <div className="space-y-2 rounded-card border border-line bg-surface-sunken p-4">
+              <div className="flex justify-between gap-2 text-caption">
+                <span className="font-semibold text-ink">協働活用効率 (CAR)</span>
+                <span
+                  className={cn("font-semibold", toneChip(thresholdTone(82, { good: 70, poor: 50 })))}
+                  data-numeric
+                >
+                  82%
+                </span>
+              </div>
+              <Bar ratio={82} tone="positive" />
+              <p className="text-caption text-ink-2">
+                AIの正しい提案を無駄に書き換えずに受容できた割合（開発生産性）。
+              </p>
+            </div>
+
+            <div className="space-y-2 rounded-card border border-line bg-surface-sunken p-4">
+              <div className="flex justify-between gap-2 text-caption">
+                <span className="font-semibold text-ink">自動化バイアス指数 (ABI)</span>
+                <span
+                  className={cn(
+                    "font-semibold",
+                    /* ABI は低いほど良い。0.30 を超えると盲従の傾向を疑う */
+                    toneChip(thresholdTone(0.12, { good: 0.3, poor: 0.5, higherIsBetter: false })),
+                  )}
+                  data-numeric
+                >
+                  0.12（極めて健全）
+                </span>
+              </div>
+              {/* ABI は低いほど良い。帯が短いことが良好を意味するので、色でも向きを示す */}
+              <Bar ratio={12} tone="positive" />
+              <p className="text-caption text-ink-2">
+                AIの誤りを無検証で承認する盲従リスク。0.30以下が極めて安全な水準。
+              </p>
+            </div>
           </div>
 
-          <span className="text-xs px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold self-start sm:self-auto">
-            特性: 堅牢性重視スタイル（High Resilience）
-          </span>
-        </div>
+          {/* Strengths & Growth Horizons Feedback */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-1.5 rounded-card border border-line bg-surface-sunken p-4">
+              <p className="text-section text-ink">発揮された強み（Strengths）</p>
+              <p className="text-caption text-ink-2">
+                AI同僚が自信満々に提示したコードの盲点（非機能要件やPCI DSS規格違反）を厳格に見抜く卓越したリスク防御力を発揮しています。AIの反論に対しても感情論にならず、客観規格の条文を引用して論理的に説得・収束できています。
+              </p>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Metric 1 */}
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-300 font-semibold">リスク防御力 (CSR)</span>
-              <span className="font-mono text-emerald-400 font-bold">76%</span>
+            <div className="space-y-1.5 rounded-card border border-line bg-surface-sunken p-4">
+              <p className="text-section text-ink">
+                さらなる高みへの着眼点（Growth Horizons）
+              </p>
+              <p className="text-caption text-ink-2">
+                AIが下位互換維持のために意図的に配置した過去世代キー許容ロジックに対し、「これも脆弱性ではないか」と疑う傾向が僅かに見られました。実務要件と照らし合わせた「正常な設計判断（トレードオフ）の弁別」を意識すると、チームでの手戻り工数をさらに圧縮できます。
+              </p>
             </div>
-            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 rounded-full w-[76%]" />
-            </div>
-            <p className="text-[11px] text-slate-400 leading-tight">
-              AIの不備・ハルシネーションを見抜いて修正・差し戻しできた割合（品質安全性）。
-            </p>
-          </div>
-
-          {/* Metric 2 */}
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-300 font-semibold">協働活用効率 (CAR)</span>
-              <span className="font-mono text-blue-400 font-bold">82%</span>
-            </div>
-            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 rounded-full w-[82%]" />
-            </div>
-            <p className="text-[11px] text-slate-400 leading-tight">
-              AIの正しい提案を無駄に書き換えずに受容できた割合（開発生産性）。
-            </p>
-          </div>
-
-          {/* Metric 3 */}
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-300 font-semibold">自動化バイアス指数 (ABI)</span>
-              <span className="font-mono text-emerald-400 font-bold">0.12 (極めて健全)</span>
-            </div>
-            <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 rounded-full w-[12%]" />
-            </div>
-            <p className="text-[11px] text-slate-400 leading-tight">
-              AIの誤りを無検証で承認する盲従リスク。0.30以下が極めて安全な水準。
-            </p>
-          </div>
-        </div>
-
-        {/* Strengths & Growth Horizons Feedback */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-800/40 text-xs text-slate-300 space-y-1.5">
-            <div className="flex items-center gap-1.5 text-emerald-300 font-bold">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>発揮された強み（Strengths）</span>
-            </div>
-            <p className="leading-relaxed text-slate-300">
-              AI同僚が自信満々に提示したコードの盲点（非機能要件やPCI DSS規格違反）を厳格に見抜く卓越したリスク防御力を発揮しています。AIの反論に対しても感情論にならず、客観規格の条文を引用して論理的に説得・収束できています。
-            </p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-800/40 text-xs text-slate-300 space-y-1.5">
-            <div className="flex items-center gap-1.5 text-blue-300 font-bold">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>さらなる高みへの着眼点（Growth Horizons）</span>
-            </div>
-            <p className="leading-relaxed text-slate-300">
-              AIが下位互換維持のために意図的に配置した過去世代キー許容ロジックに対し、「これも脆弱性ではないか」と疑う傾向が僅かに見られました。実務要件と照らし合わせた「正常な設計判断（トレードオフ）の弁別」を意識すると、チームでの手戻り工数をさらに圧縮できます。
-            </p>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Section: Best Moves (Good Moves / Highlights) */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-amber-400" />
-            <h2 className="text-base font-bold text-white tracking-tight">
-              直近演習のハイライト・好手（Good Moves）
-            </h2>
-          </div>
-          <span className="text-xs text-slate-400">客観エビデンスに基づく模範アクション</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Highlight Move 1 */}
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-amber-500/25 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
-                🌟 好手 #1: エビデンス引用による反論論破
+      <Card
+        title="直近演習のハイライト・好手（Good Moves）"
+        meta="客観エビデンスに基づく模範アクション"
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="space-y-row rounded-card border border-line bg-surface-sunken p-4">
+            <div className="flex items-center justify-between gap-2">
+              <Badge tone="accent">好手 #1: エビデンス引用による反論論破</Badge>
+              <span className="shrink-0 text-caption text-ink-3" data-numeric>
+                ターン 4
               </span>
-              <span className="text-[10px] text-slate-400 font-mono">ターン 4</span>
             </div>
-            <h3 className="text-xs font-bold text-white">
+            <h3 className="text-section text-ink">
               AI同僚の自説を「PCI DSS規格の明示的条文」で論理説得
             </h3>
-            <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-300 italic">
-              「PCI DSS Req 3.4および社内規約第4項により、キー失効キャッシュの有効期間は最大60秒と定められています。DB負荷を理由にしたローカル検証の恒久化は承認できません」
-            </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              <span className="text-amber-300 font-semibold">講評:</span> AI同僚が『DB負荷軽減のための正当な工夫』と反論した際、感情論で押し通さず客観的セキュリティ規格を引用して論破し、安全な設計へコミットさせました。
+            <p className="border-l-2 border-l-line-strong bg-surface p-2.5 text-caption text-ink">
+              「PCI DSS Req
+              3.4および社内規約第4項により、キー失効キャッシュの有効期間は最大60秒と定められています。DB負荷を理由にしたローカル検証の恒久化は承認できません」
+            </p>
+            <p className="text-caption text-ink-2">
+              <span className="font-semibold text-ink">講評:</span>{" "}
+              AI同僚が『DB負荷軽減のための正当な工夫』と反論した際、感情論で押し通さず客観的セキュリティ規格を引用して論破し、安全な設計へコミットさせました。
             </p>
           </div>
 
-          {/* Highlight Move 2 */}
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-indigo-500/25 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold">
-                🌟 好手 #2: 前提変化へのアーキテクチャ適応
+          <div className="space-y-row rounded-card border border-line bg-surface-sunken p-4">
+            <div className="flex items-center justify-between gap-2">
+              <Badge tone="accent">好手 #2: 前提変化へのアーキテクチャ適応</Badge>
+              <span className="shrink-0 text-caption text-ink-3" data-numeric>
+                ターン 5
               </span>
-              <span className="text-[10px] text-slate-400 font-mono">ターン 5</span>
             </div>
-            <h3 className="text-xs font-bold text-white">
+            <h3 className="text-section text-ink">
               負荷急増（What-if）に対し即座にリードレプリカ分散へ設計更新
             </h3>
-            <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-300 italic">
+            <p className="border-l-2 border-l-line-strong bg-surface p-2.5 text-caption text-ink">
               「トラフィック100倍を想定するなら、DB直接参照は即座に枯渇します。リードレプリカ経由の分散KVSキャッシュ参照へアーキテクチャを切り替え、失効イベントをPub/Subで受ける構成へ更新します」
-            </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              <span className="text-indigo-300 font-semibold">講評:</span> 進行役による前提急変の負荷注入に対し、自説に固執せず瞬時にトレードオフを再計算して論理的な代替アーキテクチャを即答しました。
+            </p>
+            <p className="text-caption text-ink-2">
+              <span className="font-semibold text-ink">講評:</span>{" "}
+              進行役による前提急変の負荷注入に対し、自説に固執せず瞬時にトレードオフを再計算して論理的な代替アーキテクチャを即答しました。
             </p>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Section: Actionable Takeaways for Tomorrow's PR Reviews */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
-        <div className="flex items-center gap-2">
-          <Lightbulb className="w-4 h-4 text-blue-400" />
-          <h2 className="text-base font-bold text-white tracking-tight">
-            実務直結チェックリスト（Tomorrow&apos;s Takeaways）
-          </h2>
-        </div>
-        <p className="text-xs text-slate-400">
-          演習結果から導き出された、あなたが明日からの実務（要件定義・設計・レビュー・AI協働）で意識すべき3大チェックポイント
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
-            <div className="flex items-center gap-2 text-blue-400 text-xs font-semibold">
-              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>1. キャッシュの失効スコープとSPOF</span>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
-              AIが高速化のために提案したインメモリキャッシュは、障害時にフォールバックできるか？ 整合性が必要なデータの失効確認がスキップされていないか？
+      <Card
+        title="実務直結チェックリスト（Tomorrow's Takeaways）"
+        description="演習結果から導き出された、あなたが明日からの実務（要件定義・設計・レビュー・AI協働）で意識すべき3大チェックポイント"
+      >
+        <ol className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <li className="space-y-1.5 rounded-card border border-line bg-surface-sunken p-3.5">
+            <p className="text-section text-ink">1. キャッシュの失効スコープとSPOF</p>
+            <p className="text-caption text-ink-2">
+              AIが高速化のために提案したインメモリキャッシュは、障害時にフォールバックできるか？
+              整合性が必要なデータの失効確認がスキップされていないか？
             </p>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
-            <div className="flex items-center gap-2 text-blue-400 text-xs font-semibold">
-              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>2. 非同期キューのべき等性保証</span>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
+          </li>
+          <li className="space-y-1.5 rounded-card border border-line bg-surface-sunken p-3.5">
+            <p className="text-section text-ink">2. 非同期キューのべき等性保証</p>
+            <p className="text-caption text-ink-2">
               ネットワーク瞬断によるリトライ時、同一リクエストIDによって二重決済・二重引き当てが構造的に防止（Idempotent）されているか？
             </p>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
-            <div className="flex items-center gap-2 text-blue-400 text-xs font-semibold">
-              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>3. 下位互換と脆弱性の見極め</span>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
+          </li>
+          <li className="space-y-1.5 rounded-card border border-line bg-surface-sunken p-3.5">
+            <p className="text-section text-ink">3. 下位互換と脆弱性の見極め</p>
+            <p className="text-caption text-ink-2">
               一見冗長に見えるフォールバックや古いキーの許容が、ゼロダウンタイム移行のための意図的トレードオフ（正常設計）かどうかをまず確認する。
             </p>
-          </div>
-        </div>
-      </div>
+          </li>
+        </ol>
+      </Card>
 
       {/* Section: Past Sessions History Table */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <History className="w-4 h-4 text-slate-400" />
-            <h2 className="text-base font-bold text-white tracking-tight">
-              過去セッション演習履歴
-            </h2>
-          </div>
-          <span className="text-xs text-slate-400">直近4回を表示</span>
-        </div>
-
+      <Card title="過去セッション演習履歴" meta="直近4回を表示">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-caption">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase">
-                <th className="py-2.5 px-3">受検日時</th>
-                <th className="py-2.5 px-3">演習課題</th>
-                <th className="py-2.5 px-3 text-center">判定Band</th>
-                <th className="py-2.5 px-3 text-center">編集距離</th>
-                <th className="py-2.5 px-3 text-center">検出根拠</th>
-                <th className="py-2.5 px-3 text-right">状態</th>
+              <tr className="border-b border-line text-ink-3">
+                <th className="px-3 py-2 font-medium">受検日時</th>
+                <th className="px-3 py-2 font-medium">演習課題</th>
+                <th className="px-3 py-2 text-center font-medium">判定Band</th>
+                <th className="px-3 py-2 text-center font-medium">編集距離</th>
+                <th className="px-3 py-2 text-center font-medium">検出根拠</th>
+                <th className="px-3 py-2 text-right font-medium">状態</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              <tr className="hover:bg-slate-800/30">
-                <td className="py-3 px-3 text-slate-400 font-mono">2026/09/01</td>
-                <td className="py-3 px-3 font-semibold text-slate-200">
-                  [T-06a] 決済トランザクションの冪等性・障害時キャッシュ
-                </td>
-                <td className="py-3 px-3 text-center">
-                  <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
-                    Band 3
-                  </span>
-                </td>
-                <td className="py-3 px-3 text-center font-mono text-slate-400">142</td>
-                <td className="py-3 px-3 text-center text-emerald-400 font-semibold">3件特定</td>
-                <td className="py-3 px-3 text-right text-slate-400">完了</td>
-              </tr>
-
-              <tr className="hover:bg-slate-800/30">
-                <td className="py-3 px-3 text-slate-400 font-mono">2026/08/24</td>
-                <td className="py-3 px-3 font-semibold text-slate-200">
-                  [T-06b] 高トラフィック通知配信基盤のRate Limit整合性
-                </td>
-                <td className="py-3 px-3 text-center">
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                    Band 4
-                  </span>
-                </td>
-                <td className="py-3 px-3 text-center font-mono text-slate-400">89</td>
-                <td className="py-3 px-3 text-center text-emerald-400 font-semibold">4件特定</td>
-                <td className="py-3 px-3 text-right text-slate-400">完了</td>
-              </tr>
-
-              <tr className="hover:bg-slate-800/30">
-                <td className="py-3 px-3 text-slate-400 font-mono">2026/08/17</td>
-                <td className="py-3 px-3 font-semibold text-slate-200">
-                  [T-06c] イベント駆動アーキテクチャのデッドレター検証
-                </td>
-                <td className="py-3 px-3 text-center">
-                  <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
-                    Band 3
-                  </span>
-                </td>
-                <td className="py-3 px-3 text-center font-mono text-slate-400">210</td>
-                <td className="py-3 px-3 text-center text-emerald-400 font-semibold">2件特定</td>
-                <td className="py-3 px-3 text-right text-slate-400">完了</td>
-              </tr>
-
-              <tr className="hover:bg-slate-800/30">
-                <td className="py-3 px-3 text-slate-400 font-mono">2026/08/10</td>
-                <td className="py-3 px-3 font-semibold text-slate-200">
-                  [T-05] 認証トークン失効とPCI DSS監査ログ要件
-                </td>
-                <td className="py-3 px-3 text-center">
-                  <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
-                    Band 3
-                  </span>
-                </td>
-                <td className="py-3 px-3 text-center font-mono text-slate-400">165</td>
-                <td className="py-3 px-3 text-center text-emerald-400 font-semibold">3件特定</td>
-                <td className="py-3 px-3 text-right text-slate-400">完了</td>
-              </tr>
+            <tbody className="divide-y divide-line">
+              {SESSION_HISTORY.map((row) => (
+                <tr key={row.date}>
+                  <td className="px-3 py-2.5 text-ink-2">{row.date}</td>
+                  <td className="px-3 py-2.5 font-medium text-ink">{row.task}</td>
+                  <td className="px-3 py-2.5 text-center">
+                    {/* 12 観点の表示と同じ基準で色を付ける。同じ語が画面内で違う意味にならないように */}
+                    <Badge tone={row.band >= 4 ? "positive" : row.band >= 3 ? "accent" : "caution"}>
+                      Band {row.band}
+                    </Badge>
+                  </td>
+                  <td className="px-3 py-2.5 text-center text-ink-2">{row.editDistance}</td>
+                  <td className="px-3 py-2.5 text-center text-ink-2">{row.evidence}</td>
+                  <td className="px-3 py-2.5 text-right text-ink-3">完了</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -29,9 +29,15 @@
  * - ZPD に依拠した表現を画面・ドキュメントへ書かない（`[D-29]` `[P-12]`）。
  * - 受講者を集めて一貫性の分布を測らない（`[P-17]`）。ここは実装であって実験ではない。
  */
-import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
+import {
+  createLlmClient,
+  isLlmKeyMissing,
+  measured,
+  resolveModel,
+  type LlmUsage,
+} from "@/lib/llm";
 
 /** 動的コンピテンシーのルーブリックが要求する根拠のカテゴリ。状態推定はこの単位で行う。 */
 export const EVIDENCE_TARGETS = [
@@ -104,7 +110,7 @@ export type ProbeSelection = z.infer<typeof ProbeSelectionSchema>;
 
 // メディエーターモデルの選定設定（設定ファイル / 環境変数から動的取得）
 export function getMediatorModel(): string {
-  return process.env.MEDIATOR_MODEL || process.env.LLM_MODEL || "gpt-5.6-luna";
+  return resolveModel(process.env.MEDIATOR_MODEL);
 }
 
 export function getMediatorModelVersion(): string {
@@ -172,15 +178,16 @@ export async function selectProbe(params: {
   constraints: string[];
   contextDocuments?: { title: string; type: string }[];
   probesSoFar: ProbeMove[];
+  onUsage?: (usage: LlmUsage) => void;
 }): Promise<ProbeSelection> {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey || apiKey === "your-openai-api-key-here") {
+  if (isLlmKeyMissing(apiKey)) {
     throw new MediationUnavailableError(
       "OPENAI_API_KEY が設定されていないため深掘りを実行できません。.env を設定してください。"
     );
   }
 
-  const client = new OpenAI({ apiKey });
+  const client = createLlmClient(apiKey);
 
   const contextDocsText =
     params.contextDocuments && params.contextDocuments.length > 0
@@ -204,21 +211,36 @@ ${params.probesSoFar.length > 0 ? params.probesSoFar.join(" → ") : "（まだ1
 
 現時点の状態推定と、次に打つ手を1つ決めてください。同じ手を続けて打たないでください。`;
 
-  const res = await client.chat.completions.create({
-    model: getMediatorModel(),
-    max_completion_tokens: MAX_TOKENS,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: promptText },
-    ],
-    response_format: zodResponseFormat(ProbeSelectionSchema, "probe_selection"),
-  });
+  const model = getMediatorModel();
+  const res = await measured(
+    "probe",
+    model,
+    () =>
+      client.chat.completions.create({
+        model,
+        max_completion_tokens: MAX_TOKENS,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: promptText },
+        ],
+        response_format: zodResponseFormat(ProbeSelectionSchema, "probe_selection"),
+      }),
+    params.onUsage
+  );
 
   const content = res.choices[0]?.message.content;
   if (!content) {
     throw new MediationUnavailableError("プローブ選択の構造化出力が得られませんでした。");
   }
-  const validated = ProbeSelectionSchema.safeParse(JSON.parse(content));
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (err) {
+    throw new MediationUnavailableError(
+      `プローブ選択のJSON構文解析に失敗しました: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  const validated = ProbeSelectionSchema.safeParse(parsed);
   if (!validated.success) {
     throw new MediationUnavailableError(
       `プローブ選択の構造化出力がスキーマに適合しませんでした: ${validated.error.message}`

@@ -34,7 +34,11 @@ export interface PrDescription {
 export interface PremiseShift {
   id: string;
   title: string;
-  trigger_turn?: number;
+  /**
+   * 受講者の発話が何回目に達した直後に前提変化を撃つか。未指定なら
+   * `PREMISE_SHIFT_DEFAULT_TRIGGER_USER_TURNS`。**受講者はこの時点を選べない** `[D-100]`。
+   */
+  trigger_after_user_turns?: number;
   announcement: string;
   new_requirement: string;
   context_doc: ContextDocument;
@@ -120,7 +124,7 @@ export const DYNAMIC_TASKS: DynamicTaskScenario[] = [
     premise_shift: {
       id: "shift-fintech-vip-fallback",
       title: "【緊急仕様変更】セール時の最優先（VIP）加盟店フォールバック特例とレイテンシ要件の厳格化",
-      trigger_turn: 2,
+      trigger_after_user_turns: 2,
       announcement:
         "【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知：『来週の大型セールにおいて、特定の大手加盟店（VIP）については決済全停止を避けるため、Redis障害時でもローカルキャッシュによる最大30秒のフォールバックを許容する例外ポリシーが承認されました。同時に、全体APIのp99レイテンシ目標は10ms以内への短縮が求められます』",
       new_requirement:
@@ -279,7 +283,7 @@ describe("paymentSecurityMiddleware", () => {
     premise_shift: {
       id: "shift-ecommerce-retry-timeout",
       title: "【緊急仕様変更】決済プロバイダ遅延に伴うタイムアウト補償処理の追加要求",
-      trigger_turn: 2,
+      trigger_after_user_turns: 2,
       announcement:
         "【🚨 緊急仕様変更の発生】決済基盤チームより連絡が入りました：『決済プロバイダ側のセール負荷試験において、返金確定Webhookが最大10分遅延する事例が確認されました。キュー投入後5分経過しても応答がない場合の自動リトライおよび監査アラートが必須要件として追加されました』",
       new_requirement:
@@ -454,7 +458,7 @@ describe("Order Cancellation & Refund Pipeline", () => {
     premise_shift: {
       id: "shift-helpdesk-pii-masking",
       title: "【緊急仕様変更】セキュリティ監査による個人機微情報（PII）の即時マスキング義務化",
-      trigger_turn: 2,
+      trigger_after_user_turns: 2,
       announcement:
         "【🚨 緊急仕様変更の発生】コンプライアンス委員会より緊急通達が入りました：『社内AIボットの問い合わせログに社員番号・氏名が含まれている場合、ログストアへの保存前に即時不可逆ハッシュ化またはマスキングすることが義務付けられました。エラーログにも生データを含めてはなりません』",
       new_requirement:

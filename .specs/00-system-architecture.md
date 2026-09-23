@@ -15,7 +15,7 @@
 │  │   UI Layer ("use client")   │    │   API Layer (Route Handlers)  │  │
 │  │  - Session Orchestration    │    │  - Session & Telemetry        │  │
 │  │  - 3-Pane Dynamic Dialogue  │───>│  - Dynamic Task & Flaws (Svr) │  │
-│  │  - Viability Mocks          │    │  - 2-Stage AutoSCORE          │  │
+│  │  - Viability Mocks          │    │  - 構造化採点パイプライン (2-Stage) │  │
 │  └─────────────────────────────┘    │  - Socratic Mediator          │  │
 │                                     └──────────────┬────────────────┘  │
 └────────────────────────────────────────────────────┼───────────────────┘

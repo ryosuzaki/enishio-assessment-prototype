@@ -33,7 +33,7 @@ Next.js API ルート、Prisma DB、および LLM API とリアルタイムに�
 | :--- | :--- | :--- |
 | **`InitStep`** | `src/app/components/InitStep.tsx` | 受講者ID・連番の発行フォーム。`/api/session/start` と通信。 |
 | **`AnchorQuestionStep`** | `src/app/components/AnchorQuestionStep.tsx` | 共通アンカーの出題・回答受付。`/api/anchor` と通信。4段構成（v2-sct）およびv1に対応。 |
-| **`DialogueSessionStep`** | `src/app/components/DialogueSessionStep.tsx` | 3ペイン演習画面（課題・対話・エディタ）。`/api/dialogue/turn`, `/api/dialogue/probe`, `/api/dialogue/focus` と通信。 |
+| **`DialogueSessionStep`** | `src/app/components/DialogueSessionStep.tsx` | 2ペイン演習画面（課題・対話・エディタ）。`/api/dialogue/turn`, `/api/dialogue/probe`, `/api/dialogue/focus` と通信。 |
 | **`PreliminaryJudgementStep`**| `src/app/components/PreliminaryJudgementStep.tsx` | CFF（認知先行判断）画面。AI評価閲覧前の決定強制。`/api/dialogue/preliminary-judgement` と通信。 |
 | **`EvaluationReportStep`** | `src/app/components/EvaluationReportStep.tsx` | XAIレポート表示と異議申立フォーム。`/api/dialogue/evaluate`, `/api/feedback` と通信。 |
 | **`MediationStatePanel`** | `src/app/components/MediationStatePanel.tsx` | 対話右ペインに表示される走行中の状態推定・打てる手のリアルタイム可視化。 |

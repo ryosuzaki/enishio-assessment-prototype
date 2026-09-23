@@ -10,7 +10,7 @@
 ### Principle I: 2層分離の堅持（Feasibility vs. Viability）
 * **責務の峻別**: 本リポジトリは「ビジネス全体像・UI遷移を示すモック層（Viability）」と「Next.js + PostgreSQL + LLM API で実稼働するコア評価エンジン層（Feasibility）」の2層構造を持つ（`[D-79]`）。
 * **検証規律**:
-  * **実稼働層（Feasibility）**: 1セッションが端から端まで通る縦切り（アンカー出題 → 課題対話 → CFF事前判定 → AutoSCORE 2段階採点 → XAIレポート）。厳格な型安全性、Prisma トランザクション、LLM構造化出力検証、Vitest/Playwright CI検査を必須とする。
+  * **実稼働層（Feasibility）**: 1セッションが端から端まで通る縦切り（アンカー出題 → 課題対話 → CFF事前判定 → 構造化採点パイプライン（2段階採点） → XAIレポート）。厳格な型安全性、Prisma トランザクション、LLM構造化出力検証、Vitest/Playwright CI検査を必須とする。
   * **モック層（Viability）**: 組織ダッシュボード、受講者カルテ等。事業性や画面体験の検証を主目的とし、過剰なDB結合や本番想定ロジックを強制して開発速度を落とさない。
 
 ### Principle II: 正答鍵・機密情報のクライアント非漏洩（Non-Leakage）
@@ -21,14 +21,15 @@
 ### Principle III: 採点・媒介の完全性と追跡可能性（Traceability & Integrity）
 * **フォールバック採点の禁止**: LLM API キー未設定や構造化出力パース失敗時に、キーワード一致や発見的手法による代替スコア（ローカルフォールバック）を算出してはならない。単語出現を検証行動と誤認し、かつ `rater_type = "llm"` の追跡ログが汚染されるためである。**「採点不能としてエラーを返す（または pending_human とする）」ことが測定学的に正しい。**
 * **ソクラテス型メディエーターへの正答鍵遮断**: 誘出（elicitation）を行うメディエーター（`src/lib/mediator`）に正答鍵（`injected_flaw_map` / `dynamic-task.server.ts`）を渡してはならない（`[D-28]`）。正解へ誘導する固定ヒント梯子（Interventionist DA）への変質を防ぎ、「引き出すのであって、導かない」を徹底する。
-* **2段階分離の永続化**: AutoSCORE は「第1段階：根拠抽出（`EvidenceComponent`）」と「第2段階：バンド採点（`Rating`）」を厳格に分離し、双方の構造化データを DB に永続化する。根拠なき評点付与を禁止する。
+* **2段階分離の永続化**: 構造化採点パイプラインは「第1段階：根拠抽出（`EvidenceComponent`）」と「第2段階：バンド採点（`Rating`）」を厳格に分離し、双方の構造化データを DB に永続化する。根拠なき評点付与を禁止する。
 
 ### Principle IV: データスキーマの保全と不変性（Schema Stability）
 * **`prisma/schema.prisma` の厳格管理**: スキーマは MVP 定義書 4.1.1 の正本写しであり、フィールド名や型の無断変更・削除を禁止する。ログの破壊は過去セッションデータの永久喪失を意味する。
 * **用途の凍結**: レーティングやアンカー応答には `stakes_context`（"formative" / "education" / "promotion" / "selection" / "verification"）を記録し、事後分析可能性を担保する（`[D-67]`）。
 
-### Principle V: 仕様書駆動（SDD）と Matt Pocock 式 TDD / 垂直スライス規律
-* **Spec First**: コードを書く前に、必ず `.specs/` または該当する仕様書で要求（What）と技術計画（How）を定義する。
+### Principle V: 仕様書駆動（SDD）と Living Spec / 垂直スライス規律
+* **Contract First & Living Spec**: 実稼働層（Feasibility: 採点・DB・API・セッション進行）の変更時は、コードを書く前に必ず `specs/<機能>/spec.md` で要求（What）と受入基準を改定・合意する。モック層（Viability）の見た目調整やタイポ修正はコード先行で迅速に回してよい。
+* **Flow-Back の義務化**: 実装現場で判明した技術制約や例外挙動は必ず `specs/` 正本へ書き戻し、仕様とコードの乖離（Spec Drift）を放置しない。
 * **Grill セッションの実施**: 仕様策定時、AIはイエスマンにならず、前提の穴・エッジケース・モック/本物の境界を徹底的に逆質問（Grill）して合意を形成する。
 * **Vertical Slice & TDD**: 実装は横切り（全UIを作ってから全APIを作る等）ではなく、1つのユースケースが動く垂直スライスで分割し、テスト先行（Red-Green-Refactor）で実装する。
 

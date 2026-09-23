@@ -26,9 +26,9 @@ async function main() {
 
   // 2. Start 3 consecutive sessions to verify session_seq increments 1, 2, 3
   console.log("\n[2] Testing session_seq sequential incrementation...");
-  const s1 = await startSession(learnerId);
-  const s2 = await startSession(learnerId);
-  const s3 = await startSession(learnerId);
+  const s1 = await startSession(learnerId, tenant);
+  const s2 = await startSession(learnerId, tenant);
+  const s3 = await startSession(learnerId, tenant);
 
   console.log(`- Session 1: ID=${s1.session_id}, seq=${s1.session_seq}`);
   console.log(`- Session 2: ID=${s2.session_id}, seq=${s2.session_seq}`);

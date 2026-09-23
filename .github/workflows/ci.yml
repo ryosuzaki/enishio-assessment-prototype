@@ -34,6 +34,11 @@ jobs:
       - name: TypeScript typecheck
         run: npx tsc --noEmit
 
+      # 移行済みUIに装飾（グラデーション・色付きの影・既定パレット直指定など）が
+      # 混入していないかの回帰チェック。決め事は .claude/skills/ui-design/SKILL.md。
+      - name: Check UI design tokens
+        run: npm run check:ui
+
       - name: Run unit tests (Vitest)
         run: npm run test
 
@@ -51,3 +56,53 @@ jobs:
         run: npm run test:e2e
         env:
           CI: "true"
+
+  integration:
+    name: Integration (real PostgreSQL)
+    runs-on: ubuntu-latest
+
+    # 単体テストとE2EはDBを持たない（前者はモック、後者はルートモック）。
+    # サーバのコードが実際にDBへ正しく書けているかを通しで見るのはこのジョブだけである。
+    # LLM 呼び出しはこのジョブでもモックしてある。課金の発生する経路はCIに入れない。
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: enishio_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d enishio_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/enishio_test?schema=public"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Apply schema to the test database
+        run: npx prisma db push --skip-generate
+
+      - name: Seed anchor items
+        run: npm run seed:anchors
+
+      - name: Run integration tests (Vitest, real DB)
+        run: npm run test:integration
