@@ -20,7 +20,8 @@
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test --project=chromium",
-    "capture:screenshots": "playwright test --project=capture"
+    "capture:screenshots": "playwright test --project=capture",
+    "sim:equating": "tsx scripts/simulate-equating.ts"
   },
   "keywords": [],
   "author": "",

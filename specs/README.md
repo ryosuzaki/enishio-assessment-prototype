@@ -85,6 +85,12 @@ erDiagram
 * **管理する API エンドポイント (2本)**: `/api/dialogue/probe`, `/api/dialogue/premise-shift`
 * **ドキュメント**: [spec.md](003-socratic-mediator/spec.md) / [plan.md](003-socratic-mediator/plan.md) / [tasks.md](003-socratic-mediator/tasks.md)
 
+### [004-equating-simulation](004-equating-simulation/)
+* **責務**: 共通尺度化エンジン（第1層：一対比較＋Bradley-Terry、第2層：固定設問・凍結ペアによる定点較正）の合成データ検証。本番の採点経路・DB には接続しない。
+* **管理する DB モデル**: なし
+* **管理する API エンドポイント**: なし（`npm run sim:equating` で実行）
+* **ドキュメント**: [spec.md](004-equating-simulation/spec.md) ／ 結果: [docs/equating-simulation/](../docs/equating-simulation/README.md)
+
 ---
 
 ## 4. 専門用語の定義 (Domain Terminology)
