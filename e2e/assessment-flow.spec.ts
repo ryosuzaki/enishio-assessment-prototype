@@ -492,7 +492,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByTestId("probe-consistency-block")).toContainText("0.82");
     await expect(page.getByText("評点への異議申立")).toBeVisible();
 
-    // 動的コンピテンシー4領域サマリーカードの確認
+    // AI時代の実務判断力4領域サマリーカードの確認
     await expect(page.getByText("AI時代の実務判断力：4観点の観測")).toBeVisible();
     await expect(page.getByText("① 評価的判断力")).toBeVisible();
     await expect(page.getByText("② 高次認知・動的思考")).toBeVisible();
@@ -715,7 +715,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("ルートB").first()).toBeVisible();
     await expect(page.getByText("ルートC").first()).toBeVisible();
 
-    // 動的コンピテンシー別アクションと観測状況の確認
+    // AI時代の実務判断力別アクションと観測状況の確認
     await expect(page.getByText("評価的判断力").first()).toBeVisible();
     await expect(page.getByText("ログ観測あり").first()).toBeVisible();
     await expect(page.getByText("未観測").first()).toBeVisible();

@@ -348,7 +348,7 @@ export function EvaluationReportStep({
               </p>
             </div>
 
-            {/* 動的コンピテンシー4領域の観測サマリー */}
+            {/* AI時代の実務判断力4領域の観測サマリー */}
             <div className="space-y-2 rounded-chip border border-line bg-surface-sunken p-3.5">
               <p className="text-section text-ink">
                 AI時代の実務判断力：4観点の観測
