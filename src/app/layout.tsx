@@ -3,8 +3,8 @@ import { sansJp, mono } from "./fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Enishio Assessment Engine - 評価的判断力・動的アセスメント",
-  description: "生成AI協働プロセス解析による「評価的判断力」動的アセスメント＆リスキリングプラットフォーム",
+  title: "Enishio Assessment Engine - AI時代の実務判断力",
+  description: "生成AI協働プロセス解析による「AI時代の実務判断力」アセスメント＆リスキリングプラットフォーム",
 };
 
 /** モバイルのブラウザ UI をページの地色へ揃える（Web Interface Guidelines） */
