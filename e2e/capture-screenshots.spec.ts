@@ -210,6 +210,8 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     // 見出しと副題は別の行に分けてある（`[D-102]`：h1 に括弧付きの長い副題を抱かせない）
     await expect(page.locator("h1")).toContainText("実務演習セッション");
     await expect(page.getByText("AI同僚とのコードレビュー演習")).toBeVisible();
+    // 計測ログは既定で閉じている。提出用の画面では開いた状態を撮る
+    await page.getByRole("button", { name: "計測ログを表示" }).click();
     await expect(page.getByText("計測ログ", { exact: true })).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({

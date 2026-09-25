@@ -20,8 +20,9 @@ export default function RootLayout({
   return (
     <html lang="ja" className={`${sansJp.variable} ${mono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-surface-page text-ink antialiased" suppressHydrationWarning>
-        <header className="sticky top-0 z-50 border-b border-line bg-surface">
-          <div className="mx-auto flex max-w-[1536px] items-center justify-between gap-block px-6 py-3">
+        {/* 高さは h-12 で固定する。実務演習の作業領域はこの高さを引いた残りに収める（AssessmentWorkbench） */}
+        <header className="sticky top-0 z-50 h-12 border-b border-line bg-surface">
+          <div className="mx-auto flex h-full max-w-[1536px] items-center justify-between gap-block px-6">
             <div className="flex items-baseline gap-2.5">
               <span className="flex h-5 w-5 translate-y-0.5 items-center justify-center rounded-chip bg-accent text-label font-semibold text-white">
                 E

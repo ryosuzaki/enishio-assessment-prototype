@@ -78,7 +78,7 @@ export function useDialogueFlow({
       {
         turnSeq: 1,
         role: "assistant",
-        content: `${selectedTask.title}に関する成果物を作成しました。右側のコードを確認いただき、本番リリースに向けたレビューをお願いします！`,
+        content: `${selectedTask.title}に関する成果物を作成しました。左の成果物ドラフトのコードを確認いただき、本番リリースに向けたレビューをお願いします！`,
       },
     ]);
     setTurnCounter(2);

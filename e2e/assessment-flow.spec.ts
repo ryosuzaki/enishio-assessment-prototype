@@ -209,7 +209,9 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     const taskOptions = taskSelect.locator("option");
     expect(await taskOptions.count()).toBeGreaterThanOrEqual(1);
 
-    // 右カラムのテレメトリパネル
+    // 計測ログは既定で閉じている。本体の下の「計測ログを表示」から開ける
+    await expect(page.getByText("計測ログは閉じています")).toBeVisible();
+    await page.getByRole("button", { name: "計測ログを表示" }).click();
     await expect(page.getByText("計測ログ", { exact: true })).toBeVisible();
     await expect(page.getByText("記録中")).toBeVisible();
   });
@@ -449,7 +451,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
       page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時").first()
     ).toBeVisible();
 
-    // 媒介プローブの確認（右サイドバーの TelemetryPanel 内に移設表示）
+    // 媒介プローブの確認（2ペインの下の TelemetryPanel 内。計測ログは既定で閉じているので開く）
+    await page.getByRole("button", { name: "計測ログを表示" }).click();
     await expect(page.getByTestId("mediation-state-panel")).toBeVisible();
     await expect(page.getByText("その指摘は業務要件のどの部分から来ていますか？")).toBeVisible();
     await expect(page.getByText("進行役（深掘り）")).toBeVisible();
