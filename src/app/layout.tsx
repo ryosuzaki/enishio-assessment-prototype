@@ -20,8 +20,9 @@ export default function RootLayout({
   return (
     <html lang="ja" className={`${sansJp.variable} ${mono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-surface-page text-ink antialiased" suppressHydrationWarning>
-        <header className="sticky top-0 z-50 border-b border-line bg-surface">
-          <div className="mx-auto flex max-w-[1536px] items-center justify-between gap-block px-6 py-3">
+        {/* 高さは h-12 で固定する。実務演習の作業領域はこの高さを引いた残りに収める（AssessmentWorkbench） */}
+        <header className="sticky top-0 z-50 h-12 border-b border-line bg-surface">
+          <div className="mx-auto flex h-full max-w-[1536px] items-center justify-between gap-block px-6">
             <div className="flex items-baseline gap-2.5">
               <span className="flex h-5 w-5 translate-y-0.5 items-center justify-center rounded-chip bg-accent text-label font-semibold text-white">
                 E
@@ -30,14 +31,15 @@ export default function RootLayout({
               <span className="text-label text-ink-3">Prototype v0.1</span>
             </div>
 
-            {/* 計器の状態表示。点滅はさせない——動作中であることは静的な表示で足りる */}
+            {/* 凡例。タブ側の「モック」表示と対になる——どこまでが実稼働かを最初に読ませる */}
             <div className="hidden items-center gap-block text-label text-ink-2 sm:flex">
               <span className="flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-positive" aria-hidden />
-                Telemetry Active
+                実稼働（実LLM・実DB）
               </span>
-              <span className="border-l border-line pl-block text-ink-3">
-                Axis 4 (Epistemic &amp; Ethical)
+              <span className="flex items-center gap-1.5 border-l border-line pl-block text-ink-3">
+                <span className="h-1.5 w-1.5 rounded-full border border-ink-3" aria-hidden />
+                モック（静的データ）
               </span>
             </div>
           </div>

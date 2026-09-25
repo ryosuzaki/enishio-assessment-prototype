@@ -141,16 +141,6 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
       });
     });
 
-    await page.route("**/api/dialogue/focus", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-        }),
-      });
-    });
-
     await page.route("**/api/dialogue/evaluate", async (route) => {
       await route.fulfill({
         status: 200,
@@ -203,15 +193,15 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.goto("/");
 
     // 画面タイトル・ヘッダー確認
-    await expect(page.locator("h1")).toContainText("動的実務演習セッション");
-    await expect(page.getByText("動的コンピテンシー アセスメント＆テレメトリ基盤")).toBeVisible();
+    await expect(page.locator("h1")).toContainText("実務演習セッション");
+    await expect(page.getByText("AI時代の実務判断力", { exact: true })).toBeVisible();
 
     // 5タブナビゲーションの存在確認
-    await expect(page.getByRole("button", { name: "実務演習セッション（2ペイン動的対話）" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "共通アンカー評価（固定尺度・SCT型）" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /① 組織.*ダッシュボード/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /② 受講者スキルカルテ/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /③ エキスパート事後講評/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "実務演習セッション", exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: "固定設問（SCT型）" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /組織ダッシュボード/ })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /受講者カルテ/ })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /事後講評/ })).toBeVisible();
 
     // 動的課題のドロップダウン
     const taskSelect = page.locator("select").first();
@@ -219,9 +209,11 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     const taskOptions = taskSelect.locator("option");
     expect(await taskOptions.count()).toBeGreaterThanOrEqual(1);
 
-    // 右カラムのテレメトリパネル
-    await expect(page.getByText("Live Telemetry Monitor")).toBeVisible();
-    await expect(page.getByText("Connected")).toBeVisible();
+    // 計測ログは既定で閉じている。本体の下の「計測ログを表示」から開ける
+    await expect(page.getByText("計測ログは閉じています")).toBeVisible();
+    await page.getByRole("button", { name: "計測ログを表示" }).click();
+    await expect(page.getByText("計測ログ", { exact: true })).toBeVisible();
+    await expect(page.getByText("記録中")).toBeVisible();
   });
 
   test("同梱サンプルへフォールバックした場合、運用バンクではないことが画面に明示される", async ({ page }) => {
@@ -248,12 +240,12 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.goto("/?tab=anchor");
 
     await expect(page.getByTestId("anchor-bank-source-badge")).toHaveText("公開デモ用サンプル");
-    await expect(page.getByText("出題する共通アンカー項目（全2項目から選択）")).toBeVisible();
+    await expect(page.getByText("公開用サンプル 2 問から選べます")).toBeVisible();
     await expect(
-      page.getByText(/運用中の共通アンカー項目バンクは、受検者への事前露出を避けるため公開していません/)
+      page.getByText(/運用中の設問バンクは、受講者が事前に目にしないよう公開していません/)
     ).toBeVisible();
     // 3項目のうち1項目は類型C（不備なし）であることを画面が明示する [D-83]
-    await expect(page.getByText(/類型C（仕込んだ不備が無い項目）/)).toBeVisible();
+    await expect(page.getByText(/類型C＝仕込んだ不備が無い設問/)).toBeVisible();
   });
 
   test("アンカー出題 → 4段回答 → 確信度評定 → 送信完了の一連のフローが動作する", async ({ page }) => {
@@ -267,12 +259,12 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     expect(selectedAnchorId).not.toBe("");
 
     // アンカー体験開始
-    const startButton = page.getByRole("button", { name: "このアンカー項目を体験する（4段階疑似対話を開始）" });
+    const startButton = page.getByRole("button", { name: "この設問を体験する" });
     await expect(startButton).toBeVisible();
     await startButton.click();
 
     // 出題されるのは選択されていた項目である。
-    await expect(page.getByText(new RegExp(`共通アンカー項目: ${selectedAnchorId}`))).toBeVisible();
+    await expect(page.getByText(new RegExp(`固定設問: ${selectedAnchorId}`))).toBeVisible();
 
     // 段階1（採用可否）。選択肢に答えを含めない [D-83]
     await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
@@ -306,16 +298,18 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.getByRole("button", { name: /4\s*やや自信あり/ }).click();
 
     // アンカー送信
-    const submitAnchorBtn = page.getByRole("button", { name: "アンカー回答を送信・記録する" });
+    const submitAnchorBtn = page.getByRole("button", { name: "回答を送信して記録する" });
     await submitAnchorBtn.click();
 
     // アンカー完了画面（anchor_complete）
-    await expect(page.getByText("共通アンカー項目の記録が完了しました")).toBeVisible();
+    await expect(page.getByText("固定設問の回答を記録しました")).toBeVisible();
     await expect(page.getByText("anchor_status = pretest")).toBeVisible();
     // 正誤もパネル分布も受検者へ返さない [D-83]
-    await expect(page.getByText("この区間は採点されません。結果も返りません。")).toBeVisible();
+    // 返すのは「何を記録したか」の控えだけ
+    await expect(page.getByText(/正誤は返しません/)).toBeVisible();
+    await expect(page.getByTestId("anchor-answer-record")).toBeVisible();
     // デュアル導線の確認
-    await expect(page.getByRole("button", { name: "別のアンカー項目を試す" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "別の設問を試す" })).toBeVisible();
     await expect(page.getByRole("button", { name: "実務演習セッションを体験する" })).toBeVisible();
   });
 
@@ -338,7 +332,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
   }) => {
     await page.goto("/?tab=anchor");
     await selectAnchorOrSkip(page, "ANCHOR-V2-A-01");
-    await page.getByRole("button", { name: "このアンカー項目を体験する（4段階疑似対話を開始）" }).click();
+    await page.getByRole("button", { name: "この設問を体験する" }).click();
 
     await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
     // 「条件付きで採用してよい」を選ぶ
@@ -368,9 +362,9 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
 
     await expect(page.getByText("確信度の自己評定（5段階）")).toBeVisible();
     await page.getByRole("button", { name: /4\s*やや自信あり/ }).click();
-    await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
+    await page.getByRole("button", { name: "回答を送信して記録する" }).click();
 
-    await expect(page.getByText("共通アンカー項目の記録が完了しました")).toBeVisible();
+    await expect(page.getByText("固定設問の回答を記録しました")).toBeVisible();
     // 設計注記に段階3' の採点方式が出る（受検者向けではなく開発者・審査員向け）
     await expect(page.getByText(/stage3b − stage3/)).toBeVisible();
   });
@@ -378,7 +372,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
   test("類型C（仕込んだ不備が無い項目）では段階2を出題せず、段階3' も無い", async ({ page }) => {
     await page.goto("/?tab=anchor");
     await selectAnchorOrSkip(page, "ANCHOR-V2-C-01");
-    await page.getByRole("button", { name: "このアンカー項目を体験する（4段階疑似対話を開始）" }).click();
+    await page.getByRole("button", { name: "この設問を体験する" }).click();
 
     await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
     // 不備が無い項目なので「そのまま採用してよい」が正答にあたる
@@ -401,7 +395,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.goto("/");
 
     // 1. 実務演習セッションを直接開始
-    const startSessionBtn = page.getByRole("button", { name: "実務演習セッションを開始する（課題提示へ）" });
+    const startSessionBtn = page.getByRole("button", { name: "演習を開始する" });
     await expect(startSessionBtn).toBeVisible();
     await startSessionBtn.click();
 
@@ -459,10 +453,11 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
       page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時").first()
     ).toBeVisible();
 
-    // 媒介プローブの確認（右サイドバーの TelemetryPanel 内に移設表示）
+    // 媒介プローブの確認（2ペインの下の TelemetryPanel 内。計測ログは既定で閉じているので開く）
+    await page.getByRole("button", { name: "計測ログを表示" }).click();
     await expect(page.getByTestId("mediation-state-panel")).toBeVisible();
     await expect(page.getByText("その指摘は業務要件のどの部分から来ていますか？")).toBeVisible();
-    await expect(page.getByText("進行役（媒介プローブ）")).toBeVisible();
+    await expect(page.getByText("進行役（深掘り）")).toBeVisible();
     await expect(page.getByText(/この推定を踏まえて選んだ手/)).toBeVisible();
 
     // この時点ではまだ前提変化は撃たれていない（サーバ側がしきい値未達と判定した）
@@ -479,8 +474,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
 
     // CFF画面の確認
-    await expect(page.getByText("CFF: Force Decision First & Mandatory Justification")).toBeVisible();
-    await expect(page.getByText("成果物の最終判定と判断理由の言語化")).toBeVisible();
+    await expect(page.getByText("場面4：意思決定")).toBeVisible();
+    await expect(page.getByText("PRへの最終判定を確定する")).toBeVisible();
 
     // 修正要求 (remand) を選択
     await page.locator("input[value='remand']").check();
@@ -489,21 +484,21 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await justificationTextarea.fill("Redis障害時のフォールバックおよびPCI DSS要件の観点で修正が必要であるため修正要求。");
 
     // 3. 暫定判断を確定し、AI評価を実行
-    await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
+    await page.getByRole("button", { name: "判定を確定して採点する" }).click();
 
     // 4. XAIレポート画面の確認
-    await expect(page.getByText("構造化採点パイプライン 2段階評価結果（XAIレポート）")).toBeVisible();
+    await expect(page.getByText("XAI診断（構造化採点パイプラインによる2段階採点）")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Band 3: 前提摘発・要件検証行動" })).toBeVisible();
     await expect(page.getByText("これは開発中の推定器による「暫定値」です")).toBeVisible();
-    await expect(page.getByText("判定根拠（Evidence Summary）")).toBeVisible();
-    await expect(page.getByText("形成的診断アドバイス（Diagnostic Feedback）")).toBeVisible();
-    await expect(page.getByText("抽出された受講者の検証行動スパン")).toBeVisible();
+    await expect(page.getByText("判定の根拠", { exact: true })).toBeVisible();
+    await expect(page.getByText("次に伸ばすところ")).toBeVisible();
+    await expect(page.getByText(/抽出された検証行動（採点パイプライン第1段の出力）/)).toBeVisible();
     await expect(page.getByTestId("probe-consistency-block")).toBeVisible();
     await expect(page.getByTestId("probe-consistency-block")).toContainText("0.82");
-    await expect(page.getByText("評点に対する異議申立・フィードバック")).toBeVisible();
+    await expect(page.getByText("評点への異議申立")).toBeVisible();
 
-    // 動的コンピテンシー4領域サマリーカードの確認
-    await expect(page.getByText("動的コンピテンシー 4領域の観測サマリー（提案書準拠）")).toBeVisible();
+    // AI時代の実務判断力4領域サマリーカードの確認
+    await expect(page.getByText("AI時代の実務判断力：4観点の観測")).toBeVisible();
     await expect(page.getByText("① 評価的判断力")).toBeVisible();
     await expect(page.getByText("② 高次認知・動的思考")).toBeVisible();
     await expect(page.getByText("③ 対話的共創力")).toBeVisible();
@@ -511,7 +506,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
 
     // CFF Discrepancy Highlighting の表示確認
     await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
-    await expect(page.getByTestId("prelim-action-display")).toContainText("修正要求 (Request Changes)");
+    await expect(page.getByTestId("prelim-action-display")).toContainText("修正要求");
     await expect(page.getByTestId("matched-flaws-count")).toContainText("1件 (FLAW-01)");
     await expect(page.getByTestId("action-collate-message")).toContainText("受講者の「修正要求」判断と、AI採点器が抽出した仕込み不備");
 
@@ -521,12 +516,11 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await disputeTextarea.fill("ターン2での指摘事項がより高精度に反映されるべきと考えます。");
     await page.getByRole("button", { name: "異議を申し立てる（記録）" }).click();
 
-    await expect(page.getByText("異議申立が `score_feedback` テーブルへ記録されました")).toBeVisible();
-    await expect(page.getByText("W1〜W5 全フロー縦切り動作完了")).toBeVisible();
+    await expect(page.getByText(/異議申立を記録しました（score_feedback）/)).toBeVisible();
 
     // トップへ戻るボタンの動作確認
-    await page.getByRole("button", { name: "← トップへ戻り最初からやり直す" }).click();
-    await expect(page.locator("h1")).toContainText("動的実務演習セッション");
+    await page.getByRole("button", { name: "← 最初からやり直す" }).click();
+    await expect(page.locator("h1")).toContainText("実務演習セッション");
   });
 
   test("CFF Discrepancy Highlighting（事前採否判断と抽出された不備指摘の対比）が動作する", async ({ page }) => {
@@ -561,7 +555,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     });
 
     await page.goto("/");
-    const startSessionBtn = page.getByRole("button", { name: "実務演習セッションを開始する（課題提示へ）" });
+    const startSessionBtn = page.getByRole("button", { name: "演習を開始する" });
     await expect(startSessionBtn).toBeVisible();
     await startSessionBtn.click();
 
@@ -576,11 +570,11 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.locator("input[value='remand']").check();
     const justificationTextarea = page.getByPlaceholder(/進行役の要約に補足|承認または.*と判断した具体的な根拠/);
     await justificationTextarea.fill("高可用性設計とフェイルオーバー要件を提示し、全面的に修正要求としたため。");
-    await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
+    await page.getByRole("button", { name: "判定を確定して採点する" }).click();
 
     // XAIレポート画面での乖離ハイライト確認
     await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
-    await expect(page.getByTestId("prelim-action-display")).toContainText("修正要求 (Request Changes)");
+    await expect(page.getByTestId("prelim-action-display")).toContainText("修正要求");
     await expect(page.getByTestId("matched-flaws-count")).toContainText("1件 (FLAW-02)");
     await expect(page.getByTestId("action-collate-message")).toContainText("受講者の「修正要求」判断と、AI採点器が抽出した仕込み不備");
     await expect(page.getByTestId("prelim-justification-display")).toContainText("高可用性設計とフェイルオーバー要件を提示し、全面的に修正要求としたため。");
@@ -612,7 +606,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     });
 
     await page.goto("/");
-    const startSessionBtn = page.getByRole("button", { name: "実務演習セッションを開始する（課題提示へ）" });
+    const startSessionBtn = page.getByRole("button", { name: "演習を開始する" });
     await expect(startSessionBtn).toBeVisible();
     await startSessionBtn.click();
 
@@ -625,7 +619,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.locator("input[value='approve']").check();
     const justificationTextarea = page.getByPlaceholder(/進行役の要約に補足|承認または.*と判断した具体的な根拠/);
     await justificationTextarea.fill("デモ用の保留経路確認。");
-    await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
+    await page.getByRole("button", { name: "判定を確定して採点する" }).click();
 
     await expect(page.getByText("評点保留（人間の確認待ち）")).toBeVisible();
     await expect(page.getByText("採点器の確信度が閾値（0.99）を下回ったため（0.85）")).toBeVisible();
@@ -638,7 +632,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.goto("/");
 
     // 組織・受講管理ダッシュボードタブへの切替
-    const dashboardTabBtn = page.getByRole("button", { name: /① 組織.*ダッシュボード/ });
+    const dashboardTabBtn = page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /組織ダッシュボード/ });
     await expect(dashboardTabBtn).toBeVisible();
     await dashboardTabBtn.click();
 
@@ -664,22 +658,22 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await startCta.click();
 
     // セッションタブに戻り、初期画面が表示されていることを確認
-    await expect(page.locator("h1")).toContainText("動的実務演習セッション");
-    await expect(page.getByRole("button", { name: "実務演習セッションを開始する（課題提示へ）" })).toBeVisible();
+    await expect(page.locator("h1")).toContainText("実務演習セッション");
+    await expect(page.getByRole("button", { name: "演習を開始する" })).toBeVisible();
   });
 
   test("② 受講者スキルカルテの表示と4領域・12観点・協働アプローチ特性・演習遷移が動作する", async ({ page }) => {
     await page.goto("/");
 
     // 受講者スキルカルテタブへの切替
-    const profileTabBtn = page.getByRole("button", { name: /② 受講者スキルカルテ/ });
+    const profileTabBtn = page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /受講者カルテ/ });
     await expect(profileTabBtn).toBeVisible();
     await profileTabBtn.click();
 
     // 受講者名とプロフィールヘッダー確認
     await expect(page.locator("h1")).toContainText("佐藤 拓也 さんのスキルカルテ");
     await expect(page.getByText("決済基盤チーム / シニアエンジニア")).toBeVisible();
-    await expect(page.getByText("動的コンピテンシー到達度（4領域・12サブ観点）")).toBeVisible();
+    await expect(page.getByText("AI時代の実務判断力の到達度（4観点・12項目）")).toBeVisible();
 
     // 4領域の到達度判定
     await expect(page.getByText(/① 評価的判断力/).first()).toBeVisible();
@@ -703,15 +697,15 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await startExerciseBtn.click();
 
     // セッション画面に戻り、初期画面が表示されていることを確認
-    await expect(page.locator("h1")).toContainText("動的実務演習セッション");
-    await expect(page.getByRole("button", { name: "実務演習セッションを開始する（課題提示へ）" })).toBeVisible();
+    await expect(page.locator("h1")).toContainText("実務演習セッション");
+    await expect(page.getByRole("button", { name: "演習を開始する" })).toBeVisible();
   });
 
   test("③ エキスパート事後講評の表示・トラップ解剖・攻略ルート・観測事実対比・ピン留め・演習遷移が動作する", async ({ page }) => {
     await page.goto("/");
 
     // エキスパート事後講評タブへの切替
-    const debriefingTabBtn = page.getByRole("button", { name: /③ エキスパート事後講評/ });
+    const debriefingTabBtn = page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /事後講評/ });
     await expect(debriefingTabBtn).toBeVisible();
     await debriefingTabBtn.click();
 
@@ -719,14 +713,14 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.locator("h1")).toContainText("シナリオ分析＆エキスパート検証戦略");
     await expect(page.getByText("課題トラップ構造の解剖")).toBeVisible();
     await expect(page.getByText("上位者の攻略ルート分岐図")).toBeVisible();
-    await expect(page.getByText("動的コンピテンシー別・上位者アクションと観測事実")).toBeVisible();
+    await expect(page.getByText("観点別：上位者の行動と観測された事実")).toBeVisible();
 
     // 攻略ルートの表示確認
     await expect(page.getByText("ルートA").first()).toBeVisible();
     await expect(page.getByText("ルートB").first()).toBeVisible();
     await expect(page.getByText("ルートC").first()).toBeVisible();
 
-    // 動的コンピテンシー別アクションと観測状況の確認
+    // AI時代の実務判断力別アクションと観測状況の確認
     await expect(page.getByText("評価的判断力").first()).toBeVisible();
     await expect(page.getByText("ログ観測あり").first()).toBeVisible();
     await expect(page.getByText("未観測").first()).toBeVisible();
@@ -748,8 +742,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await startExerciseBtn.click();
 
     // セッションタブに戻ることを確認
-    await expect(page.locator("h1")).toContainText("動的実務演習セッション");
-    await expect(page.getByRole("button", { name: "実務演習セッションを開始する（課題提示へ）" })).toBeVisible();
+    await expect(page.locator("h1")).toContainText("実務演習セッション");
+    await expect(page.getByRole("button", { name: "演習を開始する" })).toBeVisible();
   });
 });
 

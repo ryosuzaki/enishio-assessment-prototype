@@ -13,7 +13,12 @@ import { useEffect, useRef } from "react";
  */
 export function useWindowBlurTelemetry(sessionId: string) {
   const sessionIdRef = useRef(sessionId);
-  sessionIdRef.current = sessionId;
+
+  // 同期はレンダー中ではなく effect で行う。レンダー中の ref 書き込みは
+  // 並行レンダリングで破棄される描画からも走りうる。
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   useEffect(() => {
     let hiddenSince: number | null = null;

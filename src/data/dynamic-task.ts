@@ -44,8 +44,24 @@ export interface PremiseShift {
   context_doc: ContextDocument;
 }
 
+/**
+ * 出題しうる課題の全集合。
+ *
+ * **課題を1本足すときの起点はここである。**シナリオ本体（`DYNAMIC_TASKS`）と、
+ * サーバ側の4つのマップ（仕込み不備・AI同僚のプロンプト・意図ギャップ文言・
+ * ルーブリックの着眼点）は、どれか1つでも欠けるとその課題は実行時に落ちる。
+ * ここへIDを足すと、欠けている定義がコンパイルエラーとして出る。
+ */
+export const TASK_IDS = [
+  "TASK-FINTECH-AUTH-01",
+  "TASK-ECOMMERCE-CANCEL-01",
+  "TASK-HELPDESK-PRIVACY-01",
+] as const;
+
+export type TaskId = (typeof TASK_IDS)[number];
+
 export interface DynamicTaskScenario {
-  task_id: string;
+  task_id: TaskId;
   title: string;
   /** stimulus_features.domain として記録されるドメインラベル */
   domain: string;
@@ -560,4 +576,12 @@ export function getDynamicTask(taskId: string): DynamicTaskScenario {
     throw new Error(`Unknown dynamic task_id: ${taskId}`);
   }
   return task;
+}
+
+// `TASK_IDS` にIDだけ足してシナリオ本体を書き忘れた場合、そのIDは型の上では
+// 存在するのに出題できない。**受講者が選んでから落ちるより、起動時に落ちるほうがよい。**
+for (const taskId of TASK_IDS) {
+  if (!DYNAMIC_TASKS.some((t) => t.task_id === taskId)) {
+    throw new Error(`TASK_IDS に ${taskId} があるが、DYNAMIC_TASKS にシナリオ定義が無い`);
+  }
 }

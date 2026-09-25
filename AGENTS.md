@@ -9,8 +9,8 @@
 | :--- | :--- |
 | **プロジェクト憲法（不可侵原則）** | [`.specify/memory/constitution.md`](.specify/memory/constitution.md) |
 | **仕様書正本トップ（全体構成・ER図）** | [`specs/README.md`](specs/README.md) |
-| **セッション統制・UI・テレメトリ仕様（10モデル・8API）** | [`specs/001-session-orchestration/`](specs/001-session-orchestration/) (`spec.md` / `plan.md`) |
-| **構造化採点パイプライン・適正依存指標仕様（4モデル・評価API）** | [`specs/002-autoscore-pipeline/`](specs/002-autoscore-pipeline/) (`spec.md` / `plan.md`) |
+| **セッション統制・UI・テレメトリ仕様（10モデル・7API）** | [`specs/001-session-orchestration/`](specs/001-session-orchestration/) (`spec.md` / `plan.md`) |
+| **構造化採点パイプライン・適正依存指標仕様（4モデル・評価API）** | [`specs/002-structured-scoring-pipeline/`](specs/002-structured-scoring-pipeline/) (`spec.md` / `plan.md`) |
 | **ソクラテス型メディエーター・前提変化仕様（2モデル・プローブAPI）** | [`specs/003-socratic-mediator/`](specs/003-socratic-mediator/) (`spec.md` / `plan.md`) |
 | **開発者向け仕様書駆動開発ガイド（人間用マニュアル）** | [`docs/開発者向け仕様書駆動開発ガイド.md`](docs/開発者向け仕様書駆動開発ガイド.md) |
 | 動作確認・検証手順書 | `docs/プロトタイプ動作確認手順書.md` |

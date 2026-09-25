@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import fs from "fs";
 import path from "path";
+import { installMockApi } from "./support/mock-api";
 
 test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
   // A4 Word提出用：幅1280px、高DPI（deviceScaleFactor: 2）
@@ -18,208 +19,18 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    // 外部LLM APIやDBを不要にするルートモック
-    await page.route("**/api/session/start", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          sessionId: "mock-session-screenshot-001",
-          sessionSeq: 1,
-          learnerId: "mock-learner-001",
-        }),
-      });
-    });
-
-    await page.route("**/api/anchor", async (route) => {
-      if (route.request().method() === "POST") {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            success: true,
-            responseId: "mock-resp-001",
-            anchorStatus: "pretest",
-            scored: false,
-          }),
-        });
-      } else {
-        await route.continue();
-      }
-    });
-
-    await page.route("**/api/dialogue/start", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          flawCount: 3,
-          normalSpanCount: 2,
-        }),
-      });
-    });
-
-    await page.route("**/api/dialogue/turn", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          assistantTurnSeq: 2,
-          assistantMessage:
-            "ご指摘ありがとうございます。Redisのフェイルオーバー時とPCI DSS要件を考慮し、フォールバック機構を追加修正します。",
-          isInterlockTriggered: false,
-          updatedArtifact:
-            "// 修正版コードドラフト（フェイルオーバー機構追加）\nimport { Request, Response } from 'express';\nimport { redisClient } from './redis';\n\nexport async function handlePayment(req: Request, res: Response) {\n  try {\n    // Redisキャッシュ参照（フォールバック付き）\n    const cachedMerchant = await redisClient.get(req.body.merchantId);\n    if (!cachedMerchant) {\n      // DB直接参照フォールバック\n      return await fetchFromPrimaryDb(req.body.merchantId);\n    }\n    return res.json({ status: 'ok', data: cachedMerchant });\n  } catch (err) {\n    // フォールバックと監査ログ出力\n    console.error('Redis failover triggered:', err);\n    return await fetchFromPrimaryDb(req.body.merchantId);\n  }\n}",
-        }),
-      });
-    });
-
-    // probe / blur は未モックのままだと DB へ抜けて例外になる（スクリーンショットが
-    // 崩れる原因になるため塞ぐ）。
-    // 前提変化は進行役側が撃つ [D-100]。スクリーンショットには注入後の状態（緊急要件バナー）を
-    // 写す。**モックしないと dev ビルド限定の手動発火ボタンが提案書用の画像に写り込む。**
-    let premiseShiftCalls = 0;
-    await page.route("**/api/dialogue/premise-shift", async (route) => {
-      premiseShiftCalls += 1;
-      if (premiseShiftCalls < 2) {
-        // 1発話目では撃たない。深掘りと前提変化バナーの両方を1枚に収めるため
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            success: true,
-            injected: false,
-            reason: "trigger_turn_not_reached",
-            userTurnCount: 1,
-          }),
-        });
-        return;
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          injected: true,
-          injectedAtTurn: 4,
-          forced: false,
-          shiftId: "shift-fintech-vip-fallback",
-          title: "【緊急仕様変更】セール時の最優先（VIP）加盟店フォールバック特例とレイテンシ要件の厳格化",
-          announcement:
-            "【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知：『来週の大型セールにおいて、特定の大手加盟店（VIP）については決済全停止を避けるため、Redis障害時でもローカルキャッシュによる最大30秒のフォールバックを許容する例外ポリシーが承認されました』",
-          newRequirement:
-            "4. 【緊急追加要件】VIP加盟店（ヘッダー x-merchant-vip: true）に限り、Redis瞬断・障害時でもローカルインメモリキャッシュによる最大30秒の縮退運転を許可し決済受付を継続すること。",
-          notification:
-            "【⚡ 緊急仕様変更・追加要件の通知】\n【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知：『来週の大型セールにおいて、特定の大手加盟店（VIP）については決済全停止を避けるため、Redis障害時でもローカルキャッシュによる最大30秒のフォールバックを許容する例外ポリシーが承認されました』\n\nこれに伴い、以下の追加要件を満たす必要があります：\n「4. 【緊急追加要件】VIP加盟店（ヘッダー x-merchant-vip: true）に限り、Redis瞬断・障害時でもローカルインメモリキャッシュによる最大30秒の縮退運転を許可し決済受付を継続すること。」\n\n現在の設計やコードで問題がないか、確認と修正方針の指示をお願いします！",
-          userTurnCount: 2,
-        }),
-      });
-    });
-
-    await page.route("**/api/dialogue/probe", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          probeIssued: true,
-          probeMove: "trace_grounding",
-          probeText: "その判断の前提（SPOFリスク）を、仕様のどの記述およびコードのどの箇所から導きましたか。",
-          stateEstimate: [
-            { target: "premise_articulation", status: "partial", basis: "単一障害点への言及はあるが根拠仕様の特定が途上" },
-            { target: "tradeoff_reasoning", status: "not_elicited", basis: "可用性と一貫性のトレードオフは未言及" },
-            { target: "requirement_grounding", status: "elicited", basis: "PCI DSS要件と耐障害性要件を名指しで引用" },
-            { target: "normal_span_discrimination", status: "not_elicited", basis: "正常箇所の弁別は未実施" },
-            { target: "robustness_under_changed_premise", status: "not_elicited", basis: "前提変化時の挙動検証は未実施" },
-          ],
-          selectionRationale: "前提の言語化と要件紐づけをさらに深掘りするため、根拠の文脈を問う手を選択",
-          mediatorModelVersion: "claude-sonnet-4-5/probe-v1",
-          probeTurnSeq: 3,
-          probesSoFar: 1,
-        }),
-      });
-    });
-
-    await page.route("**/api/session/blur", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ success: true }),
-      });
-    });
-
-    await page.route("**/api/dialogue/preliminary-judgement", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          judgementId: "mock-prelim-screenshot-001",
-        }),
-      });
-    });
-
-    await page.route("**/api/dialogue/focus", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-        }),
-      });
-    });
-
-    await page.route("**/api/dialogue/evaluate", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          ratingId: "mock-rating-screenshot-001",
-          isPendingHumanReview: false,
-          ratingCategory: 3,
-          levelLabel: "Band 3: 前提摘発・要件検証行動",
-          scoringConfidence: 0.88,
-          evidenceSummary:
-            "受講者はRedis障害時の単一障害点リスクおよびPCI DSS要件との乖離を的確に指摘し、該当コードを引用してAI同僚に適切な修正指示を出している。",
-          diagnosticFeedback:
-            "セキュリティ制約と高可用性のトレードオフを意識した優れた検証行動が確認できました。今後は例外発生時の監査ログ追跡性にも着目すると、より高位の評価に到達します。",
-          evidenceComponents: [
-            {
-              turn_index: 2,
-              quoted_span: "Redisの単一障害点（SPOF）およびPCI DSS要件に対する耐障害性について考慮が必要です",
-              component_type: "FLAW_IDENTIFICATION",
-              injected_flaw_id: "FLAW-01",
-              rationale_summary: "Redis障害時の耐障害性・単一障害点要件違反を指摘",
-            },
-          ],
-          scorerModelVersion: "claude-opus-5/extract-v2/score-v2",
-        }),
-      });
-    });
-
-    await page.route("**/api/feedback", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          feedbackId: "mock-feedback-screenshot-001",
-        }),
-      });
-    });
+    await installMockApi(page);
   });
 
   test("全STEPのUIスクリーンショットをdocs/screenshots/へ高解像度出力する", async ({ page }) => {
     // 01. 初期画面 (Init Step)
     await page.goto("/");
     // 見出しと副題は別の行に分けてある（`[D-102]`：h1 に括弧付きの長い副題を抱かせない）
-    await expect(page.locator("h1")).toContainText("動的実務演習セッション");
-    await expect(page.getByText("AI同僚協働・レビュー対話")).toBeVisible();
-    await expect(page.getByText("Live Telemetry Monitor")).toBeVisible();
+    await expect(page.locator("h1")).toContainText("実務演習セッション");
+    await expect(page.getByText("AI同僚とのコードレビュー演習")).toBeVisible();
+    // 計測ログは既定で閉じている。提出用の画面では開いた状態を撮る
+    await page.getByRole("button", { name: "計測ログを表示" }).click();
+    await expect(page.getByText("計測ログ", { exact: true })).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: path.join(screenshotsDir, "01-init.png"),
@@ -229,15 +40,15 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     // 02. アンカー出題・段階1（採用可否）[D-83]
     // 共通アンカー評価は独立タブ。出題項目IDは供給源（運用バンク / 同梱サンプル）で
     // 変わるため決め打ちせず、選択済みラジオの value から拾う
-    await page.getByRole("button", { name: /共通アンカー評価/ }).click();
+    await page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: "固定設問（SCT型）" }).click();
     const anchorRadio = page.locator("input[name='anchorItem']:checked");
     await expect(anchorRadio).toBeAttached();
     const selectedAnchorId = await anchorRadio.inputValue();
     await page
-      .getByRole("button", { name: "このアンカー項目を体験する（4段階疑似対話を開始）" })
+      .getByRole("button", { name: "この設問を体験する" })
       .click();
     await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
-    await expect(page.getByText(new RegExp(`共通アンカー項目: ${selectedAnchorId}`))).toBeVisible();
+    await expect(page.getByText(new RegExp(`固定設問: ${selectedAnchorId}`))).toBeVisible();
     await page.locator("input[name='stage1']").nth(1).check();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
@@ -285,14 +96,21 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       fullPage: true,
     });
 
-    // アンカー送信 ➔ 動的2ペイン対話セッション (Dynamic 3-Pane Dialogue)
-    await page.getByRole("button", { name: "アンカー回答を送信・記録する" }).click();
-    await expect(page.getByText("共通アンカー項目の記録が完了しました")).toBeVisible();
+    // アンカー送信 ➔ 動的2ペイン対話セッション
+    await page.getByRole("button", { name: "回答を送信して記録する" }).click();
+    await expect(page.getByText("固定設問の回答を記録しました")).toBeVisible();
+    // 03b. 回答の控え。正誤は返さない [D-83]
+    await expect(page.getByTestId("anchor-answer-record")).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: path.join(screenshotsDir, "03b-anchor-record.png"),
+      fullPage: true,
+    });
     await page.getByRole("button", { name: "実務演習セッションを体験する" }).click();
 
     // 実務演習セッションタブの初期画面から課題提示へ進む
     await page
-      .getByRole("button", { name: "実務演習セッションを開始する（課題提示へ）" })
+      .getByRole("button", { name: "演習を開始する" })
       .click();
 
     // 2ペインの表示確認
@@ -332,13 +150,13 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     // 04. 動的対話画面 (2-Pane Dialogue with Code Quoting)
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
-      path: path.join(screenshotsDir, "04-dialogue-3pane.png"),
+      path: path.join(screenshotsDir, "04-dialogue.png"),
       fullPage: true,
     });
 
     // 05. CFF暫定判断 (Force Decision First & Mandatory Justification)
     await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
-    await expect(page.getByText("CFF: Force Decision First & Mandatory Justification")).toBeVisible();
+    await expect(page.getByText("場面4：意思決定")).toBeVisible();
     await page.locator("input[value='remand']").check();
     const justificationTextarea = page.getByPlaceholder(
       /進行役の要約に補足や微調整がある場合のみ入力/
@@ -348,18 +166,18 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     );
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
-      path: path.join(screenshotsDir, "05-cff.png"),
+      path: path.join(screenshotsDir, "05-decision.png"),
       fullPage: true,
     });
 
     // 06. 構造化採点パイプライン 2段階採点結果（XAIレポート）
-    await page.getByRole("button", { name: "暫定判断を確定し、AI評価を実行する" }).click();
-    await expect(page.getByText("構造化採点パイプライン 2段階評価結果（XAIレポート）")).toBeVisible();
+    await page.getByRole("button", { name: "判定を確定して採点する" }).click();
+    await expect(page.getByText("XAI診断（構造化採点パイプラインによる2段階採点）")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Band 3: 前提摘発・要件検証行動" })).toBeVisible();
     await expect(page.getByTestId("discrepancy-highlighting-block")).toBeVisible();
-    await expect(page.getByText("判定根拠（Evidence Summary）")).toBeVisible();
-    await expect(page.getByText("形成的診断アドバイス（Diagnostic Feedback）")).toBeVisible();
-    await expect(page.getByText("抽出された受講者の検証行動スパン")).toBeVisible();
+    await expect(page.getByText("判定の根拠", { exact: true })).toBeVisible();
+    await expect(page.getByText("次に伸ばすところ")).toBeVisible();
+    await expect(page.getByText(/抽出された検証行動（採点パイプライン第1段の出力）/)).toBeVisible();
 
     // 異議申立導線の入力
     await page.locator("input[value='too_low']").check();
@@ -375,7 +193,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     });
 
     // 07. 組織・受講管理ダッシュボード（Viability・モックUI）
-    const dashboardTabBtn = page.getByRole("button", { name: /① 組織.*ダッシュボード/ });
+    const dashboardTabBtn = page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /組織ダッシュボード/ });
     await dashboardTabBtn.click();
     await expect(page.locator("h1")).toContainText("組織・受講管理ダッシュボード");
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -385,7 +203,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     });
 
     // 08. 受講者スキルカルテ（Viability・モックUI）
-    const profileTabBtn = page.getByRole("button", { name: /② 受講者スキルカルテ/ });
+    const profileTabBtn = page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /受講者カルテ/ });
     await profileTabBtn.click();
     await expect(page.locator("h1")).toContainText("佐藤 拓也 さんのスキルカルテ");
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -395,7 +213,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     });
 
     // 09. シナリオ分析＆エキスパート事後講評（デブリーフィング）
-    const galleryTabBtn = page.getByRole("button", { name: /③ エキスパート事後講評/ });
+    const galleryTabBtn = page.getByRole("navigation", { name: "画面の切り替え" }).getByRole("button", { name: /事後講評/ });
     await galleryTabBtn.click();
     await expect(page.locator("h1")).toContainText("シナリオ分析＆エキスパート検証戦略");
     await page.evaluate(() => window.scrollTo(0, 0));

@@ -1,4 +1,4 @@
-# Feature Specification: 構造化採点パイプライン (002-autoscore-pipeline)
+# Feature Specification: 構造化採点パイプライン (002-structured-scoring-pipeline)
 
 > **ステータス**: Approved / Implemented  
 > **対象レイヤー**: Feasibility（実稼働）  

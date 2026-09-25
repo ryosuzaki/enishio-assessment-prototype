@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-// 移行済みUIに「AIが既定で書いてしまう装飾」が再び混入していないかを機械的に検査する。
+// UIに「AIが既定で書いてしまう装飾」が混入していないかを機械的に検査する。
 //
 // Skill（.claude/skills/ui-design/SKILL.md）に書いた決め事は守られたら嬉しい程度のもので、
 // 守らなくても動く。ここで落とすことで初めて決め事が効く。
 //
-// 検査対象は scripts/ui-migration.json の `migrated` に挙げたファイルだけである。
-// 未移行のダーク画面は既定パレットを直接使っており、全件を対象にすると常に落ちる。
+// **`src/app` 配下を全件検査する。**以前は scripts/ui-migration.json に挙げた
+// 移行済みファイルだけを見ていた（未移行のダーク画面が既定パレットを直接使っており、
+// 全件にすると常に落ちたため）。移行が終わって `remaining` が空になった時点で、
+// あの名簿は「新しく足したファイルが検査されない穴」でしかなくなったので畳んだ。
 //
 // 使い方:
 //   npm run check:ui
@@ -15,7 +17,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const config = JSON.parse(readFileSync(path.join(projectRoot, "scripts", "ui-migration.json"), "utf8"));
+
+/** 検査対象の根。画面を構成するものはすべてこの下にある。 */
+const TARGET_ROOTS = ["src/app"];
 
 /** Tailwind 既定パレットの直接指定。役割ではなく見た目で色を選んだ印。 */
 const DEFAULT_PALETTE =
@@ -81,30 +85,30 @@ const RULES = [
   },
 ];
 
-/** 移行期の足場（.legacy-dark）を張る行だけは、未移行画面を包むためのものなので見逃す。 */
-const EXEMPT_LINE = /legacy-dark/;
-
 /** コメント行は検査しない。禁止パターンそのものを説明するために書いてあることがあるため。 */
 const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*|\{\/\*)/;
 
 function listTargets() {
   const files = [];
-  for (const entry of config.migrated) {
-    const abs = path.join(projectRoot, entry);
-    let st;
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const abs = path.join(dir, name);
+      if (statSync(abs).isDirectory()) {
+        walk(abs);
+      } else if (/\.(tsx?|css)$/.test(name)) {
+        files.push(abs);
+      }
+    }
+  };
+  for (const root of TARGET_ROOTS) {
+    const abs = path.join(projectRoot, root);
     try {
-      st = statSync(abs);
+      statSync(abs);
     } catch {
-      console.error(`[設定エラー] ui-migration.json の migrated に存在しないパスがある: ${entry}`);
+      console.error(`[設定エラー] 検査対象のパスが存在しない: ${root}`);
       process.exit(2);
     }
-    if (st.isDirectory()) {
-      for (const name of readdirSync(abs)) {
-        if (/\.(tsx?|css)$/.test(name)) files.push(path.join(abs, name));
-      }
-    } else {
-      files.push(abs);
-    }
+    walk(abs);
   }
   return files;
 }
@@ -114,7 +118,7 @@ for (const file of listTargets()) {
   const rel = path.relative(projectRoot, file).split(path.sep).join("/");
   const lines = readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((line, i) => {
-    if (EXEMPT_LINE.test(line) || COMMENT_LINE.test(line)) return;
+    if (COMMENT_LINE.test(line)) return;
     for (const rule of RULES) {
       const m = line.match(rule.pattern);
       if (m) violations.push({ rel, line: i + 1, rule, matched: m[0], text: line.trim() });

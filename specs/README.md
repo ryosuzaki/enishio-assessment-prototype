@@ -8,7 +8,7 @@
 
 ## 1. システム全体構成 (System Architecture)
 
-受講者が生成AIと対話しながら実務課題を解決するプロセスから、「動的コンピテンシー（AI協働検証力・トレードオフ言語化力）」を客観的に抽出・測定するWebプラットフォームです。
+受講者が生成AIと対話しながら実務課題を解決するプロセスから、「AI時代の実務判断力（AI協働検証力・トレードオフ言語化力）」を客観的に抽出・測定するWebプラットフォームです。
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -16,7 +16,7 @@
 │  ┌─────────────────────────────┐    ┌───────────────────────────────┐  │
 │  │   UI Layer ("use client")   │    │   API Layer (Route Handlers)  │  │
 │  │  - Session Orchestration    │    │  - Session & Telemetry        │  │
-│  │  - 3-Pane Dynamic Dialogue  │───>│  - Dynamic Task & Flaws (Svr) │  │
+│  │  - 2-Pane Dynamic Dialogue  │───>│  - Dynamic Task & Flaws (Svr) │  │
 │  │  - Viability Mocks          │    │  - 構造化採点パイプライン (2-Stage) │  │
 │  └─────────────────────────────┘    │  - Socratic Mediator          │  │
 │                                     └──────────────┬────────────────┘  │
@@ -73,11 +73,11 @@ erDiagram
 * **管理する API エンドポイント (8本)**: `/api/session/start`, `/api/session/blur`, `/api/anchor` (GET/POST), `/api/dialogue/start`, `/api/dialogue/turn`, `/api/dialogue/focus`, `/api/dialogue/preliminary-judgement`, `/api/feedback`
 * **ドキュメント**: [spec.md](001-session-orchestration/spec.md) / [plan.md](001-session-orchestration/plan.md) / [tasks.md](001-session-orchestration/tasks.md)
 
-### [002-autoscore-pipeline](002-autoscore-pipeline/)
+### [002-structured-scoring-pipeline](002-structured-scoring-pipeline/)
 * **責務**: 構造化採点パイプライン（2段階採点エンジン）、客観的根拠要素抽出、ルーブリック規準評定、適正依存3指標算出、HITL閾値判定、および LLM 呼出監査。
 * **管理する DB モデル (4モデル)**: `Rating`, `EvidenceComponent`, `RelianceMetrics`, `LlmCall`
 * **管理する API エンドポイント (1本)**: `/api/dialogue/evaluate`
-* **ドキュメント**: [spec.md](002-autoscore-pipeline/spec.md) / [plan.md](002-autoscore-pipeline/plan.md) / [tasks.md](002-autoscore-pipeline/tasks.md)
+* **ドキュメント**: [spec.md](002-structured-scoring-pipeline/spec.md) / [plan.md](002-structured-scoring-pipeline/plan.md) / [tasks.md](002-structured-scoring-pipeline/tasks.md)
 
 ### [003-socratic-mediator](003-socratic-mediator/)
 * **責務**: ソクラテス型問いかけ（プローブ）自律生成、正答鍵完全遮断、5つの状態推定、および場面3前提変化（緊急仕様変更）の動的注入。
@@ -85,11 +85,17 @@ erDiagram
 * **管理する API エンドポイント (2本)**: `/api/dialogue/probe`, `/api/dialogue/premise-shift`
 * **ドキュメント**: [spec.md](003-socratic-mediator/spec.md) / [plan.md](003-socratic-mediator/plan.md) / [tasks.md](003-socratic-mediator/tasks.md)
 
+### [004-equating-simulation](004-equating-simulation/)
+* **責務**: 共通尺度化エンジン（第1層：一対比較＋Bradley-Terry、第2層：固定設問・凍結ペアによる定点較正）の合成データ検証。本番の採点経路・DB には接続しない。
+* **管理する DB モデル**: なし
+* **管理する API エンドポイント**: なし（`npm run sim:equating` で実行）
+* **ドキュメント**: [spec.md](004-equating-simulation/spec.md) ／ 結果: [docs/equating-simulation/](../docs/equating-simulation/README.md)
+
 ---
 
 ## 4. 専門用語の定義 (Domain Terminology)
 
-* **動的コンピテンシー（4領域）**（提案書では「AI時代の実務判断力」）:
+* **AI時代の実務判断力（4領域）**（旧称：動的コンピテンシー）:
   曖昧な要求を構造化し、前提変化に適応しながら、AIを統制・検証して最適解を導く能力。**① 評価的判断力／② 高次認知・動的思考／③ 対話的共創力／④ メタ認知・適応力**の4領域に整理して観測する。
 * **等化（Equating）**:
   別々の課題を受けた受講者の評点を、同じものさしの上に載せて比較できるようにすること。対話演習は受講者ごとに課題も会話も分岐するため、評点をそのまま並べても「実力差なのか難易度差なのか」を切り分けられない。
@@ -106,7 +112,7 @@ erDiagram
 * **セッション内の前提変化**:
   レビューの途中で、クライアントからの緊急仕様変更を注入する仕掛け。当初方針に固執せず方針を更新できるか（メタ認知・適応力）を実測する。**発火は進行役側（`/api/dialogue/premise-shift`）が対話ログだけを見て決定論的に判定し、受講者は撃つ時点を選べない** `[D-100]`。
 * **バンド（0〜5）と `pending_human`**:
-  バンドは動的コンピテンシーのルーブリック上の到達水準。採点器が自己申告した確信度が 0.70 を下回る判定は確定させず、`rating_category = null` ・ `rater_type = "pending_human"`（人間の確認待ち）として記録する。
+  バンドはAI時代の実務判断力のルーブリック上の到達水準。採点器が自己申告した確信度が 0.70 を下回る判定は確定させず、`rating_category = null` ・ `rater_type = "pending_human"`（人間の確認待ち）として記録する。
 * **XAI評価レポート**:
   判定の根拠となった発言箇所のハイライト、4領域の観測サマリー、受講者の事前判定との対照、異議申立導線までを含む診断画面。
 

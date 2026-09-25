@@ -18,7 +18,7 @@ import { useLearnerSession } from "../hooks/useLearnerSession";
 import { useWindowBlurTelemetry } from "../hooks/useWindowBlurTelemetry";
 import { useAnchorFlow } from "../hooks/useAnchorFlow";
 import { useDialogueFlow } from "../hooks/useDialogueFlow";
-import { Button, cn } from "./ui";
+import { Badge, Button, cn } from "./ui";
 
 export interface AssessmentWorkbenchProps {
   initialTaskId?: string;
@@ -36,7 +36,8 @@ export function AssessmentWorkbench({
   // Navigation & Tab State ([D-79]: 2-layer Viability & Feasibility)
   const [activeTab, setActiveTab] = useState<AppTab>("session");
   const [galleryTaskId, setGalleryTaskId] = useState<string>(initialTaskId);
-  const [showTelemetry, setShowTelemetry] = useState<boolean>(true);
+  // 計測ログは受講者の作業には要らないので既定で閉じる。本体の下の戻し口から開ける
+  const [showTelemetry, setShowTelemetry] = useState<boolean>(false);
 
   // Dynamic Task Selection (T-06a) — 取り組む動的課題をレジストリから選択する
   const [selectedTaskId, setSelectedTaskId] = useState<string>(initialTaskId);
@@ -55,6 +56,12 @@ export function AssessmentWorkbench({
   });
 
   // URLクエリによる初期タブの反映（?tab=dashboard / ?tab=learner / ?tab=session）
+  //
+  // マウント時の1回だけで、以後このeffectは走らない。`useSearchParams` で
+  // レンダー中に決める方法もあるが、それはこのツリー全体を Suspense 境界の下へ
+  // 押し込み、初期HTMLの生成範囲を変える。表示タブの初期値ひとつのために
+  // プリレンダリングの形を変えるほどのものではない。
+  /* eslint-disable react-hooks/set-state-in-effect -- マウント時の初期化に限る */
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -73,6 +80,7 @@ export function AssessmentWorkbench({
       setActiveTab("anchor");
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   /** 別タブの「この課題を演習する」から演習タブへ移る */
   const goToSessionWithTask = (taskId?: string) => {
@@ -83,18 +91,54 @@ export function AssessmentWorkbench({
     setActiveTab("session");
   };
 
-  const TABS: { id: AppTab; label: string }[] = [
-    { id: "session", label: "実務演習セッション（2ペイン動的対話）" },
-    { id: "anchor", label: "共通アンカー評価（固定尺度・SCT型）" },
-    { id: "org_dashboard", label: "① 組織・受講管理ダッシュボード" },
-    { id: "learner_profile", label: "② 受講者スキルカルテ" },
-    { id: "benchmark_gallery", label: "③ エキスパート事後講評" },
+  const TABS: { id: AppTab; label: string; mock: boolean }[] = [
+    { id: "session", label: "実務演習セッション", mock: false },
+    { id: "anchor", label: "固定設問（SCT型）", mock: false },
+    { id: "org_dashboard", label: "組織ダッシュボード", mock: true },
+    { id: "learner_profile", label: "受講者カルテ", mock: true },
+    { id: "benchmark_gallery", label: "事後講評", mock: true },
   ];
 
+  const telemetryPanel = showTelemetry ? (
+    <TelemetryPanel
+      learnerId={learnerId}
+      sessionId={sessionId}
+      sessionSeq={sessionSeq}
+      telemetryLog={telemetryLog}
+      scorerModelVersion={dialogue.evaluation?.scorerModelVersion ?? null}
+      onToggleCollapse={() => setShowTelemetry(false)}
+      mediationStateEstimate={dialogue.mediationStateEstimate}
+      lastProbeMove={dialogue.lastProbeMove}
+      lastSelectionRationale={dialogue.lastSelectionRationale}
+      probesIssued={dialogue.probesIssued}
+      maxProbes={MAX_PROBES_PER_SESSION}
+      isProbing={dialogue.isProbing}
+    />
+  ) : (
+    // 閉じたあとも同じ場所に戻し口を残す。画面の隅にボタンだけ置くと見つからない
+    <div className="flex flex-wrap items-center justify-between gap-row rounded-card border border-dashed border-line-strong px-pad py-cell">
+      <p className="text-caption text-ink-3">計測ログは閉じています</p>
+      <Button variant="secondary" onClick={() => setShowTelemetry(true)} title="計測ログを表示する">
+        計測ログを表示
+      </Button>
+    </div>
+  );
+
+  // 対話中は（広い画面で）作業領域を画面の高さに収める。高さは JS で測らず、
+  // ヘッダーの固定の高さ（h-12）を引いた残りを flex で配る——測定はタイミング次第でずれる
+  const isDialogueWorkspace = activeTab === "session" && dialogue.currentStep === "dialogue_session";
+
   return (
-    <div className="mx-auto max-w-[1536px] space-y-section px-6 py-section">
+    <div
+      className={cn(
+        "mx-auto max-w-[1536px] px-6",
+        isDialogueWorkspace
+          ? "space-y-block py-block lg:flex lg:h-[calc(100dvh-3rem)] lg:flex-col lg:gap-block lg:space-y-0"
+          : "space-y-section py-section",
+      )}
+    >
       {/* 2-Layer Navigation Tab Bar ([D-79]: Viability & Feasibility) */}
-      <div className="flex flex-col gap-row border-b border-line sm:flex-row sm:items-end sm:justify-between">
+      <div className="shrink-0 border-b border-line">
         <nav className="-mb-px flex flex-wrap items-end gap-x-block gap-y-row" aria-label="画面の切り替え">
           {TABS.map((tab) => (
             <button
@@ -103,20 +147,17 @@ export function AssessmentWorkbench({
               onClick={() => setActiveTab(tab.id)}
               aria-current={activeTab === tab.id ? "page" : undefined}
               className={cn(
-                "border-b-2 pb-2.5 text-label transition-colors",
+                "flex items-center gap-1.5 border-b-2 pb-2.5 text-label transition-colors",
                 activeTab === tab.id
                   ? "border-accent font-semibold text-ink"
                   : "border-transparent text-ink-3 hover:text-ink-2",
               )}
             >
               {tab.label}
+              {tab.mock && <Badge tone="neutral">モック</Badge>}
             </button>
           ))}
         </nav>
-
-        <span className="hidden pb-2.5 text-label text-ink-3 xl:block">
-          2層構造プロトタイプ（Viability / Feasibility）
-        </span>
       </div>
 
       {/* Tab 1: Organization Analytics Dashboard */}
@@ -181,133 +222,91 @@ export function AssessmentWorkbench({
 
       {/* Tab: Core Evaluation Session (Vertical Cut) */}
       {activeTab === "session" && (
-        <div className="space-y-4">
-          {!showTelemetry && (
-            <div className="flex justify-end">
-              <Button
-                variant="secondary"
-                onClick={() => setShowTelemetry(true)}
-                title="テレメトリモニターを展開する"
-              >
-                Live Telemetry を表示
-              </Button>
-            </div>
-          )}
+        <div className={cn(isDialogueWorkspace ? "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" : "space-y-section")}>
+          {/* 計測ログは各ステップの下に置く。対話中だけは右列を対話が使うため、
+              DialogueSessionStep が2ペインの下へ自分で差し込む */}
+          <div
+            className={cn(
+              "min-w-0",
+              isDialogueWorkspace
+                ? "space-y-block lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:gap-block lg:space-y-0"
+                : "space-y-section",
+            )}
+          >
+            <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
 
-          <div className="grid grid-cols-1 gap-section lg:grid-cols-12">
-            {/* Main Content Area */}
-            <div
-              className={`${
-                showTelemetry ? "lg:col-span-8 xl:col-span-9" : "col-span-12"
-              } space-y-section min-w-0 transition-all`}
-            >
-              <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(null)} />
+            {/* STEP 0: Initialization */}
+            {dialogue.currentStep === "init" && (
+              <InitStep
+                selectedTaskId={selectedTaskId}
+                setSelectedTaskId={setSelectedTaskId}
+                selectedTask={dialogue.selectedTask}
+                isSubmitting={dialogue.isSubmitting}
+                onStartSession={dialogue.startSession}
+                onGoToAnchorTab={() => setActiveTab("anchor")}
+              />
+            )}
 
-              {/* STEP 0: Initialization */}
-              {dialogue.currentStep === "init" && (
-                <InitStep
-                  selectedTaskId={selectedTaskId}
-                  setSelectedTaskId={setSelectedTaskId}
-                  selectedTask={dialogue.selectedTask}
-                  isSubmitting={dialogue.isSubmitting}
-                  onStartSession={dialogue.startSession}
-                  onGoToAnchorTab={() => setActiveTab("anchor")}
-                />
-              )}
+            {/* STEP 1: 2ペイン動的対話セッション（W3）。
+                ソクラテス媒介の計器は2ペインの下の TelemetryPanel 側にある。 */}
+            {dialogue.currentStep === "dialogue_session" && (
+              <DialogueSessionStep
+                selectedTask={dialogue.selectedTask}
+                artifactCode={dialogue.artifactCode}
+                setArtifactCode={dialogue.setArtifactCode}
+                chatHistory={dialogue.chatHistory}
+                turnCounter={dialogue.turnCounter}
+                userPromptInput={dialogue.userPromptInput}
+                setUserPromptInput={dialogue.setUserPromptInput}
+                cffActiveWarning={dialogue.cffActiveWarning}
+                isSubmitting={dialogue.isSubmitting}
+                premiseShiftState={dialogue.premiseShiftState}
+                onForcePremiseShiftForDebug={dialogue.forcePremiseShiftForDebug}
+                onProceedToPreliminaryJudgement={dialogue.proceedToPreliminaryJudgement}
+                onSendDialogueTurn={dialogue.sendDialogueTurn}
+                telemetrySlot={telemetryPanel}
+                isTelemetryOpen={showTelemetry}
+              />
+            )}
 
-              {/* STEP 1: Dynamic 3-Pane Dialogue Session (W3) */}
-              {dialogue.currentStep === "dialogue_session" && (
-                <DialogueSessionStep
-                  selectedTask={dialogue.selectedTask}
-                  artifactCode={dialogue.artifactCode}
-                  setArtifactCode={dialogue.setArtifactCode}
-                  focusItems={dialogue.focusItems}
-                  focusInputText={dialogue.focusInputText}
-                  setFocusInputText={dialogue.setFocusInputText}
-                  chatHistory={dialogue.chatHistory}
-                  turnCounter={dialogue.turnCounter}
-                  userPromptInput={dialogue.userPromptInput}
-                  setUserPromptInput={dialogue.setUserPromptInput}
-                  cffActiveWarning={dialogue.cffActiveWarning}
-                  isSubmitting={dialogue.isSubmitting}
-                  mediationStateEstimate={dialogue.mediationStateEstimate}
-                  lastProbeMove={dialogue.lastProbeMove}
-                  lastSelectionRationale={dialogue.lastSelectionRationale}
-                  probesIssued={dialogue.probesIssued}
-                  isProbing={dialogue.isProbing}
-                  premiseShiftState={dialogue.premiseShiftState}
-                  onForcePremiseShiftForDebug={dialogue.forcePremiseShiftForDebug}
-                  onProceedToPreliminaryJudgement={dialogue.proceedToPreliminaryJudgement}
-                  onAddFocusItem={dialogue.addFocusItem}
-                  onRemoveFocusItem={dialogue.removeFocusItem}
-                  onSendDialogueTurn={dialogue.sendDialogueTurn}
-                />
-              )}
+            {/* STEP 5.5: CFF Force Decision First & Facilitator Mirroring Summary [MVP 2.5, T-17b, D-80] */}
+            {dialogue.currentStep === "preliminary_judgement" && (
+              <PreliminaryJudgementStep
+                chatHistory={dialogue.chatHistory}
+                prelimAction={dialogue.prelimAction}
+                setPrelimAction={dialogue.setPrelimAction}
+                prelimJustification={dialogue.prelimJustification}
+                setPrelimJustification={dialogue.setPrelimJustification}
+                prelimError={dialogue.prelimError}
+                isEvaluating={dialogue.isEvaluating}
+                onBackToDialogue={() => dialogue.setCurrentStep("dialogue_session")}
+                onConfirmPreliminaryAndEvaluate={dialogue.confirmPreliminaryAndEvaluate}
+              />
+            )}
 
-              {/* STEP 5.5: CFF Force Decision First & Facilitator Mirroring Summary [MVP 2.5, T-17b, D-80] */}
-              {dialogue.currentStep === "preliminary_judgement" && (
-                <PreliminaryJudgementStep
-                  taskId={selectedTaskId}
-                  chatHistory={dialogue.chatHistory}
-                  prelimAction={dialogue.prelimAction}
-                  setPrelimAction={dialogue.setPrelimAction}
-                  prelimJustification={dialogue.prelimJustification}
-                  setPrelimJustification={dialogue.setPrelimJustification}
-                  prelimError={dialogue.prelimError}
-                  isEvaluating={dialogue.isEvaluating}
-                  onBackToDialogue={() => dialogue.setCurrentStep("dialogue_session")}
-                  onConfirmPreliminaryAndEvaluate={dialogue.confirmPreliminaryAndEvaluate}
-                />
-              )}
-
-              {/* STEP 6: XAI Evaluation Report Screen (W5) */}
-              {dialogue.currentStep === "evaluation_report" && dialogue.evaluation && (
-                <EvaluationReportStep
-                  evaluation={dialogue.evaluation}
-                  chatHistory={dialogue.chatHistory}
-                  prelimAction={dialogue.prelimAction}
-                  prelimJustification={dialogue.prelimJustification}
-                  anchorId={anchor.selectedAnchorId}
-                  anchorStatus={anchor.anchorStatus}
-                  bankSource={anchor.bankSource}
-                  stage1Choice={anchor.stage1Choice}
-                  stage2Choice={anchor.stage2Choice}
-                  stage3Choice={anchor.stage3Choice}
-                  confidence={anchor.confidence}
-                  disputeReason={dialogue.disputeReason}
-                  setDisputeReason={dialogue.setDisputeReason}
-                  disputeDirection={dialogue.disputeDirection}
-                  setDisputeDirection={dialogue.setDisputeDirection}
-                  disputeSubmitted={dialogue.disputeSubmitted}
-                  onSubmitDispute={dialogue.submitDispute}
-                  onResetToInit={() => dialogue.setCurrentStep("init")}
-                  onViewBenchmarkGallery={() => {
-                    setGalleryTaskId(selectedTaskId);
-                    setActiveTab("benchmark_gallery");
-                  }}
-                />
-              )}
-            </div>
-
-            {/* Right Column: Live Telemetry Monitor & System Architecture */}
-            {showTelemetry && (
-              <div className="lg:col-span-4 xl:col-span-3 space-y-block min-w-0">
-                <TelemetryPanel
-                  learnerId={learnerId}
-                  sessionId={sessionId}
-                  sessionSeq={sessionSeq}
-                  telemetryLog={telemetryLog}
-                  onToggleCollapse={() => setShowTelemetry(false)}
-                  mediationStateEstimate={dialogue.mediationStateEstimate}
-                  lastProbeMove={dialogue.lastProbeMove}
-                  lastSelectionRationale={dialogue.lastSelectionRationale}
-                  probesIssued={dialogue.probesIssued}
-                  maxProbes={MAX_PROBES_PER_SESSION}
-                  isProbing={dialogue.isProbing}
-                />
-              </div>
+            {/* STEP 6: XAI Evaluation Report Screen (W5) */}
+            {dialogue.currentStep === "evaluation_report" && dialogue.evaluation && (
+              <EvaluationReportStep
+                evaluation={dialogue.evaluation}
+                chatHistory={dialogue.chatHistory}
+                prelimAction={dialogue.prelimAction}
+                prelimJustification={dialogue.prelimJustification}
+                disputeReason={dialogue.disputeReason}
+                setDisputeReason={dialogue.setDisputeReason}
+                disputeDirection={dialogue.disputeDirection}
+                setDisputeDirection={dialogue.setDisputeDirection}
+                disputeSubmitted={dialogue.disputeSubmitted}
+                onSubmitDispute={dialogue.submitDispute}
+                onResetToInit={() => dialogue.setCurrentStep("init")}
+                onViewBenchmarkGallery={() => {
+                  setGalleryTaskId(selectedTaskId);
+                  setActiveTab("benchmark_gallery");
+                }}
+              />
             )}
           </div>
+
+          {dialogue.currentStep !== "dialogue_session" && telemetryPanel}
         </div>
       )}
     </div>

@@ -44,6 +44,9 @@ export default function RootError({ error, reset }: ErrorProps) {
           <Button
             variant="secondary"
             onClick={() => {
+              // ルータ遷移ではなくフルリロードにする。ここへ来ている時点で
+              // クライアント側の状態は壊れており、**捨てて作り直すことが目的である。**
+              // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 状態を捨てるための意図的なリロード
               if (typeof window !== "undefined") window.location.href = "/";
             }}
           >

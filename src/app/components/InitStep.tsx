@@ -16,16 +16,16 @@ interface InitStepProps {
 
 /** 演習セッションの 5 場面。場面 3 だけが「異常イベント」なので、そこにだけ意味色を割り当てる。 */
 const SCENE_FLOW: { no: number; title: string; detail: string; disrupted?: boolean }[] = [
-  { no: 1, title: "課題提示・精査", detail: "要件・コード・テストの精査と着眼点の整理" },
-  { no: 2, title: "反駁対話", detail: "AI同僚の自説弁護に対し仕様根拠で反駁・修正指示" },
+  { no: 1, title: "課題提示", detail: "PRの仕様書や障害ログを精査し、重大な設計欠陥と仕様上妥当な設計を見分ける" },
+  { no: 2, title: "検証対話", detail: "AIの反論や過剰指摘に対し、仕様や規程を根拠に検証・是正する" },
   {
     no: 3,
-    title: "前提変化（緊急仕様変更）",
-    detail: "突然の制約変更に対する方針の再適応と方針更新",
+    title: "前提変化",
+    detail: "緊急の仕様変更や納期短縮に対し、当初方針に固執せず方針を組み直す",
     disrupted: true,
   },
-  { no: 4, title: "意思決定（CFF）", detail: "AI採点前に［承認／条件付き承認／修正要求］を先行確定" },
-  { no: 5, title: "構造化採点パイプライン XAI診断", detail: "2段階客観評価・根拠ハイライト・異議申立導線" },
+  { no: 4, title: "意思決定", detail: "AIの採点を見る前に［修正要求／条件付き承認／承認］と理由を自分で確定する" },
+  { no: 5, title: "XAI診断", detail: "採点の根拠になった発言を示す診断を受け取り、振り返る" },
 ];
 
 export function InitStep({
@@ -40,22 +40,24 @@ export function InitStep({
     <div className="space-y-section">
       <header className="space-y-2">
         <div className="flex flex-wrap items-baseline gap-cell">
-          <h1 className="text-display text-ink">動的実務演習セッション</h1>
-          <Badge tone="neutral">Feasibility 実証</Badge>
+          <h1 className="text-display text-ink">実務演習セッション</h1>
+          <Badge tone="positive">実稼働</Badge>
         </div>
-        <p className="text-caption text-ink-2">AI同僚協働・レビュー対話</p>
+        <p className="text-caption text-ink-2">AI同僚とのコードレビュー演習</p>
         {/* 読ませる文章は行長を抑える。全幅に流すと目線の戻りが長くなって読み飛ばされる */}
         <p className="max-w-2xl text-body text-ink-2">
-          動的コンピテンシー アセスメント＆テレメトリ基盤の中核にあたる画面です。
-          受講者が生成AIと協働しながら、不確実な実務課題に取り組むプロセス全体を通じて、
-          <strong className="font-medium text-ink">
-            動的コンピテンシー4領域（評価的判断力、高次認知・動的思考、対話的共創力、メタ認知・適応力）
-          </strong>
-          を観測・評価します。
+          受講者はAI同僚と一緒にPRをレビューし、途中で入る仕様変更に対応したうえで、自分の判定を確定します。
+          その対話と行動のログから、
+          <strong className="font-medium text-ink">AI時代の実務判断力</strong>
+          （評価的判断力・高次認知・対話的共創力・メタ認知の4観点）の証拠を取り出して採点します。
+        </p>
+        <p className="max-w-2xl text-caption text-ink-3">
+          ここで出るのは1回の演習についての参考値です。受講者どうしを比べられるスコアにするのは、
+          事業期間中に実装する共通尺度化エンジンの役割です。
         </p>
       </header>
 
-      <Section title="演習セッションの動作フロー" description="全5場面・提案書 ①3 準拠">
+      <Section title="演習の流れ" description="全5場面">
         {/*
           5 場面は順序が意味を持つ列なので、番号を振る。番号は飾りではなく、
           「どこで何が起きるか」を指す索引として機能する。
@@ -80,21 +82,21 @@ export function InitStep({
       </Section>
 
       <Section
-        title="取り組む動的課題"
-        description={`T-06a タスクレジストリ / 全${DYNAMIC_TASKS.length}件`}
+        title="取り組む課題"
+        description={`全${DYNAMIC_TASKS.length}件`}
         actions={
           <Button variant="primary" onClick={onStartSession} disabled={isSubmitting}>
             {isSubmitting ? (
               <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-label="開始処理中" />
             ) : (
-              "実務演習セッションを開始する（課題提示へ）"
+              "演習を開始する"
             )}
           </Button>
         }
       >
         <div className="space-y-block">
           <select
-            aria-label="取り組む動的課題"
+            aria-label="取り組む課題"
             value={selectedTaskId}
             onChange={(e) => setSelectedTaskId(e.target.value)}
             className={cn(
@@ -124,15 +126,14 @@ export function InitStep({
       <Card variant="inset" className="p-pad">
         <div className="flex flex-col items-start justify-between gap-cell sm:flex-row sm:items-center">
           <p className="max-w-2xl text-caption text-ink-2">
-            <strong className="font-medium text-ink">共通アンカー評価について。</strong>{" "}
-            採点器ドリフト検知・尺度等化のための固定設問（SCT型）は、上部ナビゲーションの
-            <strong className="font-medium text-ink">「② 共通アンカー評価」</strong>
-            タブから個別にいつでも体験できます。
-            運用時の挿入場所や頻度は実証PoCを経て決定するため、プロトタイプでは両者を分離して体験可能にしています。
+            <strong className="font-medium text-ink">固定設問について。</strong>{" "}
+            全受講者が同じ条件で解く固定設問（SCT型）は、採点器のズレを外から見張るための第2層の基準です。
+            上部の<strong className="font-medium text-ink">「固定設問（SCT型）」</strong>
+            タブから単独で体験できます。演習のどこに挟むかはPoCを経て決めるため、プロトタイプでは分けてあります。
           </p>
           {onGoToAnchorTab && (
             <Button variant="secondary" onClick={onGoToAnchorTab} className="shrink-0">
-              アンカー評価を見る
+              固定設問を体験する
             </Button>
           )}
         </div>

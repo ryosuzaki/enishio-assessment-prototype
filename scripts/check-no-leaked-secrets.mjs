@@ -10,7 +10,7 @@
 // 使い方:
 //   npm run build && npm run check:no-leak
 
-import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 

@@ -21,7 +21,7 @@
 | **`AnchorResponse`** | `anchor_responses` | アンカー設問への受講者回答。v1（選択式）および v2（4段構成）を記録。`stakes_context` 不変記録。 |
 | **`PromptTurn`** | `prompt_turns` | 対話ログ（`user` / `assistant` / `system` / `mediator`）。メディエーターはAI同僚と明示的にロールを分離。 |
 | **`LearnerPreliminaryJudgement`** | `learner_preliminary_judgements` | CFF（認知先行判断）。AI評価閲覧前に受講者が下す採択/差し戻し（`approve`/`remand`）と必須理由記述（`justification`）。 |
-| **`VerificationFocusSequence`** | `verification_focus_sequences` | 受講者が検証中にハイライト・着目したコード行・テキストの順序付き追跡。 |
+| **`VerificationFocusSequence`** | `verification_focus_sequences` | **書き込み経路なし（廃止済み）。** 第3ペイン（検証パネル）の撤廃に伴い、着眼ログは `prompt_turns` へ一本化した。廃止前のセッション分を失わないためテーブル定義のみ残す。 |
 | **`ArtifactEditDistanceSeries`** | `artifact_edit_distance_series` | 成果物コードのレーベンシュタイン編集距離の時系列追跡。 |
 | **`ScoreFeedback`** | `score_feedbacks` | 評定結果に対する受講者・指導者の異議申立・フィードバック。 |
 
@@ -157,23 +157,9 @@
   }
   ```
 
-#### `POST /api/dialogue/focus`
-* **責務**: 受講者が画面上で選択・着目したコード行・スパンを記録する。
-* **Request Body**:
-  ```json
-  {
-    "sessionId": "c1234567-...",
-    "focusSeq": 1,
-    "lineStart": 42,
-    "lineEnd": 48,
-    "selectedText": "await redis.set(...)",
-    "note": "デッドロックの懸念あり"
-  }
-  ```
-* **Response (200 OK)**:
-  ```json
-  { "success": true, "focusId": "f1234567-..." }
-  ```
+#### ~~`POST /api/dialogue/focus`~~（廃止）
+
+第3ペイン（検証パネル）の撤廃に伴い削除した。着眼は受講者が要件・コードを引用して発話した時点で `prompt_turns` に残るため、このAPIで別に記録すると同じ行動が二重に記録される。着眼の取得経路は `POST /api/dialogue/turn` に一本化されている。
 
 #### `POST /api/dialogue/preliminary-judgement`
 * **責務**: CFF（認知先行判断）の「承認 / 差し戻し」と必須理由記述を永続化する。
@@ -247,12 +233,11 @@
 * **受入確認**: UIからユーザー名入力でアンカーが出題され、正答がクライアントに漏れないこと。
 
 ### Ticket 2: 2ペイン動的対話・引用とテレメトリ（Dialogue & Telemetry）
-* **スコープ**: `src/app/components/DialogueSessionStep.tsx`, `/api/dialogue/turn`, `/api/dialogue/focus`, `src/lib/edit-distance.ts`
+* **スコープ**: `src/app/components/DialogueSessionStep.tsx`, `/api/dialogue/turn`, `src/lib/edit-distance.ts`
 * **テストファースト（TDD）**:
-  * [x] `src/app/api/dialogue/focus/route.test.ts`
   * [x] `src/app/api/dialogue/turn/route.test.ts`
   * [x] `src/lib/edit-distance.test.ts`
-* **受入確認**: 対話発話、引用、行フォーカス、編集距離がそれぞれDBに永続化されること。
+* **受入確認**: 対話発話、引用、編集距離がそれぞれDBに永続化されること。着眼は引用として `prompt_turns` に入り、専用の記録経路を持たない。
 
 ### Ticket 3: CFF事前判定とXAIレポート表示（Judgement & Report）
 * **スコープ**: `src/app/components/PreliminaryJudgementStep.tsx`, `EvaluationReportStep.tsx`, `/api/dialogue/preliminary-judgement`, `/api/feedback`

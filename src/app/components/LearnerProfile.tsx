@@ -160,7 +160,7 @@ const SUB_DIMENSIONS: SubDimension[] = [
     name: "思考プロセスの自己客観化",
     band: 4,
     score: 3.8,
-    description: "自身の暫定判断の理由（CFF）を客観視し、盲点を自覚する力",
+    description: "自分が採点前に確定した判定の理由を客観視し、盲点を自覚する力",
     observedEvidence: {
       turnIndex: 5,
       quote: "「当初はキャッシュ無効化漏れのみに着目していましたが、ネットワーク分断時のフォールバック考慮が抜けていたと認識を修正しました」",
@@ -207,28 +207,28 @@ const SESSION_HISTORY: {
 }[] = [
   {
     date: "2026/09/01",
-    task: "[T-06a] 決済トランザクションの冪等性・障害時キャッシュ",
+    task: "決済トランザクションの冪等性・障害時キャッシュ",
     band: 3,
     editDistance: 142,
     evidence: "3件特定",
   },
   {
     date: "2026/08/24",
-    task: "[T-06b] 高トラフィック通知配信基盤のRate Limit整合性",
+    task: "高トラフィック通知配信基盤のレート制限の整合性",
     band: 4,
     editDistance: 89,
     evidence: "4件特定",
   },
   {
     date: "2026/08/17",
-    task: "[T-06c] イベント駆動アーキテクチャのデッドレター検証",
+    task: "イベント駆動アーキテクチャのデッドレター検証",
     band: 3,
     editDistance: 210,
     evidence: "2件特定",
   },
   {
     date: "2026/08/10",
-    task: "[T-05] 認証トークン失効とPCI DSS監査ログ要件",
+    task: "認証トークン失効とPCI DSS監査ログ要件",
     band: 3,
     editDistance: 165,
     evidence: "3件特定",
@@ -306,7 +306,7 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
             <h1 className="text-display tracking-tight text-ink">
               佐藤 拓也 さんのスキルカルテ＆実践的自己省察
             </h1>
-            <Badge tone="neutral">Viability</Badge>
+            <Badge tone="neutral">モック</Badge>
           </div>
           <p className="max-w-3xl text-body text-ink-2">
             受講者本人のマイページです。1回15〜30分の実務演習を通じて、AI協働プロセス（検証アプローチ・思考の癖・好手）を可視化し、現場の設計・レビューで即活用できる実践的カルテです。
@@ -335,7 +335,7 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
           個人専用の自己省察・能力開発スペース（心理的安全性ポリシー）
         </p>
         <p className="text-caption text-ink-2">
-          本カルテは受講者本人の能力開発・自己研鑽のために提供されています。他者との社内ランキングや序列比較は一切行われず、本人の明示的同意のない人事評価への流用も規約上禁止されています。安全な環境で、失敗を恐れずAIとの協働判断を試行錯誤できます。
+          このカルテは受講者本人の能力開発のための画面です。本人の明示的な同意なく人事評価に使うことは規約で禁じる想定です。失敗を恐れずにAIとの協働判断を試せる場にします。
         </p>
       </div>
 
@@ -352,7 +352,7 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
                 <Badge tone="neutral">決済基盤チーム / シニアエンジニア</Badge>
               </div>
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-ink-2">
-                <span>IRT尺度 較正済み（共通アンカー受検済）</span>
+                <span>共通尺度上の位置（事業期間中に実装）</span>
                 <span className="font-medium text-positive" data-numeric>
                   手戻り指摘率 前月比 18% 改善
                 </span>
@@ -383,7 +383,7 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
 
       {/* Section: 4 Domains & 12 Sub-Dimensions Breakdown */}
       <Card
-        title="動的コンピテンシー到達度（4領域・12サブ観点）"
+        title="AI時代の実務判断力の到達度（4観点・12項目）"
         description="大領域の概観と、各領域を構成する3つの具体的観点（下位スキル）ごとの実務行動エビデンス"
         meta={
           <span className="flex items-center gap-1">

@@ -260,6 +260,11 @@ model LearnerPreliminaryJudgement {
   @@map("learner_preliminary_judgements")
 }
 
+// 【書き込み経路なし】第3ペイン（検証パネル）の廃止に伴い、着眼ログは対話ターン
+// （`prompt_turns`）へ一本化した。受講者が要件やコードを引用して発話した時点で着眼は
+// 対話ログに残るため、ここへ別経路でもう一度書くと同じ行動が二重に記録される。
+// **モデルを消さないのは、廃止前のセッションで記録済みの行を失わないためである。**
+// 再び別経路で着眼を採るときは、二重記録にならない切り分けを先に決めること。
 model VerificationFocusSequence {
   id            String   @id @default(uuid())
   session_id    String

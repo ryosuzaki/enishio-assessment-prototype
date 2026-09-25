@@ -91,7 +91,7 @@ function checkLinks() {
       let decodedPath;
       try {
         decodedPath = decodeURIComponent(pathPart);
-      } catch (e) {
+      } catch {
         decodedPath = pathPart;
       }
 

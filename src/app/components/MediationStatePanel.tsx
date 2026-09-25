@@ -35,7 +35,7 @@ const STATUS_STYLE: Record<
  * 走行中の状態推定の可視化（MVP 2.1 ステップ7・8）。
  *
  * **ここに出しているのは「正解までの距離」ではない。**受講者の判断とその理由が、
- * 動的コンピテンシー ルーブリックが求める5つの根拠カテゴリごとにどこまで言語化されたかの推定である。
+ * AI時代の実務判断力 ルーブリックが求める5つの根拠カテゴリごとにどこまで言語化されたかの推定である。
  * 次に投げる問いはこの推定に応じて変わる。固定の問いの列を順に流しているのではない。
  */
 export function MediationStatePanel({
@@ -49,7 +49,7 @@ export function MediationStatePanel({
   return (
     <div data-testid="mediation-state-panel">
       <Card
-        title="媒介の状態推定（走行中）"
+        title="進行役の状態推定"
         meta={
           <span data-numeric>
             深掘り {probesIssued} / {maxProbes} 手
@@ -65,19 +65,20 @@ export function MediationStatePanel({
             </p>
           ) : (
             <>
-              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+              {/* 右の細い列に置くため、1行に1観点で縦に並べる（横に5列並べると文字が1字ずつ折り返す） */}
+              <ul className="space-y-1.5">
                 {stateEstimate.map((t) => {
                   const style = STATUS_STYLE[t.status];
                   return (
                     <li
                       key={t.target}
                       title={t.basis}
-                      className={cn("space-y-1.5 rounded-chip border p-2.5", style.cell)}
+                      className={cn("flex items-start justify-between gap-2 rounded-chip border p-2.5", style.cell)}
                     >
-                      <p className="text-section leading-snug text-ink">
+                      <p className="min-w-0 text-caption leading-snug text-ink">
                         {EVIDENCE_TARGET_LABELS[t.target] ?? t.target}
                       </p>
-                      <Badge tone={style.tone}>{style.label}</Badge>
+                      <Badge tone={style.tone} className="shrink-0">{style.label}</Badge>
                     </li>
                   );
                 })}

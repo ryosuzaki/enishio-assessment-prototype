@@ -39,8 +39,19 @@
   * **受入ゲート（Principle II）**: APIレスポンスやクライアント状態に、アンカーの正答・解説・作問意図（`note`, `hidden_premise`, `cheat_notes`）が一切含まれていないこと。
   * 回答完了後、動的対話演習（DialogueSessionStep）へ遷移する。
 
+### [US2b] Story 2b: 固定設問（v2-sct）の決定論的採点
+* **前提 (Given)**: v2-sct 形式の固定設問への回答（段階1・段階3・任意で段階3'）がある。
+* **操作 (When)**: `scoreAnchorResponse`（`src/lib/anchor-scoring.ts`）を実行する。
+* **結果 (Then)**:
+  * **LLMを一切使わず**、入力が同じなら常に同じ結果を返す。
+  * 段階1は `correct_key` との一致で 1 / 0。類型C（`no_defect`）も同じ規則で採点する。
+  * 段階3は SCT の aggregate scoring で採点する。受講者の選んだ選択肢を選んだパネリスト数 ÷ 最頻選択肢のパネリスト数（0〜1）。
+  * **段階3のパネルが `status: "mock"` の間は段階3を採点しない**（`not_scored` と理由 `panel_mock` を返す）。ダミー分布で点を出さない `[D-82]` 決定3 を守る。
+  * 段階3'は `stage3b − stage3` の差分を返す（パネル不要のため、パネルが mock でも算出する）`[D-83]`。
+  * 採点結果は受講者へ返さない（正誤やパネル分布を返すと基準点そのものが動く）。現時点では API・DB へは接続せず、パネル組成後に `AnchorResponse` の記録と突き合わせて使う。
+
 ### [US3] Story 3: 2ペイン動的対話演習・要件/コード引用（Dual Quoting）とテレメトリ収集
-* **前提 (Given)**: 受講者が演習画面（左: 課題要件・チーム情報、右: 成果物エディタ、下: AI同僚チャット）にいる。右側には開閉可能な「Live Telemetry Monitor」が配置され、必要に応じてメディエーター状態推定やログストリームをリアルタイム観測できる。
+* **前提 (Given)**: 受講者が演習画面（左上: 課題要件・チーム情報と成果物エディタの2ペイン、右列: AI同僚チャット、2ペインの下: 計測ログ）にいる。計測ログ（TelemetryPanel）は既定で閉じており（受講者の作業には不要なため）、開閉でき、閉じても同じ位置に「計測ログを表示」の戻し口が残る。開いているときは必要に応じてメディエーター状態推定やログストリームをリアルタイム観測できる。幅1024px以上ではワークスペースを画面の高さに収めてページ全体をスクロールさせず、各ペインの境界はドラッグで調整できる（配置はブラウザの localStorage に保存する。保存できない環境でも既定の配置で動く）。
 * **操作 (When)**:
   1. 第1ペイン（開発Issue・受入基準・運用コンテキスト）内の要件記述、または第2ペイン（成果物ドラフト）内の疑わしいコードを選択し、各ペインの「チャットに引用」を押下してチャット入力欄に引用を挿入する。
   2. AI同僚に引用を踏まえた指示・質問を送信する（ターン進行）。
@@ -48,7 +59,7 @@
 * **結果 (Then)**:
   * `/api/dialogue/turn` によりAI同僚の応答が返り、要件やコードの引用を含む発話ログが `PromptTurn` に時系列（`turn_seq`）で記録される。受講者の着眼箇所（仕様理解とコード不備の対応関係）と疑念の文脈は `PromptTurn` に一本化される。
   * 成果物の編集差分（Levenshtein距離）が `ArtifactEditDistanceSeries` に記録される。
-  * 演習画面内には受講者にとってノイズとなるメタ注記（DBテーブル名や仕込み不備の言及）が一切露出しない。メディエーター状態推定は右側 TelemetryPanel 内に観測計器として集約される。
+  * 演習画面内には受講者にとってノイズとなるメタ注記（DBテーブル名や仕込み不備の言及）が一切露出しない。メディエーター状態推定は2ペインの下の TelemetryPanel 内に観測計器として集約される。開始前・暫定判断・評価レポートの各画面でも、計測ログは本体の下に置く。
 
 ### [US4] Story 4: CFF（認知先行判断）の強制
 * **前提 (Given)**: 対話演習を完了し、評価へ進もうとする。
@@ -78,7 +89,7 @@
 
 * **実稼働（Feasibility）の範囲**:
   * セッションライフサイクル（Init → Anchor → Dialogue → Judgement → Report）の全遷移。
-  * `/api/session/start`, `/api/session/blur`, `/api/anchor`, `/api/dialogue/turn`, `/api/dialogue/focus`, `/api/dialogue/preliminary-judgement`, `/api/dialogue/evaluate`, `/api/feedback`。
+  * `/api/session/start`, `/api/session/blur`, `/api/anchor`, `/api/dialogue/turn`, `/api/dialogue/preliminary-judgement`, `/api/dialogue/evaluate`, `/api/feedback`。
   * PostgreSQL DB への Prisma 16モデルの永続化。
 * **モック（Viability）の範囲**:
   * 組織ダッシュボード（`OrganizationDashboard`）、受講者カルテ（`LearnerProfile`）、ベンチマーク（`BenchmarkGallery`）は静的モックデータで描画し、セッション進行エンジンとは疎結合とする。

@@ -1,6 +1,11 @@
 // サーバ専用。**このモジュールをクライアントコンポーネントから import してはならない。**
 // 仕込み不備の位置・類型・正常箇所ラベル（[P-15]）＝アセスメントの正答鍵である。
 // クライアントへ渡ると受検者が DevTools で全て読めるため、縦切りの測定が成立しなくなる。
+//
+// 以下4つのマップは `Record<TaskId, ...>` である。`TaskId` はシナリオ側（`TASK_IDS`）が
+// 持つ全集合なので、**課題を1本足して4つのうちどれかを書き忘れると型検査で落ちる。**
+// 以前は `Record<string, ...>` で、書き忘れはその課題を選んだ受講者の画面で初めて落ちていた。
+import type { TaskId } from "./dynamic-task";
 
 export interface InjectedFlaw {
   flaw_id: string;
@@ -12,7 +17,7 @@ export interface InjectedFlaw {
 }
 
 // flaw_id はタスクをまたいで一意にする（タスク接頭辞付き）。
-export const INJECTED_FLAWS_BY_TASK: Record<string, InjectedFlaw[]> = {
+export const INJECTED_FLAWS_BY_TASK: Record<TaskId, InjectedFlaw[]> = {
   "TASK-FINTECH-AUTH-01": [
     {
       flaw_id: "FLAW-01",
@@ -99,7 +104,7 @@ export const INJECTED_FLAWS_BY_TASK: Record<string, InjectedFlaw[]> = {
   ],
 };
 
-export const AI_PEER_SYSTEM_PROMPT_BY_TASK: Record<string, string> = {
+export const AI_PEER_SYSTEM_PROMPT_BY_TASK: Record<TaskId, string> = {
   "TASK-FINTECH-AUTH-01": `あなたは決済開発チームのAI同僚（エージェント）です。
 今回のPRでは、急増する決済トラフィックをさばくために「パフォーマンス向上」と「DB負荷軽減」を最優先して設計しました。
 そのため、JWTの署名検証のみをインメモリで行い、DBやRedisへの失効問い合わせをスキップしたことには合理的な理由があると考えています。
@@ -124,7 +129,7 @@ export const AI_PEER_SYSTEM_PROMPT_BY_TASK: Record<string, string> = {
 // 意図-行動ギャップのインターロック文言（タスク非依存の一般文言＋タスクごとの着眼点）。
 // **これは実行指示書 §7 W3 が指定する CFF 2種（Force Decision First /
 // Mandatory Justification）ではない。**それらは別途 preliminary-judgement で実装されている。
-export const INTENT_GAP_MESSAGE_BY_TASK: Record<string, string> = {
+export const INTENT_GAP_MESSAGE_BY_TASK: Record<TaskId, string> = {
   "TASK-FINTECH-AUTH-01":
     "⚠️ 【インターロック: 意図確認】AIの提案内容を具体的に検証しましたか？ セキュリティ基準（PCI DSS失効伝播）や可用性要件（Redis障害時の挙動）に適合しているか、具体的な理由を言語化してください。",
   "TASK-ECOMMERCE-CANCEL-01":
@@ -136,7 +141,7 @@ export const INTENT_GAP_MESSAGE_BY_TASK: Record<string, string> = {
 // Stage 2 採点プロンプトに埋め込む、タスク固有の着眼点ヒント（任意）。
 // ルーブリック本体（lib/evaluator/index.ts）はタスク非依存の一般記述にし、
 // ここで課題固有の観点を補足する。
-export const RUBRIC_HINT_BY_TASK: Record<string, string> = {
+export const RUBRIC_HINT_BY_TASK: Record<TaskId, string> = {
   "TASK-FINTECH-AUTH-01":
     "このタスクでは、トークン失効（強制ログアウト）の伝播遅延、およびRedis障害時の単一障害点（フェイルクローズによる全停止）が主要な論点である。",
   "TASK-ECOMMERCE-CANCEL-01":

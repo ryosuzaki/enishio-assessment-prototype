@@ -66,12 +66,6 @@ export interface ChatMessage {
   content: string;
 }
 
-export interface FocusItem {
-  focusSeq: number;
-  selectedText: string;
-  note?: string;
-}
-
 export const DISAGREEMENT_OPTIONS = [
   { value: "too_high", label: "評点が高すぎる" },
   { value: "too_low", label: "評点が低すぎる" },
