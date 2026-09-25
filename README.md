@@ -6,6 +6,19 @@
 
 提案の中核である**共通尺度化エンジン**（出題が受講者ごとに変わっても結果を比べられるようにする2層の仕組み）は、事業期間中に実装します。このリポジトリにあるのは、その入力になる「1回の演習セッション」と、第2層の外部基準である「固定設問」の実装です。
 
+## 動作確認動画
+
+![検証対話・前提変化・XAI診断のダイジェスト](docs/demo/digest.gif)
+
+<!-- 本編の mp4 は GitHub の Web 画面でこの位置に貼ると user-attachments の URL になり、インライン再生される -->
+
+| 動画 | 内容 | 長さ |
+| :--- | :--- | :--- |
+| [実務演習セッション](docs/demo/session.mp4) | 課題提示 → 検証対話（コード引用・進行役の深掘り） → 前提変化 → 意思決定 → XAI診断・異議申立。最後にモック画面 | 約1分45秒 |
+| [固定設問（SCT型）](docs/demo/anchor.mp4) | 設問の選択 → 段階1〜3・3'（反論への応答） → 確信度 → 記録した回答の控え | 約1分10秒 |
+
+スクリーンショットと同じく、AI同僚・進行役・採点の応答は固定データで再生しています（`npm run capture:video` で撮り直せます）。
+
 ---
 
 ## 1. 何が動いていて、どこがモックか
@@ -75,7 +88,7 @@
 
 ### 2.2 その他の画面
 
-* **固定設問（SCT型）**：医学教育の臨床推論評価で使われる SCT を IT 向けに組み直した設問。「全体判断 → 懸念の所在 → 前提変化での判断更新 → 反論への応答」を1段ずつ開示する（[画面](docs/screenshots/02-anchor-question.png)）。
+* **固定設問（SCT型）**：医学教育の臨床推論評価で使われる SCT を IT 向けに組み直した設問。「全体判断 → 懸念の所在 → 前提変化での判断更新 → 反論への応答」を1段ずつ開示する（[画面](docs/screenshots/02-anchor-question.png)）。送信後は記録した回答の控えだけを表示し、正誤は返さない（[画面](docs/screenshots/03b-anchor-record.png)）。
 * **組織ダッシュボード（モック）**：メンバー別の受講進捗、4観点の推移、AIの出力を鵜呑みにした率の改善（[画面](docs/screenshots/07-organization-dashboard.png)）。
 * **受講者カルテ（モック）**：4観点12項目のレーダーチャート、AIへの依存傾向、好手ログ（[画面](docs/screenshots/08-learner-profile.png)）。
 * **事後講評（モック）**：AIが仕掛けた誤りの構造、上位者の攻略ルートとの比較（[画面](docs/screenshots/09-benchmark-gallery.png)）。
@@ -110,6 +123,7 @@ npm run test                  # 単体テスト（Vitest 266件・APIキー/DB�
 npm run test:integration      # 結合テスト（Vitest 20件・実PostgreSQLを使用）
 npm run test:e2e              # E2Eテスト（Playwright 11シナリオ）
 npm run capture:screenshots   # UIスクリーンショット自動取得（docs/screenshots/ へ高解像度出力）
+npm run capture:video         # 動作確認動画の撮影と変換（docs/demo/ へ mp4 2本と GIF を出力）
 npm run check:flaw-detection  # 代行無効化チェック（Claude / Gemini マルチプロバイダ実測）
 npm run check:no-leak         # クライアントバンドルへの正答鍵・秘密情報非漏洩チェック
 npm run sim:equating          # 共通尺度化エンジンの合成データ検証（LLM/DB不要、docs/equating-simulation/ へ出力）

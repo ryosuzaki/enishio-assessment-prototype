@@ -17,12 +17,18 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: "**/capture-screenshots.spec.ts",
+      testIgnore: ["**/capture-screenshots.spec.ts", "**/capture-video.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "capture",
       testMatch: "**/capture-screenshots.spec.ts",
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      // README 用の動作確認動画。スクリーンショットと同じ理由で既定の実行から外す
+      name: "video",
+      testMatch: "**/capture-video.spec.ts",
       use: { ...devices["Desktop Chrome"] },
     },
   ],
