@@ -162,6 +162,23 @@ export function DialogueSessionStep({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
+  /**
+   * 引用を入力欄の末尾に足し、カーソルも末尾（引用の後ろ）へ置く。
+   * focus() だけだとカーソル位置はブラウザ任せで、引用の途中から打ち始める形になる。
+   * 値の反映（再描画）を待ってから動かすため、次のフレームで位置を合わせる。
+   */
+  const appendQuote = (formattedQuote: string) => {
+    const nextPrompt = userPromptInput ? `${userPromptInput}\n${formattedQuote}` : formattedQuote;
+    setUserPromptInput(nextPrompt);
+    requestAnimationFrame(() => {
+      const input = promptInputRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(nextPrompt.length, nextPrompt.length);
+      input.scrollTop = input.scrollHeight;
+    });
+  };
+
   /** 選択された要件・コンテキスト文章をチャット入力欄に Markdown 引用形式で挿入 */
   const handleQuoteRequirement = () => {
     let selectedText = "";
@@ -178,13 +195,9 @@ export function DialogueSessionStep({
       return;
     }
 
-    const formattedQuote = `> ${selectedText.split("\n").map((line) => line.trim()).filter(Boolean).join("\n> ")}\n\n`;
-    const nextPrompt = userPromptInput ? `${userPromptInput}\n${formattedQuote}` : formattedQuote;
-    setUserPromptInput(nextPrompt);
+    appendQuote(`> ${selectedText.split("\n").map((line) => line.trim()).filter(Boolean).join("\n> ")}\n\n`);
     setLeftQuoteNotice("要件テキストをチャット欄に引用しました");
     setTimeout(() => setLeftQuoteNotice(null), 2500);
-
-    promptInputRef.current?.focus();
   };
 
   /** 選択されたコード行をチャット入力欄に Markdown 引用形式で挿入 */
@@ -201,13 +214,9 @@ export function DialogueSessionStep({
       return;
     }
 
-    const formattedQuote = `> ${selectedText.split("\n").join("\n> ")}\n\n`;
-    const nextPrompt = userPromptInput ? `${userPromptInput}\n${formattedQuote}` : formattedQuote;
-    setUserPromptInput(nextPrompt);
+    appendQuote(`> ${selectedText.split("\n").join("\n> ")}\n\n`);
     setQuoteNotice("コードをチャット欄に引用しました");
     setTimeout(() => setQuoteNotice(null), 2500);
-
-    promptInputRef.current?.focus();
   };
 
   const pane1 = (
@@ -491,7 +500,8 @@ export function DialogueSessionStep({
             </span>
             <div
               className={cn(
-                "max-w-[85%] rounded-card border p-3 text-caption",
+                // 改行を保つ。詰めると、引用（> …）と続く本文が1行につながって見える
+                "max-w-[85%] whitespace-pre-wrap break-words rounded-card border p-3 text-caption",
                 msg.role === "user"
                   ? "border-accent bg-accent text-white"
                   : msg.role === "mediator"
@@ -584,16 +594,26 @@ export function DialogueSessionStep({
   );
 
   /* 場面3：前提変化（緊急仕様変更）の通知。発火は進行役側（/api/dialogue/premise-shift）。
-     作業領域を削らないよう1段に収める。全文は第1ペインの受入基準と運用コンテキストにも出る */
+     広い画面は作業領域が画面の高さに収まる作りなので、帯が伸びたぶんだけペインが潰れる。
+     見出し行と本文行の2段に固定し、本文は2行で切る。全文は対話欄と第1ペインの
+     受入基準・運用コンテキストにも出る。
+     （本文を見出しと同じ行に flex-1 で並べると、基準幅0のまま長いタイトルの横に押し込まれ、
+     数文字幅の列になって縦に伸びていた） */
   const premiseShiftBanner = premiseShiftState?.isInjected ? (
-    <div className="flex shrink-0 flex-wrap items-center gap-x-cell gap-y-1 rounded-card border border-caution/40 bg-caution-wash px-cell py-row">
-      <Badge tone="caution">場面3：前提変化</Badge>
-      <span className="text-label text-ink-2">緊急仕様変更・追加要件が通知されました</span>
-      <span className="text-section text-ink">{premiseShiftState.title}</span>
-      <span className="min-w-0 flex-1 text-caption text-ink-2">{premiseShiftState.announcement}</span>
-      <span className="shrink-0 whitespace-nowrap text-caption text-ink-3" data-numeric>
-        ターン {premiseShiftState.injectedAtTurn ?? 2} で通知
-      </span>
+    <div className="shrink-0 space-y-1 rounded-card border border-caution/40 bg-caution-wash px-cell py-row">
+      <div className="flex flex-wrap items-center gap-x-cell gap-y-1">
+        <Badge tone="caution">場面3：前提変化</Badge>
+        <span className="text-label text-ink-2">緊急仕様変更・追加要件が通知されました</span>
+        <span className="min-w-0 flex-1 text-section text-ink">{premiseShiftState.title}</span>
+        <span className="shrink-0 whitespace-nowrap text-caption text-ink-3" data-numeric>
+          ターン {premiseShiftState.injectedAtTurn ?? 2} で通知
+        </span>
+      </div>
+      {premiseShiftState.announcement && (
+        <p className="line-clamp-2 text-caption text-ink-2" title={premiseShiftState.announcement}>
+          {premiseShiftState.announcement}
+        </p>
+      )}
     </div>
   ) : null;
 

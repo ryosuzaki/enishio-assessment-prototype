@@ -305,7 +305,9 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("固定設問の回答を記録しました")).toBeVisible();
     await expect(page.getByText("anchor_status = pretest")).toBeVisible();
     // 正誤もパネル分布も受検者へ返さない [D-83]
-    await expect(page.getByText("この区間は採点されません。結果も返りません。")).toBeVisible();
+    // 返すのは「何を記録したか」の控えだけ
+    await expect(page.getByText(/正誤は返しません/)).toBeVisible();
+    await expect(page.getByTestId("anchor-answer-record")).toBeVisible();
     // デュアル導線の確認
     await expect(page.getByRole("button", { name: "別の設問を試す" })).toBeVisible();
     await expect(page.getByRole("button", { name: "実務演習セッションを体験する" })).toBeVisible();

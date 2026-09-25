@@ -291,13 +291,6 @@ export function AssessmentWorkbench({
                 chatHistory={dialogue.chatHistory}
                 prelimAction={dialogue.prelimAction}
                 prelimJustification={dialogue.prelimJustification}
-                anchorId={anchor.selectedAnchorId}
-                anchorStatus={anchor.anchorStatus}
-                bankSource={anchor.bankSource}
-                stage1Choice={anchor.stage1Choice}
-                stage2Choice={anchor.stage2Choice}
-                stage3Choice={anchor.stage3Choice}
-                confidence={anchor.confidence}
                 disputeReason={dialogue.disputeReason}
                 setDisputeReason={dialogue.setDisputeReason}
                 disputeDirection={dialogue.disputeDirection}

@@ -3,8 +3,6 @@
 import React from "react";
 import {
   DISAGREEMENT_OPTIONS,
-  isRetiredBankSource,
-  type AnchorBankSourceView,
   type EvaluationResult,
   type EvidenceComponent,
   type ChatMessage,
@@ -16,13 +14,6 @@ interface EvaluationReportStepProps {
   chatHistory: ChatMessage[];
   prelimAction?: "approve" | "remand" | "comment" | "";
   prelimJustification?: string;
-  anchorId?: string;
-  anchorStatus?: string;
-  bankSource?: AnchorBankSourceView | null;
-  stage1Choice?: string;
-  stage2Choice?: string;
-  stage3Choice?: number | null;
-  confidence?: number;
   disputeReason: string;
   setDisputeReason: (reason: string) => void;
   disputeDirection: string;
@@ -107,13 +98,6 @@ export function EvaluationReportStep({
   chatHistory,
   prelimAction,
   prelimJustification,
-  anchorId,
-  anchorStatus,
-  bankSource,
-  stage1Choice,
-  stage2Choice,
-  stage3Choice,
-  confidence,
   disputeReason,
   setDisputeReason,
   disputeDirection,
@@ -210,83 +194,6 @@ export function EvaluationReportStep({
           </p>
         </div>
       )}
-
-      {/* 共通アンカー課題（別の測定量・並置提示） [D-60, P-16] */}
-      <div data-testid="anchor-parallel-report-block">
-        <Card
-          title="固定設問の回答（演習の採点とは別に記録）"
-          meta={
-            <span className="flex flex-wrap items-center gap-2">
-              <Badge tone="accent">第2層の外部基準</Badge>
-              {anchorStatus && <Badge tone="neutral">status: {anchorStatus}</Badge>}
-            </span>
-          }
-        >
-          <div className="space-y-cell">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3">
-                <p className="text-caption text-ink-3">出題項目 ID / 供給源</p>
-                <p className="flex flex-wrap items-center gap-1.5 font-mono text-data font-semibold text-ink">
-                  <span>{anchorId || "—"}</span>
-                  <Badge tone={isRetiredBankSource(bankSource ?? null) ? "caution" : "neutral"}>
-                    {bankSource === "operational_v2"
-                      ? "運用バンク (v2-sct)"
-                      : bankSource === "demo_sample_v2"
-                      ? "公開デモ用サンプル (v2-sct)"
-                      : isRetiredBankSource(bankSource ?? null)
-                      ? "退役形式 (v1-static)"
-                      : "項目バンク"}
-                  </Badge>
-                </p>
-              </div>
-              <div className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3">
-                <p className="text-caption text-ink-3">回答（段階1〜3）</p>
-                <p className="text-data font-semibold text-ink" data-numeric>
-                  1: {stage1Choice || "—"} ／ 2: {stage2Choice || "—"} ／ 3:{" "}
-                  {stage3Choice === null || stage3Choice === undefined
-                    ? "—"
-                    : stage3Choice > 0
-                    ? `+${stage3Choice}`
-                    : String(stage3Choice)}
-                </p>
-              </div>
-              <div className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3">
-                <p className="text-caption text-ink-3">自己評定の確信度</p>
-                <p className="text-data font-semibold text-ink" data-numeric>
-                  {confidence ? `${confidence} / 5` : "—"}
-                  <span className="ml-1.5 font-sans text-caption font-normal text-ink-2">
-                    (
-                    {confidence === 1
-                      ? "全く自信なし"
-                      : confidence === 2
-                      ? "やや不安"
-                      : confidence === 3
-                      ? "普通"
-                      : confidence === 4
-                      ? "やや自信あり"
-                      : confidence === 5
-                      ? "非常に確信"
-                      : ""}
-                    )
-                  </span>
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-1 rounded-chip border border-line bg-surface-sunken p-3.5 text-caption text-ink-2">
-              <p className="text-section text-ink">
-                演習の評点と並べて表示している理由
-              </p>
-              <p>
-                固定設問は全受講者が同じ条件で解く<strong className="font-semibold text-ink">LLMを通さない外部基準</strong>で、
-                演習の評点とは<strong className="font-semibold text-ink">別の測定量</strong>です。
-                ここでは両者を足し合わせていません。両者を突き合わせて採点器のズレを見張り、
-                受講者を1本の尺度に並べるのは、事業期間中に実装する共通尺度化エンジンの役割です。
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
 
       {/* CFF Discrepancy Highlighting [MVP 2.5, Buçinca et al. 2021, D-80] */}
       <div data-testid="discrepancy-highlighting-block">

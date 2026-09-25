@@ -160,6 +160,108 @@ function NextButton({
   );
 }
 
+const CONFIDENCE_LABELS: Record<number, string> = {
+  1: "全く自信なし",
+  2: "やや不安",
+  3: "普通",
+  4: "やや自信あり",
+  5: "非常に確信",
+};
+
+function formatScale(anchor: AnchorItem, value: number | null): string {
+  if (value === null) return "—";
+  const label = anchor.stage3.scale.find((pt) => pt.value === value)?.label;
+  const signed = value > 0 ? `+${value}` : String(value);
+  return label ? `${signed}　${label}` : signed;
+}
+
+/**
+ * 送信した回答の控え。**正誤・パネル分布・段階3と段階3'の差分の解釈は出さない** [D-83]。
+ * 受講者に返すと、それ自体が学習材料になって固定基準点が動く。ここに出すのは
+ * 「何を記録したか」だけである。
+ */
+function AnswerRecord({
+  anchor,
+  stage1Choice,
+  stage2Choice,
+  stage3Choice,
+  stage3bChoice,
+  confidence,
+}: {
+  anchor: AnchorItem;
+  stage1Choice: string;
+  stage2Choice: string;
+  stage3Choice: number | null;
+  stage3bChoice: number | null;
+  confidence: number;
+}) {
+  const rows: { stage: string; question: string; answer: string }[] = [
+    {
+      stage: "段階1（全体判断）",
+      question: anchor.stage1.question,
+      answer: anchor.stage1.options.find((o) => o.key === stage1Choice)?.text ?? "—",
+    },
+  ];
+  if (anchor.stage2) {
+    rows.push({
+      stage: "段階2（懸念の所在）",
+      question: anchor.stage2.question,
+      answer: anchor.stage2.options.find((o) => o.key === stage2Choice)?.text ?? "—",
+    });
+  }
+  rows.push({
+    stage: "段階3（前提変化への判断更新）",
+    question: anchor.stage3.question,
+    answer: formatScale(anchor, stage3Choice),
+  });
+  if (anchor.stage3b) {
+    rows.push({
+      stage: "段階3'（反論への応答）",
+      question: anchor.stage3b.question,
+      answer: formatScale(anchor, stage3bChoice),
+    });
+  }
+  rows.push({
+    stage: "確信度",
+    question: anchor.confidence_scale ?? "ここまでの回答にどの程度自信がありますか",
+    answer: confidence ? `${confidence} / 5　${CONFIDENCE_LABELS[confidence] ?? ""}` : "—",
+  });
+
+  return (
+    <section className="space-y-cell" data-testid="anchor-answer-record">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-section text-ink">記録した回答</h3>
+        <span className="flex flex-wrap items-center gap-2">
+          <Badge tone="accent">固定設問: {anchor.anchor_id}</Badge>
+          <Badge tone="neutral">{anchor.family}</Badge>
+        </span>
+      </div>
+      <p className="text-body text-ink">{anchor.title}</p>
+      <dl className="divide-y divide-line rounded-card border border-line">
+        {rows.map((row) => (
+          <div key={row.stage} className="grid grid-cols-1 gap-x-block gap-y-1 p-cell sm:grid-cols-[14rem_1fr]">
+            <dt className="space-y-0.5">
+              <span className="block text-label text-ink-2">{row.stage}</span>
+              <span className="block text-caption text-ink-3">{row.question}</span>
+            </dt>
+            <dd className="text-body text-ink" data-numeric>
+              {row.answer}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <div className="space-y-1 rounded-card border border-line bg-surface-sunken p-4 text-caption text-ink-2">
+        <p className="text-section text-ink">演習の評点とは別に扱う理由</p>
+        <p>
+          固定設問は全受講者が同じ条件で解く<strong className="font-semibold text-ink">LLMを通さない外部基準</strong>で、
+          実務演習の評点とは<strong className="font-semibold text-ink">別の測定量</strong>です。両者は足し合わせません。
+          両者を突き合わせて採点器のズレを見張り、受講者を1本の尺度に並べるのは、事業期間中に実装する共通尺度化エンジンの役割です。
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export function AnchorQuestionStep({
   currentStep,
   currentAnchor,
@@ -371,8 +473,19 @@ export function AnchorQuestionStep({
           <h2 className="text-title tracking-tight text-ink">
             固定設問の回答を記録しました
           </h2>
-          <p className="text-caption text-ink-3">この区間は採点されません。結果も返りません。</p>
+          <p className="text-caption text-ink-3">
+            正誤は返しません。この区間は、演習の採点器を外から見張るための基準として記録します。
+          </p>
         </div>
+
+        <AnswerRecord
+          anchor={currentAnchor}
+          stage1Choice={stage1Choice}
+          stage2Choice={stage2Choice}
+          stage3Choice={stage3Choice}
+          stage3bChoice={stage3bChoice}
+          confidence={confidence}
+        />
 
         {/*
           設計注記は「開発者向け」として明示的に囲う。
