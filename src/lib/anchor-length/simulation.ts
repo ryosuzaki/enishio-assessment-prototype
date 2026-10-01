@@ -106,8 +106,10 @@ export interface AnchorLengthParams {
   cjReliability: number;
 }
 
-/** 収束妥当性の基準（2層等化機構仕様 §5 #9） */
+/** 収束妥当性の旧基準（観測値。2層等化機構仕様 §5 #9 の D-121 以前） */
 export const CRITERION = { rho: 0.6, lowerBound: 0.4 };
+/** 補正後の値に移した基準：希薄化補正後の95%信頼区間の下限がこれを上回る */
+export const DISATTENUATED_LOWER_BOUND = 0.4;
 
 export interface AnchorLengthReplicate {
   rho: number;
@@ -115,6 +117,9 @@ export interface AnchorLengthReplicate {
   passed: boolean;
   alpha: number;
   disattenuated: number;
+  /** 観測値の区間の下限を √(α̂·rel_CJ) で割ったもの（信頼性を既知として扱う近似） */
+  disattenuatedLower: number;
+  passedDisattenuated: boolean;
 }
 
 export function runAnchorLengthOnce(params: AnchorLengthParams, rng: Rng): AnchorLengthReplicate {
@@ -135,17 +140,22 @@ export function runAnchorLengthOnce(params: AnchorLengthParams, rng: Rng): Ancho
   const rho = spearman(cjObserved, anchorTotal);
   const { lower } = spearmanCi(rho, n);
   const alpha = cronbachAlpha(scores);
+  const correction = Math.sqrt(Math.max(alpha, 1e-6) * cjReliability);
+  const disattenuatedLower = lower / correction;
   return {
     rho,
     lower,
     passed: rho >= CRITERION.rho && lower > CRITERION.lowerBound,
     alpha,
-    disattenuated: rho / Math.sqrt(Math.max(alpha, 1e-6) * cjReliability),
+    disattenuated: rho / correction,
+    disattenuatedLower,
+    passedDisattenuated: disattenuatedLower > DISATTENUATED_LOWER_BOUND,
   };
 }
 
 export interface AnchorLengthResult {
   passRate: number;
+  passRateDisattenuated: number;
   rho: Summary;
   alpha: number;
   /** α̂ が 0 に近い試行で発散するので、平均ではなく中央値で要約する */
@@ -157,6 +167,7 @@ export function runAnchorLength(params: AnchorLengthParams, reps: number, seed: 
   const rows = Array.from({ length: reps }, () => runAnchorLengthOnce(params, rng));
   return {
     passRate: rows.filter((r) => r.passed).length / reps,
+    passRateDisattenuated: rows.filter((r) => r.passedDisattenuated).length / reps,
     rho: summarize(rows.map((r) => r.rho)),
     alpha: mean(rows.map((r) => r.alpha)),
     disattenuated: (() => {

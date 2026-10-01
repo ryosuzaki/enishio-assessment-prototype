@@ -10,6 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   CRITERION,
+  DISATTENUATED_LOWER_BOUND,
   attenuationCeiling,
   calibrateLoading,
   runAnchorLength,
@@ -22,7 +23,7 @@ const LEARNERS = 60;
 const REPS_MAIN = 1000;
 const REPS_SENSITIVITY = 400;
 const LENGTHS = [10, 15, 20, 25, 30, 40, 50, 60, 80];
-const TRUE_CORRELATIONS = [0.7, 0.8, 0.9, 1.0];
+const TRUE_CORRELATIONS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
 const CJ_MAIN = 0.8;
 const CJ_SENSITIVITY = [0.7, 0.9];
 const TARGET_PASS_RATE = 0.8;
@@ -119,6 +120,7 @@ w("- **必要な項目数は、1項目あたりの信頼性しだいで数倍変
 w("- **2つの構成概念の真の相関が 0.8 以下だと、項目数を増やしても基準にほぼ届かない。**$\\text{rel}_{\\text{CJ}} = 0.8$ では、どの信頼性でも 80 項目まで増やして届かなかった。観測相関の上限 $r_{\\text{true}}\\sqrt{\\text{rel}_{\\text{A}}\\cdot\\text{rel}_{\\text{CJ}}}$ が 0.60 を十分に超えないためである。つまり「観測相関 ≥ 0.60」という基準は、固定設問と共通尺度がほぼ同じものを測っていること（$r_{\\text{true}} \\ge 0.9$）を前提にしている。");
 w("- **受講者 60 名では、「下限 > 0.40」は「$\\hat\\rho \\ge 0.60$」とほぼ同じ条件になる。**$\\hat\\rho = 0.60$ のときの下限が 0.40 前後になるためである。");
 w("- **希薄化補正後の値は、項目数の影響をほとんど受けずに真の相関の近くに来る。**1項目あたりの信頼性が 0.06 以上なら、15〜20 項目でも中央値は真の相関に近い。ただし区間は広い。また、順位相関と4段階の得点を使っているため、真の相関より 0.03 ほど低めに出る。");
+w(`- **基準を補正後の値（区間の下限 > ${DISATTENUATED_LOWER_BOUND}）に移すと、20 項目でも届く条件が広がる。**1項目あたりの信頼性 0.06 以上・20 項目なら、$r_{\\text{true}} = 0.9$ で 82〜96%、0.8 で 62〜80% が合格する。真の相関が 0.5 のときに誤って合格する割合は 5〜8% にとどまる。一方、$r_{\\text{true}} = 0.7$ では 34〜43% しか合格しない。60 名で「関連が強い」と言い切れるのは $r_{\\text{true}}$ がおよそ 0.8 以上のときで、それより弱い関連は区間が広く、判定がつかない。`);
 w();
 w("---");
 w();
@@ -163,7 +165,24 @@ for (const p of PER_ITEM) {
 }
 w("---");
 w();
-w(`## 結果3：希薄化補正後の値（$\\text{rel}_{\\text{CJ}} = ${CJ_MAIN}$、$r_{\\text{true}} = 0.9$）`);
+w(`## 結果3：補正後の基準（希薄化補正後の95%信頼区間の下限 > ${DISATTENUATED_LOWER_BOUND}）を満たす割合（$\\text{rel}_{\\text{CJ}} = ${CJ_MAIN}$）`);
+w();
+w("観測値の区間の下限を $\\sqrt{\\hat\\alpha \\cdot \\text{rel}_{\\text{CJ}}}$ で割った値で判定します（信頼性を既知として扱う近似）。$r_{\\text{true}}$ が低い列は、関連が弱いのに合格してしまう割合を表します。");
+w();
+for (const p of PER_ITEM) {
+  w(`### 1項目あたりの信頼性 ${p.value}`);
+  w();
+  w(`| 項目数 | ${TRUE_CORRELATIONS.map((r) => `$r_{\\text{true}}=${r}$`).join(" | ")} |`);
+  w(`| :-- | ${TRUE_CORRELATIONS.map(() => ":--").join(" | ")} |`);
+  for (const length of LENGTHS.filter((l) => l <= 40)) {
+    const cells = TRUE_CORRELATIONS.map((r) => pct(results.get(key(p.value, length, r, CJ_MAIN))!.passRateDisattenuated));
+    w(`| ${length} | ${cells.join(" | ")} |`);
+  }
+  w();
+}
+w("---");
+w();
+w(`## 結果4：希薄化補正後の値（$\\text{rel}_{\\text{CJ}} = ${CJ_MAIN}$、$r_{\\text{true}} = 0.9$）`);
 w();
 w("$\\hat\\rho / \\sqrt{\\hat\\alpha \\cdot \\text{rel}_{\\text{CJ}}}$ の中央値（5〜95%範囲）です。α̂ が 0 に近い試行では補正値が発散するため、平均ではなく中央値で示します。補正後の値は項目数が少なくても真の相関の近くに来ますが、項目数が少ないほど、また1項目あたりの信頼性が低いほどばらつきます。");
 w();
