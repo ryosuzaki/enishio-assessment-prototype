@@ -60,7 +60,7 @@ export interface AnchorItem {
 
 export interface ChatMessage {
   turnSeq: number;
-  // "mediator" はソクラテス型深掘り・What-if注入（MVP 2.1 ステップ7・8）の問い。
+  // "mediator" はソクラテス型深掘り・What-if注入（測定設計書 2.1 ステップ5・6）の問い。
   // AI同僚（assistant）とは別役割であり、画面上も区別して表示する。
   role: "user" | "assistant" | "system" | "mediator";
   content: string;
@@ -104,7 +104,7 @@ export interface EvaluationResult {
   scorerModelVersion: string;
 }
 
-// --- Mediation (MVP 2.1 ステップ7・8: ソクラテス型深掘り・What-if注入) ---
+// --- Mediation (測定設計書 2.1 ステップ5・6: ソクラテス型深掘り・What-if注入) ---
 // src/lib/mediator/index.ts の EVIDENCE_TARGETS / PROBE_MOVES と対応する。
 // あちらはサーバ専用モジュール（`.server.ts` ではないが LLM SDK を使うためクライアント
 // から import しない）なので、画面側の型と表示ラベルはここに複製する。
@@ -146,7 +146,7 @@ export const PROBE_MOVES = [
 export type ProbeMove = (typeof PROBE_MOVES)[number];
 
 // src/lib/mediator/index.ts の MAX_PROBES_PER_SESSION と一致させる（サーバ専用モジュールの
-// ため画面側では複製する）。MVP 2.1 ステップ7が「3〜4ターン」の深掘りを必須としている。
+// ため画面側では複製する）。測定設計書 2.1 ステップ5が「3〜4ターン」の深掘りを必須としている。
 export const MAX_PROBES_PER_SESSION = 4;
 
 export const PROBE_MOVE_LABELS: Record<ProbeMove, string> = {

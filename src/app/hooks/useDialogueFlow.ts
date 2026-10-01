@@ -49,7 +49,7 @@ export function useDialogueFlow({
     isInjected: false,
   });
 
-  // Mediation State (MVP 2.1 ステップ7・8: ソクラテス型深掘り・What-if注入)
+  // Mediation State (測定設計書 2.1 ステップ5・6: ソクラテス型深掘り・What-if注入)
   const [mediationStateEstimate, setMediationStateEstimate] = useState<
     EvidenceTargetState[] | null
   >(null);
@@ -184,7 +184,7 @@ export function useDialogueFlow({
     maybeInjectPremiseShift(turnCounter, chatHistory, { force: true });
 
   /**
-   * ソクラテス型深掘り（MVP 2.1 ステップ7・8）。
+   * ソクラテス型深掘り（測定設計書 2.1 ステップ5・6）。
    *
    * AI同僚の応答とは別の手番。**正答鍵（injected_flaw_map）はこの呼び出しに含めない**
    * ——渡っているのは taskId のみで、サーバ側で業務要件・制約と対話ログから

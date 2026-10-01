@@ -85,7 +85,7 @@ model Rating {
   rating_category         Int? // 0..5。null = 未採点（アンカー無得点 / HITL確認待ち）
   rater_type              String // "llm" | "human" | "pending_human"
   scoring_confidence      Float? // 第2エージェントの自己申告確信度。閾値未満は pending_human へ回す
-  // ソクラテス型深掘り（MVP 2.1 ステップ7）への応答の一貫性（MVP 4.4）。
+  // ソクラテス型深掘り（測定設計書 2.1 ステップ5）への応答の一貫性（MVP 4.4）。
   // 第1エージェントが構造化出力として返す0..1の自己申告値であり、統計量ではない。
   // 深掘りが1回も走らなかったセッションでは null（「一貫していた」ではない）。
   probe_consistency_score Float?
@@ -182,7 +182,7 @@ model PromptTurn {
   session_id    String
   turn_seq      Int
   // "user" | "assistant" | "system" | "mediator"
-  // mediator は AI同僚（assistant）と別役割である。深掘りの問い（MVP 2.1 ステップ7・8）を
+  // mediator は AI同僚（assistant）と別役割である。深掘りの問い（測定設計書 2.1 ステップ5・6）を
   // assistant に混ぜると、受講者が検証したのかメディエーターが問うたのかが分離できなくなる。
   role          String
   // AI同僚やメディエーターの発話モデル種別（例: "claude-sonnet-4-5"）。user の場合は null
@@ -344,7 +344,7 @@ model RelianceMetrics {
   @@map("reliance_metrics")
 }
 
-// ソクラテス型深掘り・What-if注入の1手（MVP 2.1 ステップ7・8）。
+// ソクラテス型深掘り・What-if注入の1手（測定設計書 2.1 ステップ5・6）。
 //
 // **媒介の機能は elicitation（誘出）であって intervention-for-growth ではない** `[D-28]`。
 // 選択器には `injected_flaw_map`（正答鍵）を渡さない。渡すと仕込み不備へ向かう

@@ -91,7 +91,7 @@ describe("打てる手と根拠カテゴリの定義", () => {
     expect(Object.keys(EVIDENCE_TARGET_LABELS)).toHaveLength(EVIDENCE_TARGETS.length);
   });
 
-  it("1セッションあたりの深掘り上限は 4 手（MVP 2.1 ステップ7の3〜4ターン）", () => {
+  it("1セッションあたりの深掘り上限は 4 手（測定設計書 2.1 ステップ5の3〜4ターン）", () => {
     expect(MAX_PROBES_PER_SESSION).toBe(4);
   });
 });

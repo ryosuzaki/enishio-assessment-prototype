@@ -89,7 +89,7 @@ export async function resolveSessionContext(sessionId: string) {
  * 対話の1ターンを記録する（MVP 4.4 `prompt_turns[]`）。
  *
  * `mediator` は AI同僚（`assistant`）とは別の役割である——AI同僚は成果物を書く相手、
- * メディエーターは受講者の判断を引き出す相手（MVP 2.1 ステップ7・8）。
+ * メディエーターは受講者の判断を引き出す相手（測定設計書 2.1 ステップ5・6）。
  * **同じ role にまとめてはならない。**受講者が検証したのかメディエーターが問うたのかを
  * 事後に分離できなくなり、第1エージェントが応答の一貫性を判定できなくなる。
  */
@@ -183,7 +183,7 @@ export interface RecordRatingParams {
   stimulusFeatures: Prisma.InputJsonObject;
   scoringConfidence?: number | null;
   /**
-   * ソクラテス型深掘り（MVP 2.1 ステップ7）への応答の一貫性（MVP 4.4）。
+   * ソクラテス型深掘り（測定設計書 2.1 ステップ5）への応答の一貫性（MVP 4.4）。
    * 深掘りが1回も走らなかったセッションでは null にする。0 を入れてはならない
    * ——「一貫していなかった」と「そもそも問うていない」は別である。
    */
@@ -556,7 +556,7 @@ export async function accumulateWindowBlurDuration(sessionId: string, deltaSec: 
 }
 
 /**
- * ソクラテス型深掘り・What-if注入の1手を記録する（MVP 2.1 ステップ7・8）。
+ * ソクラテス型深掘り・What-if注入の1手を記録する（測定設計書 2.1 ステップ5・6）。
  *
  * `state_estimate` と `selection_rationale` を必ず残す。**なぜその問いを選んだかが
  * 残らなければ、媒介は「記述可能・再現可能・監査可能な人工物」ではなくなる** `[D-30]`。

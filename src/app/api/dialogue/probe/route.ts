@@ -17,7 +17,7 @@ import { getDynamicTask } from "@/data/dynamic-task";
 import { prisma } from "@/lib/db";
 
 /**
- * POST /api/dialogue/probe — ソクラテス型深掘り・What-if注入を1手打つ（MVP 2.1 ステップ7・8）。
+ * POST /api/dialogue/probe — ソクラテス型深掘り・What-if注入を1手打つ（測定設計書 2.1 ステップ5・6）。
  *
  * AI同僚の応答（/api/dialogue/turn）とは**別の手番**である。AI同僚は成果物を書く相手であり、
  * メディエーターは受講者の判断を引き出す相手である。役割を混ぜると、受講者が検証したのか
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       .filter((m) => m !== "none");
 
     if (probesSoFar.length >= MAX_PROBES_PER_SESSION) {
-      // MVP 2.1 ステップ7は「3〜4ターン」。上限に達したら打ち切る。
+      // 測定設計書 2.1 ステップ5は「3〜4ターン」。上限に達したら打ち切る。
       return NextResponse.json({
         success: true,
         probeIssued: false,
