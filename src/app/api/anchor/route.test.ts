@@ -51,7 +51,7 @@ const SEEDED: AnchorRecordV2 = {
     options: [
       { key: "A", text: "整合性", note: "OPTION_NOTE_SECRET" },
       { key: "B", text: "可用性" },
-      { key: "C", text: "監査証跡" },
+      { key: "C", text: "監査証跡", note: "正解" },
       { key: "D", text: "性能" },
     ],
   },
@@ -358,6 +358,8 @@ describe("POST — 応答の記録", () => {
 
     expect(res.status).toBe(409);
     expect(json.alreadyAnswered).toBe(true);
+    // 解説を返すのは記録できたときだけ
+    expect(json).not.toHaveProperty("explanation");
     // Prisma の例外文（テーブル名・カラム名）をそのまま外へ出さない
     expect(json.error).not.toContain("session_id");
   });
@@ -379,5 +381,68 @@ describe("POST — 応答の記録", () => {
 
     expect(res.status).toBe(500);
     expect(recordAnchorResponse).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 解答をロックした後の解説 `[D-116]`・spec 001 US2c。
+ * 応答を記録できたら解説を返す。作問意図と得点は、ロックした後も返さない。
+ */
+describe("POST — 解答直後の解説", () => {
+  const body = {
+    sessionId: "session-1",
+    anchorId: "ANCHOR-TEST-01",
+    formatVersion: "v2-sct",
+    stage1Selection: "B",
+    stage2Selection: "A",
+    stage3Selection: 1,
+    stage3bSelection: 0,
+    confidence: 4,
+  };
+
+  it("段階1・2の想定回答と隠れた前提を返す", async () => {
+    const json = await (await post(body)).json();
+
+    expect(json.explanation).toMatchObject({
+      anchor_id: "ANCHOR-TEST-01",
+      has_defect: true,
+      hidden_premise: "HIDDEN_PREMISE_SECRET",
+      stage1: { correct_key: "C", correct_text: "採用しない" },
+      stage2: { correct_key: "C", correct_text: "監査証跡" },
+    });
+  });
+
+  it("パネルが mock の間は段階3の分布を返さない", async () => {
+    const json = await (await post(body)).json();
+    expect(json.explanation.stage3).toEqual({ panel_status: "mock", distribution: null });
+  });
+
+  it("作問意図（note・cheat_notes・distractor_notes・段階3'）は返さない", async () => {
+    const text = JSON.stringify(await (await post(body)).json());
+    for (const secret of SECRETS.filter((x) => x !== "HIDDEN_PREMISE_SECRET")) {
+      expect(text).not.toContain(secret);
+    }
+    expect(text).not.toContain("それは考えすぎでは");
+  });
+
+  it("得点は返さない", async () => {
+    const json = await (await post(body)).json();
+    expect(json.scored).toBe(false);
+    // scored: false（得点化しないという宣言）以外に、得点を表すキーを持たない
+    expect(JSON.stringify(json)).not.toMatch(/"(score|scores|theta|ability|correct|is_correct)"\s*:/i);
+    expect(json.explanation).not.toHaveProperty("score");
+  });
+
+  it("類型C では段階2の解説を null にし、不備がないことを示す", async () => {
+    const json = await (await post({ ...body, anchorId: "ANCHOR-TEST-02", stage2Selection: null })).json();
+    expect(json.explanation.has_defect).toBe(false);
+    expect(json.explanation.stage2).toBeNull();
+  });
+
+  it("バンクに無い項目では解説を null にする（記録は通す）", async () => {
+    loadAnchorBank.mockReturnValue({ anchors: [], source: "demo_sample_v2" });
+    const json = await (await post(body)).json();
+    expect(json.success).toBe(true);
+    expect(json.explanation).toBeNull();
   });
 });

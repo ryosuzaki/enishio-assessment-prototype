@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { shuffleOptions, isV2, isRetiredSource, type AnchorRecordV2 } from "./anchor-bank";
+import { shuffleOptions, isV2, isRetiredSource, toAnchorExplanation, type AnchorRecordV2 } from "./anchor-bank";
 
 /**
  * v1 運用バンク（20項目）は、**両設問とも正答が全項目でキー A に固定**されており、
@@ -153,5 +153,59 @@ describe("isRetiredSource", () => {
     expect(isRetiredSource("operational_v2")).toBe(false);
     expect(isRetiredSource("demo_sample_v2")).toBe(false);
     expect(isRetiredSource("missing")).toBe(false);
+  });
+});
+
+/**
+ * 解答をロックした後の解説 `[D-116]`・spec 001 US2c。
+ * 返してよいのは解説だけで、作問意図と得点は返さない。項目を足しても漏れないよう、
+ * バンクそのものを通して検査する。
+ */
+describe("toAnchorExplanation", () => {
+  const items = loadV2Sample();
+
+  it("段階1・2の想定回答と隠れた前提を返す", () => {
+    const seeded = items.find((a) => a.item_kind === "seeded_premise" && a.stage2)!;
+    const ex = toAnchorExplanation(seeded)!;
+    expect(ex.has_defect).toBe(true);
+    expect(ex.hidden_premise).toBe(seeded.hidden_premise);
+    expect(ex.stage1.correct_key).toBe(seeded.stage1.correct_key);
+    expect(ex.stage1.correct_text).not.toBe("");
+    const correct2 = seeded.stage2!.options.find((o) => o.note === "正解")!;
+    expect(ex.stage2).toEqual({ correct_key: correct2.key, correct_text: correct2.text });
+  });
+
+  it("類型C では段階2の解説を返さず、不備がないことを示す", () => {
+    const noDefect = items.find((a) => a.item_kind === "no_defect")!;
+    const ex = toAnchorExplanation(noDefect)!;
+    expect(ex.has_defect).toBe(false);
+    expect(ex.stage2).toBeNull();
+  });
+
+  it("パネルが mock の間は分布を返さない", () => {
+    for (const a of items) {
+      const ex = toAnchorExplanation(a)!;
+      expect(ex.stage3.panel_status).toBe(a.stage3.panel.status);
+      if (a.stage3.panel.status === "mock") expect(ex.stage3.distribution).toBeNull();
+    }
+  });
+
+  it("パネルが確定したら分布を返す", () => {
+    const base = items[0];
+    const finalized: AnchorRecordV2 = {
+      ...base,
+      stage3: { ...base.stage3, panel: { ...base.stage3.panel, status: "final" } },
+    };
+    expect(toAnchorExplanation(finalized)!.stage3.distribution).toEqual(base.stage3.panel.distribution);
+  });
+
+  it("作問意図（note・cheat_notes・distractor_notes・段階3'）を含めない", () => {
+    for (const a of items) {
+      const json = JSON.stringify(toAnchorExplanation(a));
+      expect(json).not.toMatch(/"note"|cheat_notes|distractor_notes|stage3b|pushback|scoring/);
+      for (const text of [a.cheat_notes, a.distractor_notes, a.stage1.note, a.stage2?.note, a.stage3b?.note]) {
+        if (text) expect(json).not.toContain(text);
+      }
+    }
   });
 });

@@ -22,7 +22,8 @@
     "test:e2e": "playwright test --project=chromium",
     "capture:screenshots": "playwright test --project=capture",
     "capture:video": "playwright test --project=video && bash scripts/build-demo-video.sh",
-    "sim:equating": "tsx scripts/simulate-equating.ts"
+    "sim:equating": "tsx scripts/simulate-equating.ts",
+    "sim:anchor-length": "tsx scripts/simulate-anchor-length.ts"
   },
   "keywords": [],
   "author": "",

@@ -8,6 +8,7 @@ import {
   isV2,
   isRetiredSource,
   shuffleOptions,
+  toAnchorExplanation,
   BANK_MISSING_MESSAGE,
   RETIRED_BANK_WARNING,
   type AnchorOption,
@@ -15,11 +16,12 @@ import {
 } from "@/lib/anchor-bank";
 
 /**
- * 受検者へ返してよい形へ落とす。
+ * 解答をロックする前に、受検者へ返してよい形へ落とす。
  *
  * `note`（"正解" 等）・`correct_key`・`hidden_premise`・`cheat_notes`・`distractor_notes`、
  * そして **段階3の専門家パネル分布**は、いずれも項目の採点鍵と設計意図である。
  * 画面に描画しなくてもレスポンスに含めれば DevTools から読めるため、サーバ側で落とす。
+ * 解説はロックした後の POST だけが返す（`toAnchorExplanation`・`[D-116]`）。
  *
  * あわせて段階2の選択肢をシャッフルする。v1 運用バンクは正答が全問キー A に固定されており、
  * 読まずに解けた（`[D-83]`）。段階1（採用可否）と段階3（リッカート）は順序に意味があるため
@@ -235,11 +237,18 @@ export async function POST(req: Request) {
       confidence: Number(confidence) || 3,
     });
 
+    // 応答を記録した＝解答がロックされたので、ここで初めて解説を返す [D-116]・spec 001 US2c。
+    // 返すのは解説だけで、作問意図と得点は返さない（toAnchorExplanation）。
+    // 得点を出さないことは scored: false のまま変わらない（R2-9）。
+    const bankItem = loadAnchorBank().anchors.find((a) => a.anchor_id === anchorId);
+    const explanation = bankItem ? toAnchorExplanation(bankItem) : null;
+
     return NextResponse.json({
       success: true,
       responseId: responseRecord.response_id,
       anchorStatus: responseRecord.anchor_status,
       scored: false,
+      explanation,
     });
   } catch (error: unknown) {
     // P2002 = (session_id, anchor_id) の一意制約違反。同じ項目への2回目の回答である。

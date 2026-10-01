@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { messageOf } from "@/lib/error-message";
-import type { AnchorItem, AnchorBankSourceView, StepType } from "../types";
+import type { AnchorItem, AnchorBankSourceView, AnchorExplanationView, StepType } from "../types";
 
 interface AnchorFlowDeps {
   sessionId: string;
@@ -49,6 +49,8 @@ export function useAnchorFlow({
   const [stage3bDurationMs, setStage3bDurationMs] = useState<number>(0);
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  // 解答をロックした後にだけサーバから届く解説 [D-116]。ロック前は常に null。
+  const [explanation, setExplanation] = useState<AnchorExplanationView | null>(null);
 
   // 項目一覧の読み込み
   useEffect(() => {
@@ -79,6 +81,7 @@ export function useAnchorFlow({
     setStage3Choice(null);
     setStage3bChoice(null);
     setConfidence(3);
+    setExplanation(null);
   };
 
   const startAnchorFlow = async () => {
@@ -209,6 +212,7 @@ export function useAnchorFlow({
       if (data.anchorStatus) {
         setAnchorStatus(data.anchorStatus);
       }
+      setExplanation(data.explanation ?? null);
       addTelemetry(
         `Anchor recorded (Response ID: ${data.responseId.slice(0, 8)}..., ${data.anchorStatus} / 無得点)`
       );
@@ -239,6 +243,7 @@ export function useAnchorFlow({
     confidence,
     setConfidence,
     isSubmitting,
+    explanation,
     startAnchorFlow,
     resetAnchorFlow,
     advanceStage1,

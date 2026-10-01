@@ -29,6 +29,7 @@ export interface AnchorOptionView {
  * 採点するため、単一の正解が存在しない。
  *
  * サーバは `correct_key` / `item_kind` / パネル分布を落として返す（採点鍵のため）。
+ * 解説は、解答をロックした後の POST だけが返す（`AnchorExplanationView`・`[D-116]`）。
  */
 export interface AnchorItem {
   anchor_id: string;
@@ -56,6 +57,22 @@ export interface AnchorItem {
    * 段階3との差分が迎合（過剰依存）の指標になる。パネル不要 [D-83]。
    */
   stage3b: { pushback: string; question: string } | null;
+}
+
+/**
+ * 解答をロックした後に返る、その設問の解説 `[D-116]`・spec 001 US2c。
+ * 作問意図と得点は含まない。段階3の分布はパネルが `mock` の間は null。
+ */
+export interface AnchorExplanationView {
+  anchor_id: string;
+  has_defect: boolean;
+  hidden_premise: string | null;
+  stage1: { correct_key: string; correct_text: string };
+  stage2: { correct_key: string; correct_text: string } | null;
+  stage3: {
+    panel_status: "mock" | "provisional" | "final";
+    distribution: Record<string, number> | null;
+  };
 }
 
 export interface ChatMessage {

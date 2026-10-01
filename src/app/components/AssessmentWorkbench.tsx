@@ -210,6 +210,7 @@ export function AssessmentWorkbench({
             confidence={anchor.confidence}
             setConfidence={anchor.setConfidence}
             isSubmitting={anchor.isSubmitting}
+            explanation={anchor.explanation}
             onStage1Next={anchor.advanceStage1}
             onStage2Next={anchor.advanceStage2}
             onStage3Next={anchor.advanceStage3}

@@ -204,3 +204,49 @@ export function shuffleOptions<T extends AnchorOption>(
   }
   return { options: shuffled, order: shuffled.map((o) => o.key).join(",") };
 }
+
+/** 解答をロックした後に受講者へ返す解説 `[D-116]`。spec 001 US2c。 */
+export interface AnchorExplanation {
+  anchor_id: string;
+  /** 隠れた前提の不備があったか。類型C（`no_defect`）では false */
+  has_defect: boolean;
+  hidden_premise: string | null;
+  stage1: { correct_key: string; correct_text: string };
+  /** 段階2を出題しない項目（類型C）では null */
+  stage2: { correct_key: string; correct_text: string } | null;
+  stage3: {
+    panel_status: AnchorPanel["status"];
+    /** パネルが `mock` の間は null。ダミー分布を基準のように見せない `[D-82]` 決定3 */
+    distribution: Record<string, number> | null;
+  };
+}
+
+/**
+ * 解答をロックした後に返してよい解説だけを取り出す。
+ *
+ * **返さないもの**: 選択肢と段階の `note`（作問意図）、`cheat_notes`、`distractor_notes`、
+ * 段階3'の `note` / `scoring`、得点。段階3'の `note` は「この反論に新情報はない」という設計
+ * そのもので、返すとどの設問に反論が来るかが読めるようになる `[D-83]`。得点を返さないのは
+ * 精度が足りないためである（R2-9）。
+ *
+ * 退役形式（v1）は解説を持たないので null を返す。
+ */
+export function toAnchorExplanation(a: AnchorRecord): AnchorExplanation | null {
+  if (!isV2(a)) return null;
+
+  const stage1Correct = a.stage1.options.find((o) => o.key === a.stage1.correct_key);
+  const stage2Correct = a.stage2?.options.find((o) => o.note === "正解") ?? null;
+  const panel = a.stage3.panel;
+
+  return {
+    anchor_id: a.anchor_id,
+    has_defect: a.item_kind !== "no_defect",
+    hidden_premise: a.hidden_premise,
+    stage1: { correct_key: a.stage1.correct_key, correct_text: stage1Correct?.text ?? "" },
+    stage2: stage2Correct ? { correct_key: stage2Correct.key, correct_text: stage2Correct.text } : null,
+    stage3: {
+      panel_status: panel.status,
+      distribution: panel.status === "mock" ? null : { ...panel.distribution },
+    },
+  };
+}
