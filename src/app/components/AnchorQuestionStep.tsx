@@ -2,7 +2,7 @@
 
 import React from "react";
 import { RefreshCw } from "lucide-react";
-import type { AnchorItem, StepType } from "../types";
+import type { AnchorExplanationView, AnchorItem, StepType } from "../types";
 import { Badge, Button, cn } from "./ui";
 
 /**
@@ -39,6 +39,8 @@ interface AnchorQuestionStepProps {
   confidence: number;
   setConfidence: (confidence: number) => void;
   isSubmitting: boolean;
+  /** 解答をロックした後にだけ届く解説 [D-116]。届かなければ null */
+  explanation?: AnchorExplanationView | null;
   onStage1Next: () => void;
   onStage2Next: () => void;
   onStage3Next: () => void;
@@ -176,9 +178,9 @@ function formatScale(anchor: AnchorItem, value: number | null): string {
 }
 
 /**
- * 送信した回答の控え。**正誤・パネル分布・段階3と段階3'の差分の解釈は出さない** [D-83]。
- * 受講者に返すと、それ自体が学習材料になって固定基準点が動く。ここに出すのは
- * 「何を記録したか」だけである。
+ * 送信した回答の控え。ここに出すのは「何を記録したか」だけである。
+ * 想定回答は解説（`Explanation`）が出す。**段階3と段階3'の差分の解釈は出さない** [D-83]——
+ * どの設問に反論が来るかを読ませないためである。
  */
 function AnswerRecord({
   anchor,
@@ -262,6 +264,70 @@ function AnswerRecord({
   );
 }
 
+/**
+ * 解答をロックした後の解説 [D-116]。**得点（能力値）は出さない**（R2-9）。
+ *
+ * 返すのは想定回答と隠れていた前提だけで、作問意図は出さない（サーバが落としている）。
+ * 受講者の回答は上の「記録した回答」にあるので、ここでは繰り返さない。
+ * 想定と違ったことを色で示さない——ここは採点結果ではなく、考え方の手がかりである。
+ */
+function Explanation({
+  anchor,
+  explanation,
+}: {
+  anchor: AnchorItem;
+  explanation: AnchorExplanationView;
+}) {
+  const rows: { label: string; body: React.ReactNode }[] = [
+    { label: "段階1（全体判断）の想定回答", body: explanation.stage1.correct_text },
+  ];
+  if (explanation.stage2) {
+    rows.push({ label: "段階2（懸念の所在）の想定回答", body: explanation.stage2.correct_text });
+  }
+  rows.push({
+    label: explanation.has_defect ? "提案に隠れていた前提" : "隠れた前提について",
+    body: explanation.has_defect
+      ? explanation.hidden_premise
+      : "この提案には、見落とすと問題になる前提の不備はありませんでした。不備の無い提案を見分けられるかも、この設問で見ています。",
+  });
+
+  const distribution = explanation.stage3.distribution;
+  const total = distribution ? Object.values(distribution).reduce((s, n) => s + n, 0) : 0;
+  rows.push({
+    label: "段階3（前提変化への判断更新）",
+    body: distribution ? (
+      <ul className="space-y-1" data-numeric>
+        {anchor.stage3.scale.map((pt) => (
+          <li key={pt.value}>
+            {formatScale(anchor, pt.value)}：専門家 {distribution[String(pt.value)] ?? 0} / {total} 名
+          </li>
+        ))}
+      </ul>
+    ) : (
+      "専門家パネルの回答分布は準備中です。技術判断の専門家のパネルを集めてから表示します。この段階には単一の正解はなく、専門家の判断がどう分かれるかを示します。"
+    ),
+  });
+
+  return (
+    <section className="space-y-cell rounded-card bg-surface-sunken p-pad" data-testid="anchor-explanation">
+      <div className="space-y-1">
+        <h3 className="text-section text-ink">この設問の解説</h3>
+        <p className="text-caption text-ink-2">
+          想定していた回答と、提案に隠れていた前提です。得点（能力値）は返しません。
+        </p>
+      </div>
+      <dl className="divide-y divide-line">
+        {rows.map((row) => (
+          <div key={row.label} className="grid grid-cols-1 gap-x-block gap-y-1 py-cell sm:grid-cols-[14rem_1fr]">
+            <dt className="text-label text-ink-2">{row.label}</dt>
+            <dd className="text-body text-ink">{row.body}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 export function AnchorQuestionStep({
   currentStep,
   currentAnchor,
@@ -282,6 +348,7 @@ export function AnchorQuestionStep({
   confidence,
   setConfidence,
   isSubmitting,
+  explanation = null,
   onStage1Next,
   onStage2Next,
   onStage3Next,
@@ -474,7 +541,7 @@ export function AnchorQuestionStep({
             固定設問の回答を記録しました
           </h2>
           <p className="text-caption text-ink-3">
-            正誤は返しません。この区間は、演習の採点器を外から見張るための基準として記録します。
+            得点は返しません。設問ごとの解説を下に示します。この区間は、演習の採点器を外から見張るための基準として記録します。
           </p>
         </div>
 
@@ -487,10 +554,12 @@ export function AnchorQuestionStep({
           confidence={confidence}
         />
 
+        {explanation && <Explanation anchor={currentAnchor} explanation={explanation} />}
+
         {/*
           設計注記は「開発者向け」として明示的に囲う。
-          受検者へ正誤やパネル分布を返すと、それ自体が学習材料になり、固定基準点である
-          はずのアンカーが回を追うごとに動く（[D-83] のテストワイズネス）。
+          得点は返さない（R2-9）。解説はロック後に返す——同じ人に同じ設問は二度出さず、
+          得点が評価に関係しないので漏らす動機もないため、基準点は動かない [D-116]。
         */}
         <div className="space-y-2 rounded-card border border-dashed border-line-strong bg-surface-sunken p-4">
           <p className="text-section text-ink">
@@ -511,7 +580,10 @@ export function AnchorQuestionStep({
               {currentAnchor.stage3.panel_status === "mock" &&
                 " いまのパネルはダミー分布なので、採点値は出していない（技術判断の専門家10〜15名でパネルを組むのが前提）。"}
             </li>
-            <li>正誤もパネル分布も受講者へは返さない。返すと、それが学習材料になって基準点そのものが動く</li>
+            <li>
+              得点（能力値）は受講者へ返さない（項目数が少なく、個人の値としては精度が足りない）。設問ごとの解説は解答をロックした直後に返す。
+              同じ人に同じ設問は二度出さず、得点が評価に関係しないので、解説を返しても基準点は動かない
+            </li>
             {currentAnchor.stage3b && (
               <li>
                 この項目には<strong className="font-semibold text-ink">段階3&apos;（新情報を含まない反論）</strong>

@@ -15,7 +15,7 @@
 
 ### Principle II: 正答鍵・機密情報のクライアント非漏洩（Non-Leakage）
 * **`.server.ts` の隔離**: `src/data/*.server.ts`（仕込み不備の位置・類型・正常箇所ラベル＝正答鍵）は、クライアントコンポーネント（`"use client"`）から絶対に import してはならない。
-* **APIレスポンスの秘匿**: アンカー項目の正答や作問意図（`note`, `hidden_premise`, `cheat_notes`, `distractor_notes`）を API レスポンスに含めてはならない。画面非描画であっても DevTools から閲覧可能になるためである。
+* **APIレスポンスの秘匿**: アンカー項目の正答と解説を、解答をロックする前の API レスポンスに含めてはならない。画面非描画であっても DevTools から閲覧可能になるためである。ロックした後は、その設問の解説（段階1・2の想定回答、`hidden_premise`、確定済みの専門家パネル分布）だけを返してよい（`[D-116]`）。作問意図（`note`, `cheat_notes`, `distractor_notes`、段階3'の `note` / `scoring`）はロック後も返さず、得点（能力値）はいつも返さない。
 * **CI検証の強制**: ビルド成果物に対する漏洩検査（`npm run check:no-leak`）を常時パスしなければならない。
 
 ### Principle III: 採点・媒介の完全性と追跡可能性（Traceability & Integrity）

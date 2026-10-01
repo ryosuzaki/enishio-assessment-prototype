@@ -26,6 +26,15 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
             responseId: "mock-resp-001",
             anchorStatus: "pretest",
             scored: false,
+            // 解答をロックした後の解説 [D-116]。パネルは mock なので分布は null
+            explanation: {
+              anchor_id: "ANCHOR-V2-A-01",
+              has_defect: true,
+              hidden_premise: "モックの隠れた前提",
+              stage1: { correct_key: "2", correct_text: "条件付きで採用してよい（確認すべき点がある）" },
+              stage2: { correct_key: "C", correct_text: "モックの想定回答（段階2）" },
+              stage3: { panel_status: "mock", distribution: null },
+            },
           }),
         });
       } else {
@@ -304,10 +313,15 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     // アンカー完了画面（anchor_complete）
     await expect(page.getByText("固定設問の回答を記録しました")).toBeVisible();
     await expect(page.getByText("anchor_status = pretest")).toBeVisible();
-    // 正誤もパネル分布も受検者へ返さない [D-83]
-    // 返すのは「何を記録したか」の控えだけ
-    await expect(page.getByText(/正誤は返しません/)).toBeVisible();
+    // 得点は返さず、解答をロックした後に設問の解説を返す [D-116]
+    await expect(page.getByText(/得点は返しません。設問ごとの解説を下に示します/)).toBeVisible();
     await expect(page.getByTestId("anchor-answer-record")).toBeVisible();
+    const explanation = page.getByTestId("anchor-explanation");
+    await expect(explanation).toBeVisible();
+    await expect(explanation.getByText("モックの隠れた前提")).toBeVisible();
+    await expect(explanation.getByText("モックの想定回答（段階2）")).toBeVisible();
+    // パネルが mock の間は分布を出さない
+    await expect(explanation.getByText(/専門家パネルの回答分布は準備中です/)).toBeVisible();
     // デュアル導線の確認
     await expect(page.getByRole("button", { name: "別の設問を試す" })).toBeVisible();
     await expect(page.getByRole("button", { name: "実務演習セッションを体験する" })).toBeVisible();
