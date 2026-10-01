@@ -91,6 +91,9 @@ erDiagram
 * **管理する API エンドポイント**: なし（`npm run sim:equating` で実行）
 * **ドキュメント**: [spec.md](004-equating-simulation/spec.md) ／ 結果: [docs/equating-simulation/](../docs/equating-simulation/README.md)
 
+### [log-contract.md](log-contract.md)（フィーチャー横断）
+* **責務**: 評点・テレメトリのフィールド名・型・値域の正本。各フィーチャーの `plan.md` はモデルの持ち主と API を定め、フィールドの意味はここで定める。`prisma/schema.prisma` はこれと一致させる。
+
 ---
 
 ## 4. 専門用語の定義 (Domain Terminology)

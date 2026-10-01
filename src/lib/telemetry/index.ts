@@ -231,7 +231,7 @@ export async function recordRating(params: RecordRatingParams, tx?: Prisma.Trans
       stimulus_type: params.stimulusType,
       anchor_id: params.anchorId ?? null,
       anchor_status: params.anchorStatus ?? null,
-      // [D-67] 決定2 / MVP 4.1.1：全応答に付す。本プロトタイプは Phase 1 相当のため既定は "formative"。
+      // [D-67] 決定2 / ログ契約 §4：全応答に付す。本プロトタイプは Phase 1 相当のため既定は "formative"。
       stakes_context: params.stakesContext ?? "formative",
       stimulus_features: params.stimulusFeatures,
       scoring_confidence: params.scoringConfidence ?? null,
