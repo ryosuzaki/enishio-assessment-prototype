@@ -1,5 +1,5 @@
 /**
- * ソクラテス型深掘り・What-if注入のプローブ選択器（MVP 2.1 ステップ7・8）。
+ * ソクラテス型深掘り・What-if注入のプローブ選択器（測定設計書 2.1 ステップ5・6）。
  *
  * ## これが何であって、何でないか
  *
@@ -121,7 +121,7 @@ export function getMediatorModelVersion(): string {
 export const MEDIATOR_MODEL_VERSION = getMediatorModelVersion();
 const MAX_TOKENS = 8000;
 
-/** 1セッションあたりの深掘りの上限（MVP 2.1 ステップ7は「3〜4ターン」を必須としている）。 */
+/** 1セッションあたりの深掘りの上限（測定設計書 2.1 ステップ5は「3〜4ターン」を必須としている）。 */
 export const MAX_PROBES_PER_SESSION = 4;
 
 /**

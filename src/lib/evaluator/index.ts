@@ -50,7 +50,7 @@ export const EvidenceExtractionOutputSchema = z.object({
       "受講者が正常箇所（is_flaw=false）を明示的に正当と判断した場合のみ true。" +
         "正常箇所に一切言及がない場合は判断材料がないため false にすること。"
     ),
-  // ソクラテス型深掘り（MVP 2.1 ステップ7）への応答の一貫性（MVP 4.4）。
+  // ソクラテス型深掘り（測定設計書 2.1 ステップ5）への応答の一貫性（MVP 4.4）。
   // 深掘りが1手も入っていないログでは null を返させる。0 は「一貫していなかった」であり、
   // 「そもそも問うていない」とは別である。
   probe_consistency: z

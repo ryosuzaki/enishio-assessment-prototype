@@ -24,7 +24,7 @@
 * **2段階分離の永続化**: 構造化採点パイプラインは「第1段階：根拠抽出（`EvidenceComponent`）」と「第2段階：バンド採点（`Rating`）」を厳格に分離し、双方の構造化データを DB に永続化する。根拠なき評点付与を禁止する。
 
 ### Principle IV: データスキーマの保全と不変性（Schema Stability）
-* **`prisma/schema.prisma` の厳格管理**: スキーマは MVP 定義書 4.1.1 の正本写しであり、フィールド名や型の無断変更・削除を禁止する。ログの破壊は過去セッションデータの永久喪失を意味する。
+* **`prisma/schema.prisma` の厳格管理**: スキーマは [`specs/log-contract.md`](../../specs/log-contract.md)（ログ契約）と一致させ、フィールド名や型の無断変更・削除を禁止する。ログの破壊は過去セッションデータの永久喪失を意味する。
 * **用途の凍結**: レーティングやアンカー応答には `stakes_context`（"formative" / "education" / "promotion" / "selection" / "verification"）を記録し、事後分析可能性を担保する（`[D-67]`）。
 
 ### Principle V: 仕様書駆動（SDD）と Living Spec / 垂直スライス規律
