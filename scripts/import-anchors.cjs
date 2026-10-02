@@ -106,9 +106,10 @@ function parseAnchorBankMarkdown(filePath) {
   return items;
 }
 
+// v1 静的選択式の項目バンク（[D-83] で退役）を読む。現行の v2-sct 運用バンクの生成元ではない。
 // 仕様・調査は隣の enishio-education リポジトリが持つ（AGENTS.md 参照）。
 // 親リポジトリ enishio-business の products/ 配下に並んでチェックアウトされる前提。
-const mdPath = path.resolve(__dirname, "../../enishio-education/docs/共通アンカー項目バンク初版_T-05.md");
+const mdPath = path.resolve(__dirname, "../../enishio-education/docs/退役/共通アンカー項目バンク初版_T-05.md");
 
 if (!fs.existsSync(mdPath)) {
   console.error(`アンカー項目バンクが見つかりません: ${mdPath}`);

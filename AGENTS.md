@@ -17,7 +17,7 @@
 | **コードレビューの観点・重大度基準・報告形式（AIレビュー実行者向け）** | [`docs/レビュー観点チェックリスト.md`](docs/レビュー観点チェックリスト.md) |
 | **ログのフィールド定義の正本** | [`specs/log-contract.md`](specs/log-contract.md)（各ログがなぜ要るかは `../enishio-education/docs/Phase1測定設計書.md` 4章） |
 | 採点軸・アンカーの設計根拠 | `../enishio-education/docs/設計決定記録.md` |
-| アンカー項目バンク（20項目の本文） | `../enishio-education/docs/共通アンカー項目バンク初版_T-05.md` |
+| アンカー項目バンク（20項目の本文） | **未定**。v2-sct の運用20項目は未踏事業の中で作り直す。v1 静的選択式の20項目（`../enishio-education/docs/退役/共通アンカー項目バンク初版_T-05.md`）は `[D-83]` で退役しており、`npm run parse:anchors` が生成する `src/data/anchors.json` も退役した経路である |
 
 ---
 
