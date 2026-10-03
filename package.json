@@ -16,14 +16,13 @@
     "lint": "eslint .",
     "check:no-leak": "node scripts/check-no-leaked-secrets.mjs",
     "check:ui": "node scripts/check-ui-tokens.mjs",
+    "check:no-simulation": "node scripts/check-no-simulation.mjs",
     "check:flaw-detection": "tsx scripts/check-flaw-detection-resistance.ts",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test --project=chromium",
     "capture:screenshots": "playwright test --project=capture",
-    "capture:video": "playwright test --project=video && bash scripts/build-demo-video.sh",
-    "sim:equating": "tsx scripts/simulate-equating.ts",
-    "sim:anchor-length": "tsx scripts/simulate-anchor-length.ts"
+    "capture:video": "playwright test --project=video && bash scripts/build-demo-video.sh"
   },
   "keywords": [],
   "author": "",

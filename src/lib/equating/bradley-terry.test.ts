@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { fitBradleyTerry, type Comparison } from "./bradley-terry";
-import { createRng } from "./random";
-import { spearman } from "./simulation";
 
 describe("fitBradleyTerry", () => {
   it("returns abilities centered at zero", () => {
@@ -41,46 +39,24 @@ describe("fitBradleyTerry", () => {
     for (const a of ability) expect(Number.isFinite(a)).toBe(true);
   });
 
-  it("recovers known strengths from sufficient comparisons", () => {
-    const rng = createRng(7);
-    const n = 40;
-    const truth = Array.from({ length: n }, () => rng.normal());
+  // Deterministic input on purpose: each pair's win counts are set to the expected counts
+  // under known strengths, so the test checks the MM algorithm, not a simulated judge.
+  it("recovers known log-strengths from a round robin with expected win counts", () => {
+    const truth = [-1.5, -0.9, -0.3, 0.3, 0.9, 1.5];
+    const gamesPerPair = 40;
     const comparisons: Comparison[] = [];
-    for (let rep = 0; rep < 30; rep++) {
-      for (let i = 0; i < n; i++) {
-        const j = (i + 1 + Math.floor(rng.next() * (n - 1))) % n;
+    for (let i = 0; i < truth.length; i++) {
+      for (let j = i + 1; j < truth.length; j++) {
         const p = 1 / (1 + Math.exp(-(truth[i] - truth[j])));
-        comparisons.push(rng.next() < p ? { winner: i, loser: j } : { winner: j, loser: i });
+        const winsI = Math.round(gamesPerPair * p);
+        for (let k = 0; k < winsI; k++) comparisons.push({ winner: i, loser: j });
+        for (let k = winsI; k < gamesPerPair; k++) comparisons.push({ winner: j, loser: i });
       }
     }
-    const { ability } = fitBradleyTerry(n, comparisons);
-    expect(spearman(truth, ability)).toBeGreaterThan(0.9);
-  });
-});
-
-describe("createRng", () => {
-  it("is reproducible for the same seed", () => {
-    const a = createRng(123);
-    const b = createRng(123);
-    const xs = Array.from({ length: 5 }, () => a.next());
-    const ys = Array.from({ length: 5 }, () => b.next());
-    expect(xs).toEqual(ys);
-  });
-
-  it("draws standard normals with mean near 0 and sd near 1", () => {
-    const rng = createRng(1);
-    const xs = Array.from({ length: 20000 }, () => rng.normal());
-    const mean = xs.reduce((s, x) => s + x, 0) / xs.length;
-    const sd = Math.sqrt(xs.reduce((s, x) => s + (x - mean) ** 2, 0) / xs.length);
-    expect(mean).toBeCloseTo(0, 1);
-    expect(sd).toBeCloseTo(1, 1);
-  });
-});
-
-describe("spearman", () => {
-  it("is 1 for identical orderings and handles ties", () => {
-    expect(spearman([1, 2, 3, 4], [10, 20, 30, 40])).toBeCloseTo(1, 10);
-    expect(spearman([1, 2, 3, 4], [4, 3, 2, 1])).toBeCloseTo(-1, 10);
-    expect(Number.isFinite(spearman([1, 2, 3, 4], [1, 1, 2, 2]))).toBe(true);
+    const { ability, converged } = fitBradleyTerry(truth.length, comparisons);
+    expect(converged).toBe(true);
+    for (let i = 1; i < truth.length; i++) expect(ability[i]).toBeGreaterThan(ability[i - 1]);
+    // The weak prior (one virtual win and loss per player) shrinks estimates slightly toward 0.
+    for (let i = 0; i < truth.length; i++) expect(Math.abs(ability[i] - truth[i])).toBeLessThan(0.15);
   });
 });
