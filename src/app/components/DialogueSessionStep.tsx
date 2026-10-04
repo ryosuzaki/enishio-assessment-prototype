@@ -420,14 +420,14 @@ export function DialogueSessionStep({
           <div className="flex min-h-60 flex-1 flex-col space-y-1.5">
             <div className="flex shrink-0 items-center justify-between gap-2 rounded-chip border border-caution/25 bg-caution-wash px-3 py-1.5 text-caption text-ink-2">
               <span>
-                AI同僚が作成したユニットテストです。正常系以外のテストが網羅されているか精査してください。
+                AIエージェントが作成したユニットテストです。正常系以外のテストが網羅されているか精査してください。
               </span>
               <span className="shrink-0 font-mono text-data text-ink-2">All tests passed (3/3)</span>
             </div>
             <textarea
               ref={testTextareaRef}
               data-testid="test-code-editor"
-              aria-label="AI同僚が作成したテストコード"
+              aria-label="AIエージェントが作成したテストコード"
               readOnly
               value={selectedTask.test_code}
               className={cn(
@@ -470,7 +470,7 @@ export function DialogueSessionStep({
       )}
     >
       <header className="flex shrink-0 items-start justify-between gap-2 border-b border-line pb-2">
-      <h2 className="text-section text-ink">AI同僚との対話・修正指示（マルチターン対話）</h2>
+      <h2 className="text-section text-ink">AIエージェントへの修正指示・対話（マルチターン対話）</h2>
       <span className="shrink-0 whitespace-nowrap text-caption text-ink-3" data-numeric>
         ターン {turnCounter}
       </span>
@@ -496,7 +496,7 @@ export function DialogueSessionStep({
                 ? "あなた（受講者）"
                 : msg.role === "mediator"
                   ? "進行役（深掘り）"
-                  : "AI同僚"}
+                  : "AIエージェント"}
             </span>
             <div
               className={cn(
@@ -541,8 +541,8 @@ export function DialogueSessionStep({
               onSendDialogueTurn();
             }
           }}
-          aria-label="AI同僚への指示・指摘入力"
-          placeholder="AI同僚に指示・指摘を入力（Enterで送信、Shift+Enterで改行。コード引用対応）…"
+          aria-label="AIエージェントへの指示・指摘入力"
+          placeholder="AIエージェントに指示・指摘を入力（Enterで送信、Shift+Enterで改行。コード引用対応）…"
           className={cn(
             "min-h-[76px] flex-1 resize-y rounded-chip border border-line-strong bg-surface px-4 py-2.5",
             "text-caption text-ink focus:border-accent focus:outline-none",

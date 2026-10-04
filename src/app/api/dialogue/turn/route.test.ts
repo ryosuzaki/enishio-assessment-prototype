@@ -194,7 +194,7 @@ describe("ボディの検証", () => {
 });
 
 describe("対話ターンの記録", () => {
-  it("受講者の発言を user ロールで、AI同僚の応答を assistant ロールで残す", async () => {
+  it("受講者の発言を user ロールで、AIエージェントの応答を assistant ロールで残す", async () => {
     const body = await (await post(validBody())).json();
 
     expect(body.assistantTurnSeq).toBe(2);
@@ -221,7 +221,7 @@ describe("対話ターンの記録", () => {
     expect(recordEditDistance).toHaveBeenCalledOnce();
   });
 
-  it("APIキーが無ければ 503 を返し、AI同僚の応答をでっち上げない", async () => {
+  it("APIキーが無ければ 503 を返し、AIエージェントの応答をでっち上げない", async () => {
     process.env.OPENAI_API_KEY = "your-openai-api-key-here";
 
     const res = await post(validBody());
@@ -230,11 +230,11 @@ describe("対話ターンの記録", () => {
     expect(createMock).not.toHaveBeenCalled();
   });
 
-  it("対話履歴はサーバのログから読み、mediator を AI同僚の発話に混ぜない", async () => {
+  it("対話履歴はサーバのログから読み、mediator を AIエージェントの発話に混ぜない", async () => {
     promptTurnFindMany.mockResolvedValue([
       { turn_seq: 1, role: "user", content: "受講者の発言" },
       { turn_seq: 2, role: "mediator", content: "進行役の問い" },
-      { turn_seq: 3, role: "assistant", content: "AI同僚の返答" },
+      { turn_seq: 3, role: "assistant", content: "AIエージェントの返答" },
     ]);
 
     await post(validBody());
@@ -242,6 +242,6 @@ describe("対話ターンの記録", () => {
     const userContent = createMock.mock.calls[0][0].messages[1].content as string;
     expect(userContent).toContain("受講者: 受講者の発言");
     expect(userContent).toContain("第三者の進行役: 進行役の問い");
-    expect(userContent).toContain("あなた: AI同僚の返答");
+    expect(userContent).toContain("あなた: AIエージェントの返答");
   });
 });

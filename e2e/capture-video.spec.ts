@@ -213,7 +213,7 @@ test("session: 実務演習セッションの動作確認動画", async ({ page 
   await pause(page, 600);
 
   // ── 1. 課題提示 ──────────────────────────────
-  await caption(page, "場面1　課題提示", "AI同僚と一緒にPRをレビューする。課題は3種類から選べる");
+  await caption(page, "場面1　課題提示", "AIエージェントが作成したPRをレビューする。課題は3種類から選べる");
   await pause(page, 1500);
   await moveTo(page, page.getByRole("combobox", { name: "取り組む課題" }));
   await pause(page, 1200);
@@ -241,9 +241,9 @@ test("session: 実務演習セッションの動作確認動画", async ({ page 
   await humanClick(page, page.getByTestId("quote-code-btn"));
   await expect(page.getByText("コードをチャット欄に引用しました")).toBeVisible();
 
-  const promptInput = page.getByPlaceholder(/AI同僚に指示・指摘を入力/);
+  const promptInput = page.getByPlaceholder(/AIエージェントに指示・指摘を入力/);
   await reveal(page, promptInput);
-  await caption(page, "場面2　検証対話", "仕様や規程を根拠に、AI同僚の設計を検証・是正する");
+  await caption(page, "場面2　検証対話", "仕様や規程を根拠に、AIエージェントのコードを検証・是正する");
   // 引用の直後はアプリがカーソルを引用の後ろに置いている。クリックせずに続けて打つ
   await expect(promptInput).toBeFocused();
   await humanType(
@@ -378,7 +378,7 @@ test("anchor: 固定設問（SCT型）の動作確認動画", async ({ page }) =
   // ── 2. 段階1：全体判断 ──────────────────────────
   await expect(page.getByText(/段階 1（全体判断）/)).toBeVisible();
   await smoothScrollTo(page, 0);
-  await caption(page, "段階1　全体判断", "状況とAI同僚の提案を読み、まず採用してよいかだけを答える");
+  await caption(page, "段階1　全体判断", "状況とAIエージェントの提案を読み、まず採用してよいかだけを答える");
   await pause(page, 3200);
   const stage1 = page.locator("input[name='stage1']").nth(1);
   await reveal(page, stage1);
@@ -411,7 +411,7 @@ test("anchor: 固定設問（SCT型）の動作確認動画", async ({ page }) =
   const stage3b = page.locator("input[name='stage3b']");
   if (await stage3b.first().isVisible().catch(() => false)) {
     await smoothScrollTo(page, 0);
-    await caption(page, "段階3'　反論への応答", "AI同僚が新しい事実なしに押し返してくる。ここで判断が動けば迎合");
+    await caption(page, "段階3'　反論への応答", "AIエージェントが新しい事実なしに押し返してくる。ここで判断が動けば迎合");
     await pause(page, 3500);
     await reveal(page, stage3b.nth(2));
     await humanCheck(page, stage3b.nth(2));

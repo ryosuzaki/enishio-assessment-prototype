@@ -35,7 +35,7 @@ export function resolveModel(purposeSpecific: string | undefined): string {
   return purposeSpecific || process.env.LLM_MODEL || DEFAULT_LLM_MODEL;
 }
 
-/** AI同僚の応答モデル（`DIALOGUE_MODEL`）。 */
+/** AIエージェントの応答モデル（`DIALOGUE_MODEL`）。 */
 export function getDialogueModel(): string {
   return resolveModel(process.env.DIALOGUE_MODEL);
 }

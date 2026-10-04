@@ -127,7 +127,7 @@ erDiagram
 | `src/app/api/dialogue/evaluate/route.test.ts` | 確信度が**閾値ちょうど（0.70）なら確定し、下回ったときだけ `pending_human`** になる。保留時もモデルの自己申告確信度は改変せず記録する。`learner_id` / `session_seq` をリクエストボディから採らない。採点失敗時に評点を1行も作らない。 |
 | `src/lib/telemetry/reliance-metrics.test.ts` | 適正依存3指標（CSR / ABI / CAR）の算出。**分母が0のときは 0 ではなく null**（「該当箇所が無かった」と「1件も正しく扱えなかった」を潰さない）。仕込み不備への過剰指摘を正常箇所の過剰指摘として誤算しない。 |
 | `src/lib/mediator/index.test.ts` | **媒介へ正答鍵を渡さない**（Principle III）——プロンプトに仕込み不備の位置・説明が含まれず、モジュール自体が `dynamic-task.server` を import していない。打てる手の定義とシステムプロンプトがずれない。 |
-| `src/app/api/dialogue/probe/route.test.ts` | 深掘りの上限（4手）と、`none`（問わない）を手数に数えないこと。**「問わない」と判断した事実も記録するが対話ログには流さない。**問いは `mediator` ロールで残す（AI同僚と混ぜない）。 |
+| `src/app/api/dialogue/probe/route.test.ts` | 深掘りの上限（4手）と、`none`（問わない）を手数に数えないこと。**「問わない」と判断した事実も記録するが対話ログには流さない。**問いは `mediator` ロールで残す（AIエージェントと混ぜない）。 |
 | `src/app/api/anchor/route.test.ts` | **採点鍵（`correct_key` / `hidden_premise` / 専門家パネル分布 / `item_kind` / 各種 note）がレスポンスに1つも載らない**（Principle II）。段階2の提示順を応答と一緒に返す。段階3の回答 `0`（＝動かなかった）を未回答として弾かない。 |
 | `src/lib/anchor-bank.test.ts` | 同梱サンプルが v2-sct として読め、正答が1キーに固定されていない。類型C（不備なし）が混ざっている。 |
 | `src/lib/telemetry/index.test.ts` | `ratings` の記録前バリデーション（アンカーの `anchor_id` / `anchor_status` 必須、バンド範囲、`rating_category = null` は `pending_human` のときだけ）。異議申立の理由必須、CFF の判断理由必須。 |

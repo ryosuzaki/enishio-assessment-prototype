@@ -61,7 +61,7 @@ export function MediationStatePanel({
             <p className="text-caption text-ink-2">
               {isProbing
                 ? "対話ログから、どの根拠がまだ引き出せていないかを推定しています…"
-                : "AI同僚へ最初の指摘を送ると、そこまでの発言から状態を推定して次に問う内容を決めます。"}
+                : "AIエージェントへ最初の指示を送ると、そこまでの発言から状態を推定して次に問う内容を決めます。"}
             </p>
           ) : (
             <>

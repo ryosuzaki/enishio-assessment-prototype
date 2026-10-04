@@ -800,7 +800,7 @@ export function OrganizationDashboard({
             <Badge tone="positive">実稼働</Badge>
           </div>
           <p className="max-w-2xl text-caption text-ink-2">
-            AI同僚との対話、進行役による深掘り、採点前の意思決定、構造化採点パイプラインによる2段階採点とXAI診断までを、実LLM・実DBで動かせます。
+            AIエージェントへの指示とコード検証、進行役による深掘り、採点前の意思決定、構造化採点パイプラインによる2段階採点とXAI診断までを、実LLM・実DBで動かせます。
           </p>
         </div>
 

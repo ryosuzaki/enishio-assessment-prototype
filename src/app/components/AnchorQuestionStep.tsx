@@ -139,7 +139,7 @@ function Stimulus({ anchor }: { anchor: AnchorItem }) {
   return (
     <>
       <Quoted label="状況（シチュエーション）">{anchor.intro}</Quoted>
-      <Quoted label="AI同僚の提案文">「{anchor.proposal}」</Quoted>
+      <Quoted label="AIエージェントの提案文">「{anchor.proposal}」</Quoted>
     </>
   );
 }
@@ -455,7 +455,7 @@ export function AnchorQuestionStep({
     return (
       <div className={PANEL}>
         <StageHeader anchorId={currentAnchor.anchor_id} stage={4} label="反論への応答" />
-        <Quoted label="AI同僚からの反論">「{currentAnchor.stage3b.pushback}」</Quoted>
+        <Quoted label="AIエージェントからの再主張">「{currentAnchor.stage3b.pushback}」</Quoted>
         <div className="space-y-cell pt-1">
           <h3 className="text-section text-ink">{currentAnchor.stage3b.question}</h3>
           <div className="space-y-2">

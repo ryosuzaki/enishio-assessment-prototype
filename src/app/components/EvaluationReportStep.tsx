@@ -279,7 +279,7 @@ export function EvaluationReportStep({
                   <span className="block text-ink-3">観点別の集計は未実装（上の総合評点に含む）</span>
                 </AxisCell>
                 <AxisCell title="③ 対話的共創力">
-                  AI同僚への建設的指示。対話ターン数{" "}
+                  AIエージェントへの建設的指示。対話ターン数{" "}
                   <span className="font-semibold text-ink" data-numeric>
                     {chatHistory.filter((m) => m.role === "user").length}ターン
                   </span>
@@ -367,7 +367,7 @@ export function EvaluationReportStep({
                 ? "あなた（受講者）"
                 : msg.role === "mediator"
                   ? "進行役（深掘り）"
-                  : "AI同僚";
+                  : "AIエージェント";
             return (
               <div
                 key={i}

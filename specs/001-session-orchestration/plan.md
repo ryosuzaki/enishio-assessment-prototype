@@ -19,7 +19,7 @@
 | **`Session`** | `sessions` | 演習セッション。受講者ごとの連番 `session_seq` を一意に管理。`window_blur_duration_sec`（画面外離脱時間）を記録（採点には非使用）。 |
 | **`AnchorItem`** | `anchor_items` | 共通アンカー課題バンク（系統A/B、ステータス：pretest/operational/verification/retired）。 |
 | **`AnchorResponse`** | `anchor_responses` | アンカー設問への受講者回答。v1（選択式）および v2（4段構成）を記録。`stakes_context` 不変記録。 |
-| **`PromptTurn`** | `prompt_turns` | 対話ログ（`user` / `assistant` / `system` / `mediator`）。メディエーターはAI同僚と明示的にロールを分離。 |
+| **`PromptTurn`** | `prompt_turns` | 対話ログ（`user` / `assistant` / `system` / `mediator`）。メディエーターはAIエージェントと明示的にロールを分離。 |
 | **`LearnerPreliminaryJudgement`** | `learner_preliminary_judgements` | CFF（認知先行判断）。AI評価閲覧前に受講者が下す採択/差し戻し（`approve`/`remand`）と必須理由記述（`justification`）。 |
 | **`VerificationFocusSequence`** | `verification_focus_sequences` | **書き込み経路なし（廃止済み）。** 第3ペイン（検証パネル）の撤廃に伴い、着眼ログは `prompt_turns` へ一本化した。廃止前のセッション分を失わないためテーブル定義のみ残す。 |
 | **`ArtifactEditDistanceSeries`** | `artifact_edit_distance_series` | 成果物コードのレーベンシュタイン編集距離の時系列追跡。 |
@@ -138,7 +138,7 @@
   ```
 
 #### `POST /api/dialogue/turn`
-* **責務**: 受講者の指示を受け、AI同僚（Assistant）が成果物コードを改修して応答する。
+* **責務**: 受講者の指示を受け、AIエージェント（Assistant）が成果物コードを改修して応答する。
 * **Request Body**:
   ```json
   {

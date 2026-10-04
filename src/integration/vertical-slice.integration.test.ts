@@ -296,7 +296,7 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     expect(probes[0].selection_rationale).toBe(PROBE_SELECTION.selection_rationale);
     expect(probes[0].state_estimate).toMatchObject({ targets: expect.any(Array) });
 
-    // AI同僚と同じ role にまとめると、受講者が検証したのか問われたのかが分離できなくなる
+    // AIエージェントと同じ role にまとめると、受講者が検証したのか問われたのかが分離できなくなる
     const mediatorTurn = await prisma.promptTurn.findUniqueOrThrow({
       where: { session_id_turn_seq: { session_id: sessionId, turn_seq: 5 } },
     });

@@ -162,7 +162,7 @@ export async function installMockApi(page: Page) {
         levelLabel: "Band 3: 前提摘発・要件検証行動",
         scoringConfidence: 0.88,
         evidenceSummary:
-          "受講者はRedis障害時の単一障害点リスクおよびPCI DSS要件との乖離を的確に指摘し、該当コードを引用してAI同僚に適切な修正指示を出している。",
+          "受講者はRedis障害時の単一障害点リスクおよびPCI DSS要件との乖離を的確に指摘し、該当コードを引用してAIエージェントに適切な修正指示を出している。",
         diagnosticFeedback:
           "セキュリティ制約と高可用性のトレードオフを意識した優れた検証行動が確認できました。今後は例外発生時の監査ログ追跡性にも着目すると、より高位の評価に到達します。",
         evidenceComponents: [

@@ -164,7 +164,7 @@ describe("深掘りの回数上限", () => {
 });
 
 describe("打った手の記録", () => {
-  it("問いを対話ログへ mediator ロールで残す（AI同僚と混ぜない）", async () => {
+  it("問いを対話ログへ mediator ロールで残す（AIエージェントと混ぜない）", async () => {
     const json = await (await post(validBody())).json();
 
     expect(json.probeIssued).toBe(true);

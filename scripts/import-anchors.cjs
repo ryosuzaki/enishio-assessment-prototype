@@ -54,8 +54,8 @@ function parseAnchorBankMarkdown(filePath) {
       currentItem.metadata = line.replace("- **メタデータ**:", "").trim();
     } else if (line.startsWith("- **導入文**:")) {
       currentItem.intro = line.replace("- **導入文**:", "").trim();
-    } else if (line.startsWith("- **AI同僚の提案文**:")) {
-      currentItem.proposal = line.replace("- **AI同僚の提案文**:", "").trim().replace(/^「|」$/g, "");
+    } else if (line.startsWith("- **AI同僚の提案文**:") || line.startsWith("- **AIエージェントの提案文**:")) {
+      currentItem.proposal = line.replace(/^- \*\*(?:AI同僚|AIエージェント)の提案文\*\*:\s*/, "").trim().replace(/^「|」$/g, "");
     } else if (line.startsWith("- **埋め込んだ前提の明示**:")) {
       currentItem.hidden_premise = line.replace("- **埋め込んだ前提の明示**:", "").trim();
     } else if (line.startsWith("- **設問1（主質問・4択）**:")) {

@@ -19,7 +19,7 @@ import {
   parseRequestBody,
 } from "@/lib/request-validation";
 
-// AI同僚の応答。**仕込み不備の位置は渡さない** —— 渡すとAI同僚が自分から不備を
+// AIエージェントの応答。**仕込み不備の位置は渡さない** —— 渡すとAIエージェントが自分から不備を
 // 白状してしまい、受講者が検証したのかAIが教えたのかlog上で分離できなくなる。
 const AiPeerReplySchema = z.object({
   reply: z.string().describe("受講者への返答。1〜3段落程度"),
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
         {
           success: false,
           error:
-            "OPENAI_API_KEY が設定されていないため、AI同僚が応答できません。.env を設定してください。",
+            "OPENAI_API_KEY が設定されていないため、AIエージェントが応答できません。.env を設定してください。",
         },
         { status: 503 }
       );
@@ -163,8 +163,8 @@ ${task.constraints.join("\n")}
             { role: "system", content: systemPrompt },
             {
               role: "user",
-              // mediator（ソクラテス型深掘り・What-if注入）は AI同僚自身の発話ではない。
-              // 「あなた」に丸めると、AI同僚が自分の発した問いだと誤認して応答が歪む。
+              // mediator（ソクラテス型深掘り・What-if注入）は AIエージェント自身の発話ではない。
+              // 「あなた」に丸めると、AIエージェントが自分の発した問いだと誤認して応答が歪む。
               content: priorTurns
                 .map((t) => {
                   const speaker =
@@ -185,7 +185,7 @@ ${task.constraints.join("\n")}
     const aiPeerReply = content ? AiPeerReplySchema.safeParse(JSON.parse(content)) : null;
     if (!aiPeerReply?.success) {
       return NextResponse.json(
-        { success: false, error: "AI同僚の応答が構造化出力として得られませんでした。" },
+        { success: false, error: "AIエージェントの応答が構造化出力として得られませんでした。" },
         { status: 502 }
       );
     }

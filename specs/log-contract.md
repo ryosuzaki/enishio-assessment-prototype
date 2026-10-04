@@ -62,7 +62,7 @@
 | `scoring_confidence` | Float? | 採点器が自己申告した確信度。閾値未満は `pending_human` へ回し、値そのものは改変せず記録する | |
 | `probe_consistency_score` | Float? | ソクラテス型深掘りへの応答の一貫性（0〜1）。採点器の構造化出力による自己申告値であり統計量ではない。深掘りが1回も走らなかったセッションでは `null` | |
 | `scorer_model_version` | String | 採点モデル識別子＋プロンプト版（例 `"model_id/extract-v1/score-v1"`）。版の異なる区間は分けて読む | ⛔ |
-| `stimulus_ref` | String | 評点が対応する刺激（AI同僚のドラフトの該当箇所・受講者の応答）への参照 | |
+| `stimulus_ref` | String | 評点が対応する刺激（AIエージェントのドラフトの該当箇所・受講者の応答）への参照 | |
 | `stimulus_type` | String | `"generated"`（受講者の文脈から生成した課題）／ `"anchor"`（共通アンカー） | ⛔ |
 | `anchor_id` | String? | どのアンカー項目か。`stimulus_type = "anchor"` のとき必須 | ⛔ |
 | `anchor_status` | String? | `"pretest"` ／ `"operational"` ／ `"verification"` ／ `"retired"`。`stimulus_type = "anchor"` のとき必須。応答時点の値を凍結する | ⛔ |
@@ -96,7 +96,7 @@
 
 | ログ | モデル | 主なフィールド | 定義 |
 | :--- | :--- | :--- | :--- |
-| 発話全文 | `PromptTurn` | `turn_seq`・`role`・`model_version`・`content` | `role` は `"user"` ／ `"assistant"`（AI同僚）／ `"system"` ／ `"mediator"`（進行役）。進行役の問いを `assistant` に混ぜない |
+| 発話全文 | `PromptTurn` | `turn_seq`・`role`・`model_version`・`content` | `role` は `"user"` ／ `"assistant"`（AIエージェント）／ `"system"` ／ `"mediator"`（進行役）。進行役の問いを `assistant` に混ぜない |
 | 編集距離の推移 | `ArtifactEditDistanceSeries` | `timestamp`・`edit_distance`・`current_text` | 成果物の編集距離の時系列 |
 | 検証の焦点 | `VerificationFocusSequence` | `focus_seq`・`line_start`・`line_end`・`selected_text` | **新規には書き込まない。**検証パネルを撤廃し、着眼は受講者が要件・コードを引用して発話した時点で `PromptTurn` に残るようになった（二重記録を避けるため。001 plan.md）。旧行を保持するためモデルは残す |
 | 仕込み不備と正常箇所 | `InjectedFlawMap` | `flaw_id`・`flaw_type`・`span_text`・`is_flaw` | **正常箇所も `is_flaw = false` で持つ**（適正依存指標の分母になる）。正答鍵であり、クライアントへ渡さない |

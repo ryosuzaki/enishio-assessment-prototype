@@ -45,7 +45,7 @@ describe("モデルの解決", () => {
     expect(resolveModel("")).toBe("from-llm-model");
   });
 
-  it("DIALOGUE_MODEL が AI同僚の応答モデルになる", () => {
+  it("DIALOGUE_MODEL が AIエージェントの応答モデルになる", () => {
     process.env.LLM_MODEL = "from-llm-model";
     process.env.DIALOGUE_MODEL = "from-dialogue";
     expect(getDialogueModel()).toBe("from-dialogue");

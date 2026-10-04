@@ -92,7 +92,7 @@ const SUB_DIMENSIONS: SubDimension[] = [
     observedEvidence: {
       turnIndex: 2,
       quote: "「このRace Conditionは非アトミックな在庫確認に起因する仮説が立ちます。排他ロックまたはバージョン列での検証が必要です」",
-      analysis: "対症療法ではなく、並行処理の根本原因仮説を立てて検証方針をAI同僚に提示。",
+      analysis: "対症療法ではなく、並行処理の根本原因仮説を立てて検証方針をAIエージェントに提示。",
     },
   },
   {
@@ -131,11 +131,11 @@ const SUB_DIMENSIONS: SubDimension[] = [
     name: "エビデンスに基づく納得形成",
     band: 4,
     score: 3.6,
-    description: "AIの反論に対し、感情論ではなく仕様や規格を引用して説得・収束させる力",
+    description: "AIの表面的な修正や主張に対し、感情論ではなく仕様や規格を引用して適正に制御・収束させる力",
     observedEvidence: {
       turnIndex: 4,
       quote: "「PCI DSS Req 3.4および社内規約第4項により、失効キャッシュ有効期間は最大60秒と定められています。提案はこれを超過しています」",
-      analysis: "AI同僚の『負荷軽減のため』という主張に対し、外部規格の根拠を明示して論破・コミット。",
+      analysis: "AIエージェントの『負荷軽減のため』という主張に対し、外部規格の根拠を明示して是正・コミット。",
     },
   },
   {
@@ -484,7 +484,7 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
               <DomainCard
                 title="③ 対話的共創力"
                 level="Level 3.2"
-                description="AI同僚への境界設定と説得力。客観規格を引用してAIの反論を論破・収束させる対話力が秀でています。"
+                description="AIエージェントへの境界設定と指示力。客観規格を引用してAIの出力を適正に制御・収束させる対話力が秀でています。"
                 subPoints="論理的指示設計 / エビデンス納得形成 / 他者視点取得"
               />
               <DomainCard
@@ -639,7 +639,7 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
             <div className="space-y-1.5 rounded-card border border-line bg-surface-sunken p-4">
               <p className="text-section text-ink">発揮された強み（Strengths）</p>
               <p className="text-caption text-ink-2">
-                AI同僚が自信満々に提示したコードの盲点（非機能要件やPCI DSS規格違反）を厳格に見抜く卓越したリスク防御力を発揮しています。AIの反論に対しても感情論にならず、客観規格の条文を引用して論理的に説得・収束できています。
+                AIエージェントが提示したコードの盲点（非機能要件やPCI DSS規格違反）を厳格に見抜く卓越したリスク防御力を発揮しています。表面的な実装理由に対しても感情論にならず、客観規格の条文を引用して論理的に是正・収束できています。
               </p>
             </div>
 
@@ -663,13 +663,13 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-row rounded-card border border-line bg-surface-sunken p-4">
             <div className="flex items-center justify-between gap-2">
-              <Badge tone="accent">好手 #1: エビデンス引用による反論論破</Badge>
+              <Badge tone="accent">好手 #1: 客観規格の引用による是正指示</Badge>
               <span className="shrink-0 text-caption text-ink-3" data-numeric>
                 ターン 4
               </span>
             </div>
             <h3 className="text-section text-ink">
-              AI同僚の自説を「PCI DSS規格の明示的条文」で論理説得
+              AIエージェントのコード理由を「PCI DSS規格の明示的条文」で論理是正
             </h3>
             <p className="border-l-2 border-l-line-strong bg-surface p-2.5 text-caption text-ink">
               「PCI DSS Req
@@ -677,7 +677,7 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
             </p>
             <p className="text-caption text-ink-2">
               <span className="font-semibold text-ink">講評:</span>{" "}
-              AI同僚が『DB負荷軽減のための正当な工夫』と反論した際、感情論で押し通さず客観的セキュリティ規格を引用して論破し、安全な設計へコミットさせました。
+              AIエージェントが『DB負荷軽減のための工夫』と実装理由を述べた際、感情論で押し通さず客観的セキュリティ規格を引用して是正し、安全な設計へコミットさせました。
             </p>
           </div>
 

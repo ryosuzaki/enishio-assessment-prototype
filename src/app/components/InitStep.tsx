@@ -17,14 +17,14 @@ interface InitStepProps {
 /** 演習セッションの 5 場面。場面 3 だけが「異常イベント」なので、そこにだけ意味色を割り当てる。 */
 const SCENE_FLOW: { no: number; title: string; detail: string; disrupted?: boolean }[] = [
   { no: 1, title: "課題提示", detail: "PRの仕様書や障害ログを精査し、重大な設計欠陥と仕様上妥当な設計を見分ける" },
-  { no: 2, title: "検証対話", detail: "AIの反論や過剰指摘に対し、仕様や規程を根拠に検証・是正する" },
+  { no: 2, title: "検証対話", detail: "AIエージェントへの指示とコード検証を通じ、仕様や規程の不備を是正する" },
   {
     no: 3,
     title: "前提変化",
     detail: "緊急の仕様変更や納期短縮に対し、当初方針に固執せず方針を組み直す",
     disrupted: true,
   },
-  { no: 4, title: "意思決定", detail: "AIの採点を見る前に［修正要求／条件付き承認／承認］と理由を自分で確定する" },
+  { no: 4, title: "意思決定", detail: "採点結果を見る前に［修正要求／条件付き承認／承認］と理由を自分で確定する" },
   { no: 5, title: "XAI診断", detail: "採点の根拠になった発言を示す診断を受け取り、振り返る" },
 ];
 
@@ -43,10 +43,10 @@ export function InitStep({
           <h1 className="text-display text-ink">実務演習セッション</h1>
           <Badge tone="positive">実稼働</Badge>
         </div>
-        <p className="text-caption text-ink-2">AI同僚とのコードレビュー演習</p>
+        <p className="text-caption text-ink-2">AIエージェントが作成したPRのレビュー演習</p>
         {/* 読ませる文章は行長を抑える。全幅に流すと目線の戻りが長くなって読み飛ばされる */}
         <p className="max-w-2xl text-body text-ink-2">
-          受講者はAI同僚と一緒にPRをレビューし、途中で入る仕様変更に対応したうえで、自分の判定を確定します。
+          受講者はAIエージェントが作成したPRをレビュー・指示し、途中で入る仕様変更に対応したうえで、自分の判定を確定します。
           その対話と行動のログから、
           <strong className="font-medium text-ink">AI時代の実務判断力</strong>
           （評価的判断力・高次認知・対話的共創力・メタ認知の4観点）の証拠を取り出して採点します。

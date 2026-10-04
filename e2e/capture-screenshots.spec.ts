@@ -27,7 +27,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     await page.goto("/");
     // 見出しと副題は別の行に分けてある（`[D-102]`：h1 に括弧付きの長い副題を抱かせない）
     await expect(page.locator("h1")).toContainText("実務演習セッション");
-    await expect(page.getByText("AI同僚とのコードレビュー演習")).toBeVisible();
+    await expect(page.getByText("AIエージェントが作成したPRのレビュー演習")).toBeVisible();
     // 計測ログは既定で閉じている。提出用の画面では開いた状態を撮る
     await page.getByRole("button", { name: "計測ログを表示" }).click();
     await expect(page.getByText("計測ログ", { exact: true })).toBeVisible();
@@ -78,7 +78,7 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     // 02c. 段階3'（新情報を含まない反論）。付いている項目でだけ現れる
     const capStage3bOptions = page.locator("input[name='stage3b']");
     if (await capStage3bOptions.first().isVisible().catch(() => false)) {
-      await expect(page.getByText("AI同僚からの反論")).toBeVisible();
+      await expect(page.getByText("AIエージェントからの再主張")).toBeVisible();
       // 段階3と同じ「変わらない」(0) を選ぶ。差分0＝保持を撮る
       await capStage3bOptions.nth(2).check();
       await page.evaluate(() => window.scrollTo(0, 0));
@@ -129,8 +129,8 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     await quoteBtn.click();
     await expect(page.getByText("コードをチャット欄に引用しました")).toBeVisible();
 
-    // AI同僚へメッセージ送信
-    const promptInput = page.getByPlaceholder(/AI同僚に指示・指摘を入力/);
+    // AIエージェントへメッセージ送信
+    const promptInput = page.getByPlaceholder(/AIエージェントに指示・指摘を入力/);
     await promptInput.fill(
       "Redisの単一障害点（SPOF）およびPCI DSS要件に対する耐障害性について考慮が必要です。フォールバック処理の実装を検討してください。"
     );

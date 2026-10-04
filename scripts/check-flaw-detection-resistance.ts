@@ -1,6 +1,6 @@
 // T-06b: 代行無効化チェック（生成課題側・テストA相当：自力想起・OpenAI / Claude / Gemini マルチプロバイダ対応）
 //
-// 目的: T-06aで新設した動的課題（DYNAMIC_TASKS）の「AI同僚の初版ドラフト」を、
+// 目的: T-06aで新設した動的課題（DYNAMIC_TASKS）の「AIエージェントの初版ドラフト」を、
 // 正答鍵（injected_flaw_map）を一切与えずに汎用LLM（OpenAI / Claude / Gemini）へ素で投げ、
 // 仕込んだ不備を自力で看破できてしまわないか（＝刺激物として簡単すぎないか）を確認する。
 //
@@ -123,7 +123,7 @@ function initClients(): ProviderClients {
 function buildPrompt(task: DynamicTaskScenario): string {
   return `
 あなたはソフトウェアエンジニアリングのコードレビュアーです。
-以下は、ある開発チームでAI同僚（AIエージェント）が作成したコードのPR（プルリクエスト）初版ドラフトです。
+以下は、ある開発チームでAIエージェントが作成したコードのPR（プルリクエスト）初版ドラフトです。
 このドラフトに含まれるリスク・問題点を指摘してください。
 
 指摘ごとに、該当箇所の引用（該当コード片。コメントを含めてよい）と、指摘内容を簡潔に述べてください。
@@ -138,7 +138,7 @@ ${task.business_requirements.map((r) => `- ${r}`).join("\n")}
 【制約】
 ${task.constraints.map((c) => `- ${c}`).join("\n")}
 
-【AI同僚が作成した初版ドラフト】
+【AIエージェントが作成した初版ドラフト】
 \`\`\`
 ${task.initial_ai_draft}
 \`\`\`

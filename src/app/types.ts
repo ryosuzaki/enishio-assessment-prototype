@@ -78,7 +78,7 @@ export interface AnchorExplanationView {
 export interface ChatMessage {
   turnSeq: number;
   // "mediator" はソクラテス型深掘り・What-if注入（測定設計書 2.1 ステップ5・6）の問い。
-  // AI同僚（assistant）とは別役割であり、画面上も区別して表示する。
+  // AIエージェント（assistant）とは別役割であり、画面上も区別して表示する。
   role: "user" | "assistant" | "system" | "mediator";
   content: string;
 }

@@ -1,7 +1,7 @@
 // Dynamic Task Registry (T-06a) compliant with [P-15]
 //
 // このモジュールはクライアントバンドルへ含まれる。受検者へ提示してよい情報だけを置く。
-// 仕込み不備・正常箇所ラベル・AI同僚のシステムプロンプトは dynamic-task.server.ts にある。
+// 仕込み不備・正常箇所ラベル・AIエージェントのシステムプロンプトは dynamic-task.server.ts にある。
 
 export interface DynamicTaskStimulusFeatures {
   /** business_requirements + constraints の合計項目数 */
@@ -48,7 +48,7 @@ export interface PremiseShift {
  * 出題しうる課題の全集合。
  *
  * **課題を1本足すときの起点はここである。**シナリオ本体（`DYNAMIC_TASKS`）と、
- * サーバ側の4つのマップ（仕込み不備・AI同僚のプロンプト・意図ギャップ文言・
+ * サーバ側の4つのマップ（仕込み不備・AIエージェントのプロンプト・意図ギャップ文言・
  * ルーブリックの着眼点）は、どれか1つでも欠けるとその課題は実行時に落ちる。
  * ここへIDを足すと、欠けている定義がコンパイルエラーとして出る。
  */
@@ -85,8 +85,8 @@ export const DYNAMIC_TASKS: DynamicTaskScenario[] = [
     domain: "fintech_security",
     target_dimension: "axis_4",
     scenario_intro: `【🎯 あなたの目標】
-来週の大型決済キャンペーン本番リリースに向け、AI同僚が作成した PR #204 をレビューしてください。
-単に欠陥を探すのではなく、チームの運用基準を満たす安全な水準までAI同僚と議論・修正し、チームとしてのリリース判断（承認 / 条件付き承認 / 修正要求）を決定することがゴールです。`,
+来週の大型決済キャンペーン本番リリースに向け、AIエージェントが作成した PR #204 をレビューしてください。
+単に欠陥を探すのではなく、チームの運用基準を満たす安全な水準までAIエージェントへ指示・修正させ、チームとしてのリリース判断（承認 / 条件付き承認 / 修正要求）を決定することがゴールです。`,
     business_requirements: [
       "1. 【レート制限の機能性】一般ユーザー（無料）は 60 req/min、プレミアム加盟店は 1,000 req/min の頻度制御を適用し、超過時は 429 を返却すること",
       "2. 【耐障害性と可用性】決済受付はチームの最重要サービス。周辺基盤（Redis等）の障害や瞬断時にも、決済基盤全体の全停止（巻き添え死）を避けること",
@@ -98,7 +98,7 @@ export const DYNAMIC_TASKS: DynamicTaskScenario[] = [
     ],
     pr_description: {
       title: "feat(auth): 決済APIのレート制限導入と署名検証のインメモリ高速化",
-      author: "AI-Peer (Backend Assistant)",
+      author: "AI-Agent (Backend Assistant)",
       branch: "feature/payment-rate-limit-opt",
       summary:
         "来週のキャンペーン時のトラフィック急増に対応するため、Redisを用いたスライディングウィンドウ型レート制限を導入しました。またDB負荷軽減と低レイテンシ（<15ms）達成のため、JWT検証をローカル公開鍵によるインメモリ署名検証に切り替えて高スループットを実現しています。",
@@ -116,7 +116,7 @@ export const DYNAMIC_TASKS: DynamicTaskScenario[] = [
         source: "Slack",
         timestamp: "昨日 14:15",
         content:
-          "SRE高橋: お疲れ様です！来週水曜深夜2:00〜4:00に、セール対策のRedisクラスタ増強に伴うノード切り替え（フェイルオーバー）試験を実施します。\n切り替え時に2〜3秒の通信途絶（ECONNREFUSED / ETIMEDOUT）が発生する見込みです。昨期のインシデント（INC-2025-0812）のように、Redisの瞬断で決済API全体が一律500を返して全停止しないよう、各サービスのタイムアウト設定とフォールバック（縮退運転）を徹底してください！\n\nAI同僚: 了解しました！今回のレートリミットPRでも意識して対応進めます！",
+          "SRE高橋: お疲れ様です！来週水曜深夜2:00〜4:00に、セール対策のRedisクラスタ増強に伴うノード切り替え（フェイルオーバー）試験を実施します。\n切り替え時に2〜3秒の通信途絶（ECONNREFUSED / ETIMEDOUT）が発生する見込みです。昨期のインシデント（INC-2025-0812）のように、Redisの瞬断で決済API全体が一律500を返して全停止しないよう、各サービスのタイムアウト設定とフォールバック（縮退運転）を徹底してください！\n\ngithub-bot: [PR #204 Draft created by AI-Agent from Issue #102: \"feat(auth): 決済APIのレート制限導入と署名検証のインメモリ高速化\"]",
       },
       {
         id: "slack-security-audit",
@@ -155,7 +155,7 @@ export const DYNAMIC_TASKS: DynamicTaskScenario[] = [
           "事業責任者・SRE合同: 【緊急仕様変更】来週のセールで数億円規模の取扱高を持つトップ10社（VIP加盟店）について、万一のRedisフェイルオーバーによる決済停止は許容できないとの役員判断が下りました。\nVIP加盟店ヘッダーが付与されたリクエストに限り、Redis接続不可時でも最長30秒のローカルキャッシュによるフォールバックを特別に許容してください。\nただし一般加盟店の失効即時遮断（PCI DSS要件）は厳格に維持し、全体のp99レイテンシは10ms以内を維持してください！",
       },
     },
-    initial_ai_draft: `// AI同僚が作成した決済API認証・レート制限ミドルウェア（初版ドラフト）
+    initial_ai_draft: `// AIエージェントが作成した決済API認証・レート制限ミドルウェア（初版ドラフト）
 import { Request, Response, NextFunction } from "express";
 import Redis from "ioredis";
 
@@ -202,7 +202,7 @@ function verifyToken(token: string) {
   return { userId: "user-12345", role: "merchant" };
 }`,
     test_code: `// tests/payment-security.test.ts
-// AI同僚が作成したユニットテスト（Vitest）
+// AIエージェントが作成したユニットテスト（Vitest）
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { paymentSecurityMiddleware } from "../src/paymentSecurityMiddleware";
 
@@ -254,7 +254,7 @@ describe("paymentSecurityMiddleware", () => {
     target_dimension: "axis_4",
     scenario_intro: `【🎯 あなたの目標】
 セール対策の注文キャンセル・返金APIに関する PR をレビューしてください。
-データ整合性や運用信頼性を担保できる安全な水準までAI同僚と議論・修正し、チームとしてのリリース判断（承認 / 条件付き承認 / 修正要求）を決定することがゴールです。`,
+データ整合性や運用信頼性を担保できる安全な水準までAIエージェントへ指示・修正させ、チームとしてのリリース判断（承認 / 条件付き承認 / 修正要求）を決定することがゴールです。`,
     business_requirements: [
       "1. 注文キャンセル受付時に非同期で返金キューへ処理をエンキューし、クライアントへ即座に応答（202）を返すこと",
       "2. 決済プロバイダからの返金確定Webhookを受信した段階で、在庫を適切に復元すること",
@@ -266,7 +266,7 @@ describe("paymentSecurityMiddleware", () => {
     ],
     pr_description: {
       title: "feat(order): 注文キャンセル・非同期返金パイプラインと在庫復元ハンドラの実装",
-      author: "AI-Peer (E-Commerce Specialist)",
+      author: "AI-Agent (E-Commerce Specialist)",
       branch: "feature/order-cancellation-pipeline",
       summary:
         "セール時の大量キャンセルに対応するため、返金処理を非同期キューへ分離し、クライアントへのレスポンス速度（202 Accepted）を劇的に改善しました。決済確定前の早すぎる在庫復元による二重販売も防ぐ設計としています。",
@@ -293,7 +293,7 @@ describe("paymentSecurityMiddleware", () => {
         source: "Slack",
         timestamp: "先週 11:20",
         content:
-          "経理佐藤: お疲れ様です！決済プロバイダとの月次照合で返金残高に差異が出ると決算監査上の大問題になります。キューに投入した返金が万が一ワーカ障害やAPIエラーで落ちた場合、誰にも気づかれないサイレントロストだけは絶対に避けてください（リトライ・デッドレター・アラートの完備）。\n\nAI同僚: 了解です！非同期キューで高速に応答を返す設計にしています！",
+          "経理佐藤: お疲れ様です！決済プロバイダとの月次照合で返金残高に差異が出ると決算監査上の大問題になります。キューに投入した返金が万が一ワーカ障害やAPIエラーで落ちた場合、誰にも気づかれないサイレントロストだけは絶対に避けてください（リトライ・デッドレター・アラートの完備）。\n\ngithub-bot: [PR #312 Draft created by AI-Agent from Issue #88: \"feat(order): 注文キャンセル・非同期返金パイプラインと在庫復元ハンドラの実装\"]",
       },
     ],
     premise_shift: {
@@ -314,7 +314,7 @@ describe("paymentSecurityMiddleware", () => {
           "決済PF担当: 【緊急】決済プロバイダ側から、セール時の負荷により返金完了通知Webhookの送信に数分〜10分の遅延が生じる可能性があるとの通知がありました。\n現在の『キューに入れて待つだけ』の実装では、タイムアウト時の再送や経理アラートが無いためサイレントロストのリスクがあります。5分経過時のリトライおよびデッドレター通知の設計を急ぎ盛り込んでください！",
       },
     },
-    initial_ai_draft: `// AI同僚が生成した注文キャンセル・返金処理API（初版ドラフト）
+    initial_ai_draft: `// AIエージェントが生成した注文キャンセル・返金処理API（初版ドラフト）
 import { Request, Response } from "express";
 import { db } from "./db";
 import { refundQueue } from "./queue";
@@ -376,7 +376,7 @@ export async function refundConfirmedWebhookHandler(req: Request, res: Response)
   return res.status(200).json({ received: true });
 }`,
     test_code: `// tests/cancel-order.test.ts
-// AI同僚が作成したユニットテスト（Vitest）
+// AIエージェントが作成したユニットテスト（Vitest）
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { cancelOrderHandler, refundConfirmedWebhookHandler } from "../src/cancelOrderHandler";
 
@@ -429,7 +429,7 @@ describe("Order Cancellation & Refund Pipeline", () => {
     target_dimension: "axis_4",
     scenario_intro: `【🎯 あなたの目標】
 社内ヘルプデスク向けロギングとエラーハンドラの PR をレビューしてください。
-プライバシー規程やセキュリティ基準を満たす安全な水準までAI同僚と議論・修正し、チームとしてのリリース判断（承認 / 条件付き承認 / 修正要求）を決定することがゴールです。`,
+プライバシー規程やセキュリティ基準を満たす安全な水準までAIエージェントへ指示・修正させ、チームとしてのリリース判断（承認 / 条件付き承認 / 修正要求）を決定することがゴールです。`,
     business_requirements: [
       "1. 社員からの問い合わせ内容を監査用ログストアへ確実に永続化し、対応履歴のトレーサビリティを確保すること",
       "2. アプリケーションログの肥大化を防ぎつつ、障害調査に必要な最小限の可観測性を担保すること",
@@ -441,7 +441,7 @@ describe("Order Cancellation & Refund Pipeline", () => {
     ],
     pr_description: {
       title: "feat(logging): 社内ヘルプデスク向け問い合わせロギングとエラーハンドラの刷新",
-      author: "AI-Peer (Internal DX Assistant)",
+      author: "AI-Agent (Internal DX Assistant)",
       branch: "feature/helpdesk-logging-middleware",
       summary:
         "問い合わせ対応のトレーサビリティ向上のため、監査用ログストアへの記録ミドルウェアを追加しました。また本番ログのノイズ低減とエラー時の迅速な一次切り分けのため、詳細なエラートレースをレスポンスに含めるようにしました。",
@@ -459,7 +459,7 @@ describe("Order Cancellation & Refund Pipeline", () => {
         source: "Slack",
         timestamp: "先週木曜 15:40",
         content:
-          "情シス田中: お疲れ様です！先日のセキュリティ監査で、『社内限定ツールだからといって、エラーレスポンスに生のスタックトレースや内部コンテキストが丸見えになっているのは、万一の内部不正や権限昇格攻撃の踏み台にされるリスクがある』と指摘を受けました。エラー時は汎用メッセージを返し、詳細はサーバーログ側にのみ残す方針で統一してください。\n\nAI同僚: 承知しました！迅速な一次切り分けとセキュリティのバランスを考慮して実装します。",
+          "情シス田中: お疲れ様です！先日のセキュリティ監査で、『社内限定ツールだからといって、エラーレスポンスに生のスタックトレースや内部コンテキストが丸見えになっているのは、万一の内部不正や権限昇格攻撃の踏み台にされるリスクがある』と指摘を受けました。エラー時は汎用メッセージを返し、詳細はサーバーログ側にのみ残す方針で統一してください。\n\ngithub-bot: [PR #158 Draft created by AI-Agent from Issue #45: \"feat(logging): 社内ヘルプデスク向け問い合わせロギングとエラーハンドラの刷新\"]",
       },
       {
         id: "memo-privacy-guideline",
@@ -489,7 +489,7 @@ describe("Order Cancellation & Refund Pipeline", () => {
           "【緊急通達：社内ツールの個人情報保護の即時強化】\n本日開催の監査役会において、社内ヘルプデスクAIツールのログに社員のプライベートな問い合わせや個人情報が生テキストで保存されていることが指摘されました。直ちにログ永続化前のPIIマスキング処理を必須化し、監査対応を完了させてください。",
       },
     },
-    initial_ai_draft: `// AI同僚が生成した問い合わせロギングミドルウェア（初版ドラフト）
+    initial_ai_draft: `// AIエージェントが生成した問い合わせロギングミドルウェア（初版ドラフト）
 import { Request, Response, NextFunction } from "express";
 import { logStore } from "./log-store";
 import { logger } from "./logger";
@@ -524,7 +524,7 @@ export function inquiryErrorHandler(err: Error, req: Request, res: Response, nex
   });
 }`,
     test_code: `// tests/inquiry-logging.test.ts
-// AI同僚が作成したユニットテスト（Vitest）
+// AIエージェントが作成したユニットテスト（Vitest）
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { inquiryLoggingMiddleware, inquiryErrorHandler } from "../src/inquiryLoggingMiddleware";
 

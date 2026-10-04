@@ -389,7 +389,7 @@ describe("2段階分離（この設計の中核主張の回帰テスト）", () 
   it("第2段階のプロンプトに対話ログの生テキストが渡っていない", async () => {
     const transcript = [
       { turnSeq: 1, role: "user", content: "TRANSCRIPT_SENTINEL_一字一句そのままのログ" },
-      { turnSeq: 2, role: "assistant", content: "AI同僚の返答" },
+      { turnSeq: 2, role: "assistant", content: "AIエージェントの返答" },
     ];
 
     createMock.mockResolvedValueOnce(llmResponse(SAMPLE_EVIDENCE));
@@ -404,7 +404,7 @@ describe("2段階分離（この設計の中核主張の回帰テスト）", () 
     expect(stage1Prompt).toContain("TRANSCRIPT_SENTINEL_一字一句そのままのログ");
     // 生ログが第2段階へ回ると「何を根拠に何点にしたか」が事後に分離できなくなる
     expect(stage2Prompt).not.toContain("TRANSCRIPT_SENTINEL_一字一句そのままのログ");
-    expect(stage2Prompt).not.toContain("AI同僚の返答");
+    expect(stage2Prompt).not.toContain("AIエージェントの返答");
   });
 
   it("第2段階に正答鍵の本文（仕込み不備の位置と説明）を渡していない", async () => {

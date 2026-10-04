@@ -79,9 +79,9 @@ export async function POST(req: Request) {
 
     const notification = buildPremiseShiftNotification(shift);
 
-    // 対話ログに残す。**残さないと AI同僚が緊急要件を知らないまま応答する** ——
+    // 対話ログに残す。**残さないと AIエージェントが緊急要件を知らないまま応答する** ——
     // /api/dialogue/turn は記録済みログから文脈を組み立てるため、画面にだけ出した通知は
-    // AI同僚にも事後の監査にも届かない。
+    // AIエージェントにも事後の監査にも届かない。
     await recordPromptTurn(
       sessionId,
       turnSeq,

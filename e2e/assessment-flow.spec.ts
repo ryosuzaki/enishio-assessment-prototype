@@ -164,7 +164,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
           confidenceThreshold: 0.7,
           isDemoThresholdOverride: false,
           evidenceSummary:
-            "受講者はRedis障害時の単一障害点リスクおよびPCI DSS要件との乖離を的確に指摘し、AI同僚に適切な修正指示を出している。",
+            "受講者はRedis障害時の単一障害点リスクおよびPCI DSS要件との乖離を的確に指摘し、AIエージェントに適切な修正指示を出している。",
           diagnosticFeedback:
             "セキュリティ制約と高可用性のトレードオフを意識した優れた検証行動が確認できました。",
           evidenceComponents: [
@@ -296,7 +296,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     // 段階3'（新情報を含まない反論）。付いている項目でだけ現れる [D-83]
     const stage3bRadio = page.locator("input[name='stage3b']").first();
     if (await stage3bRadio.isVisible().catch(() => false)) {
-      await expect(page.getByText("AI同僚からの反論")).toBeVisible();
+      await expect(page.getByText("AIエージェントからの再主張")).toBeVisible();
       await stage3bRadio.check();
       await page.getByRole("button", { name: "確信度評定へ" }).click();
     }
@@ -366,7 +366,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
 
     // 段階3': 反論画面が確かに出る
     await expect(page.getByText(/段階 4（反論への応答）/)).toBeVisible();
-    await expect(page.getByText("AI同僚からの反論")).toBeVisible();
+    await expect(page.getByText("AIエージェントからの再主張")).toBeVisible();
     // 総段数を出していない（出すと段階3' の有無が最初から読めてしまう）
     await expect(page.getByText(/段階 \d+ \/ \d+/)).toHaveCount(0);
 
@@ -417,7 +417,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("【第1ペイン】開発Issue ＆ チーム情報")).toBeVisible();
     await expect(page.getByText("【第2ペイン】成果物ドラフト")).toBeVisible();
     await expect(page.getByText("【第2ペイン】検証パネル")).toHaveCount(0);
-    await expect(page.getByText("AI同僚との対話・修正指示（マルチターン対話）")).toBeVisible();
+    await expect(page.getByText("AIエージェントへの指示・検証（マルチターン対話）")).toBeVisible();
 
     // 第1ペイン（要件引用機能）の確認
     const quoteReqBtn = page.getByTestId("quote-requirement-btn");
@@ -457,12 +457,12 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     // 場面3 前提変化：**受講者が発生させるボタンは存在しない** [D-100]
     await expect(page.getByRole("button", { name: /緊急仕様変更を発生させる/ })).toHaveCount(0);
 
-    // AI同僚へメッセージ送信（1回目）
-    const promptInput = page.getByPlaceholder(/AI同僚に指示・指摘を入力/);
+    // AIエージェントへメッセージ送信（1回目）
+    const promptInput = page.getByPlaceholder(/AIエージェントに指示・指摘を入力/);
     await promptInput.fill("Redisの単一障害点について考慮が必要です");
     await page.getByRole("button", { name: "送信" }).click();
 
-    // AI同僚の返答が表示されたことを確認
+    // AIエージェントの返答が表示されたことを確認
     await expect(
       page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時").first()
     ).toBeVisible();
@@ -574,7 +574,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await startSessionBtn.click();
 
     // 1ターン対話
-    const promptInput = page.getByPlaceholder(/AI同僚に指示・指摘を入力/);
+    const promptInput = page.getByPlaceholder(/AIエージェントに指示・指摘を入力/);
     await promptInput.fill("Redisの単一障害点について考慮が必要です");
     await page.getByRole("button", { name: "送信" }).click();
     await expect(page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時")).toBeVisible();
@@ -624,7 +624,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(startSessionBtn).toBeVisible();
     await startSessionBtn.click();
 
-    const promptInput = page.getByPlaceholder(/AI同僚に指示・指摘を入力/);
+    const promptInput = page.getByPlaceholder(/AIエージェントに指示・指摘を入力/);
     await promptInput.fill("Redisの単一障害点について考慮が必要です");
     await page.getByRole("button", { name: "送信" }).click();
     await expect(page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時")).toBeVisible();

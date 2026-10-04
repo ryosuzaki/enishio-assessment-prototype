@@ -186,7 +186,7 @@ export function useDialogueFlow({
   /**
    * ソクラテス型深掘り（測定設計書 2.1 ステップ5・6）。
    *
-   * AI同僚の応答とは別の手番。**正答鍵（injected_flaw_map）はこの呼び出しに含めない**
+   * AIエージェントの応答とは別の手番。**正答鍵（injected_flaw_map）はこの呼び出しに含めない**
    * ——渡っているのは taskId のみで、サーバ側で業務要件・制約と対話ログから
    * 状態推定を行う（`src/lib/mediator` の注記を参照）。
    */
@@ -281,12 +281,12 @@ export function useDialogueFlow({
         setCffActiveWarning(data.assistantMessage);
         addTelemetry("Interlock triggered (Intent-Action Gap)");
       } else {
-        addTelemetry(`AI Peer response recorded (Turn #${data.assistantTurnSeq})`);
+        addTelemetry(`AI Agent response recorded (Turn #${data.assistantTurnSeq})`);
       }
 
       if (data.updatedArtifact) {
         setArtifactCode(data.updatedArtifact);
-        addTelemetry("Artifact draft updated by AI Peer");
+        addTelemetry("Artifact draft updated by AI Agent");
       }
 
       setTurnCounter(nextTurn);
@@ -314,7 +314,7 @@ export function useDialogueFlow({
   const proceedToPreliminaryJudgement = () => {
     setErrorMessage(null);
     if (chatHistory.length < 2) {
-      setErrorMessage("最低1回以上AI同僚と対話してから完了してください。");
+      setErrorMessage("最低1回以上AIエージェントに指示・対話してから完了してください。");
       return;
     }
     setPrelimError(null);
