@@ -525,6 +525,13 @@ export function DialogueSessionStep({
         isWide ? "min-h-0 flex-1" : "min-h-[440px] max-h-[660px]",
       )}
     >
+      {chatHistory.length === 0 && (
+        <p className="py-6 text-center text-caption text-ink-3" data-testid="chat-empty-hint">
+          AIエージェントが作成したPRを、左の要件と中央のコードで確認してください。
+          <br />
+          気づいた点や修正してほしい点を、下の欄に入力して始めます。
+        </p>
+      )}
       {chatHistory.map((msg, i) => (
           <div
             key={i}
@@ -537,7 +544,7 @@ export function DialogueSessionStep({
               {msg.role === "user"
                 ? "あなた（受講者）"
                 : msg.role === "mediator"
-                  ? "進行役（深掘り）"
+                  ? "進行役"
                   : "AIエージェント"}
             </span>
             <div

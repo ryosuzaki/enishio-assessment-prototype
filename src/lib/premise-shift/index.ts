@@ -57,7 +57,8 @@ export function decidePremiseShift(params: {
 export function buildPremiseShiftNotification(shift: PremiseShift): string {
   return (
     `【⚡ 緊急仕様変更・追加要件の通知】\n${shift.announcement}\n\n` +
-    `これに伴い、以下の追加要件を満たす必要があります：\n「${shift.new_requirement}」\n\n` +
-    `現在の設計やコードで問題がないか、確認と修正方針の指示をお願いします！`
+    // 通知は進行役の発言であり、受講者に次の行動を促す一文は付けない。促すと、不意の変化に
+    // 自分から方針を組み直すかどうか（領域4）を測れなくなる。
+    `これに伴い、以下の追加要件を満たす必要があります：\n「${shift.new_requirement}」`
   );
 }

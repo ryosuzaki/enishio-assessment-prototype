@@ -71,4 +71,14 @@ describe("premise shift task definitions", () => {
     expect(text).toContain(shift!.announcement);
     expect(text).toContain(shift!.new_requirement);
   });
+
+  it("does not tell the learner what to do next (the shift is a notice, not a request)", () => {
+    for (const task of DYNAMIC_TASKS) {
+      if (!task.premise_shift) continue;
+      const text = buildPremiseShiftNotification(task.premise_shift);
+      // 次の行動を促すと、不意の変化に自分から方針を組み直すかどうかを測れなくなる
+      expect(text).not.toContain("お願いします");
+      expect(text.endsWith(`「${task.premise_shift.new_requirement}」`)).toBe(true);
+    }
+  });
 });

@@ -74,14 +74,10 @@ export function useDialogueFlow({
 
   const resetSessionState = () => {
     setArtifactCode(selectedTask.initial_ai_draft);
-    setChatHistory([
-      {
-        turnSeq: 1,
-        role: "assistant",
-        content: `${selectedTask.title}に関する成果物を作成しました。左の成果物ドラフトのコードを確認いただき、本番リリースに向けたレビューをお願いします！`,
-      },
-    ]);
-    setTurnCounter(2);
+    // 対話は受講者の最初の入力から始める。AIエージェントは受講者の指示に応じて話す側で、
+    // 自分からレビューを依頼したり、話し始めたりしない。
+    setChatHistory([]);
+    setTurnCounter(1);
     setMediationStateEstimate(null);
     setLastProbeMove(null);
     setLastSelectionRationale(null);
@@ -164,9 +160,10 @@ export function useDialogueFlow({
         announcement: data.announcement,
         newRequirement: data.newRequirement,
       });
+      // 通知は進行役の発言であって、AIエージェントの発言ではない（測定設計書 2.1 ステップ6）
       setChatHistory([
         ...historySoFar,
-        { turnSeq: data.injectedAtTurn, role: "assistant", content: data.notification },
+        { turnSeq: data.injectedAtTurn, role: "mediator", content: data.notification },
       ]);
       setTurnCounter(data.injectedAtTurn + 1);
       addTelemetry(

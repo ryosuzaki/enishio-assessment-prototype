@@ -177,10 +177,6 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
               rationale_summary: "Redis障害時の耐障害性要件違反を指摘",
             },
           ],
-          probeConsistency: {
-            score: 0.82,
-            rationale: "進行役の問いかけに対し、直前の指摘と整合する理由づけを述べていた",
-          },
           scorerModelVersion: "claude-sonnet-4-5/extract-v5/score-v3",
         }),
       });
@@ -471,7 +467,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await page.getByRole("button", { name: "計測ログを表示" }).click();
     await expect(page.getByTestId("mediation-state-panel")).toBeVisible();
     await expect(page.getByText("その指摘は業務要件のどの部分から来ていますか？")).toBeVisible();
-    await expect(page.getByText("進行役（深掘り）")).toBeVisible();
+    await expect(page.getByText("進行役", { exact: true })).toBeVisible();
     await expect(page.getByText(/この推定を踏まえて選んだ手/)).toBeVisible();
 
     // この時点ではまだ前提変化は撃たれていない（サーバ側がしきい値未達と判定した）
@@ -507,8 +503,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("判定の根拠", { exact: true })).toBeVisible();
     await expect(page.getByText("次に伸ばすところ")).toBeVisible();
     await expect(page.getByText(/抽出された検証行動（採点パイプライン第1段の出力）/)).toBeVisible();
-    await expect(page.getByTestId("probe-consistency-block")).toBeVisible();
-    await expect(page.getByTestId("probe-consistency-block")).toContainText("0.82");
+    // 深掘りへの応答の一貫性は代行検知の信号であり、Phase 1 では診断画面に出さない
+    await expect(page.getByTestId("probe-consistency-block")).toHaveCount(0);
     await expect(page.getByText("評点への異議申立")).toBeVisible();
 
     // AI時代の実務判断力4領域サマリーカードの確認
@@ -613,7 +609,6 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
           evidenceSummary: "",
           diagnosticFeedback: "",
           evidenceComponents: [],
-          probeConsistency: null,
           scorerModelVersion: "claude-sonnet-4-5/extract-v5/score-v3",
         }),
       });
