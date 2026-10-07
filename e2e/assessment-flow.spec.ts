@@ -417,7 +417,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("【第1ペイン】開発Issue ＆ チーム情報")).toBeVisible();
     await expect(page.getByText("【第2ペイン】成果物ドラフト")).toBeVisible();
     await expect(page.getByText("【第2ペイン】検証パネル")).toHaveCount(0);
-    await expect(page.getByText("AIエージェントへの指示・検証（マルチターン対話）")).toBeVisible();
+    await expect(page.getByText("AIエージェントへの修正指示・対話（マルチターン対話）")).toBeVisible();
 
     // 第1ペイン（要件引用機能）の確認
     const quoteReqBtn = page.getByTestId("quote-requirement-btn");

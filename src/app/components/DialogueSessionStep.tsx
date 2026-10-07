@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useSyncExternalStore } from "react";
-import { Quote } from "lucide-react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
+import { ChevronDown, ChevronUp, Quote } from "lucide-react";
 import { Group, Panel, Separator, useDefaultLayout, type LayoutStorage } from "react-resizable-panels";
 import type { DynamicTaskScenario } from "@/data/dynamic-task";
 import type { ChatMessage, PremiseShiftState } from "../types";
@@ -13,6 +13,18 @@ import { Badge, Button, cn } from "./ui";
  * 同じ条件で force を無視するため、受講者が撃てないという保証は片側だけでは破れない `[D-100]`。
  */
 const IS_DEV_BUILD = process.env.NODE_ENV !== "production";
+
+/** PR説明をこの文字数より長いときだけ「全文を表示」の開閉を出す（2行に収まる目安） */
+const PR_SUMMARY_CLAMP_CHARS = 70;
+
+/**
+ * 指示入力欄が内容に合わせて伸びる上限。コード引用は複数行になりやすく、3行の固定高では
+ * 引用の先頭が欄の外へ出て、何を引用したか見えなかった。チャット欄は幅が狭くコード1行が
+ * 2行以上に折り返すため、引用5行ほどが収まる高さ（画面の45%）まで伸ばす。
+ * 上限を超えたぶんは欄内でスクロールする。
+ */
+const PROMPT_INPUT_MAX_VIEWPORT_RATIO = 0.45;
+const PROMPT_INPUT_MAX_PX = 400;
 
 /** これ以上の幅では、画面の高さに収めたリサイズ可能なレイアウトにする（Tailwind の lg と同じ） */
 const WIDE_QUERY = "(min-width: 1024px)";
@@ -147,6 +159,9 @@ export function DialogueSessionStep({
   const [codeTab, setCodeTab] = useState<"impl" | "test">("impl");
   const [quoteNotice, setQuoteNotice] = useState<string | null>(null);
   const [leftQuoteNotice, setLeftQuoteNotice] = useState<string | null>(null);
+  // 画面の高さを食う2つは、既定で畳む。コードを読む面積を先に確保するため
+  const [isPremiseDetailOpen, setIsPremiseDetailOpen] = useState(false);
+  const [isPrSummaryOpen, setIsPrSummaryOpen] = useState(false);
   const isWide = useMediaQuery(WIDE_QUERY);
 
   const outerLayout = useDefaultLayout({ id: "dialogue-outer", storage: layoutStorage });
@@ -161,6 +176,16 @@ export function DialogueSessionStep({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  // 入力欄を内容の高さに合わせる（送信して空になれば元の高さに戻る）
+  useLayoutEffect(() => {
+    const input = promptInputRef.current;
+    if (!input) return;
+    input.style.height = "auto";
+    // scrollHeight は枠線を含まないため、border 2px ぶんを足す
+    const maxPx = Math.min(Math.round(window.innerHeight * PROMPT_INPUT_MAX_VIEWPORT_RATIO), PROMPT_INPUT_MAX_PX);
+    input.style.height = `${Math.min(input.scrollHeight + 2, maxPx)}px`;
+  }, [userPromptInput, isWide]);
 
   /**
    * 引用を入力欄の末尾に足し、カーソルも末尾（引用の後ろ）へ置く。
@@ -370,8 +395,25 @@ export function DialogueSessionStep({
               <span className="shrink-0 font-mono text-data text-ink-2">
                 {selectedTask.pr_description.branch}
               </span>
+              {selectedTask.pr_description.summary.length > PR_SUMMARY_CLAMP_CHARS && (
+                <button
+                  type="button"
+                  onClick={() => setIsPrSummaryOpen((v) => !v)}
+                  aria-expanded={isPrSummaryOpen}
+                  aria-label={isPrSummaryOpen ? "PRの説明を折りたたむ" : "PRの説明の全文を表示"}
+                  title={isPrSummaryOpen ? "PRの説明を折りたたむ" : "PRの説明の全文を表示"}
+                  className="shrink-0 rounded-chip p-0.5 text-accent hover:bg-accent-wash"
+                >
+                  {isPrSummaryOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+              )}
             </div>
-            <p className="text-caption text-ink-2">{selectedTask.pr_description.summary}</p>
+            <p
+              className={cn("text-caption text-ink-2", !isPrSummaryOpen && "line-clamp-2")}
+              title={isPrSummaryOpen ? undefined : selectedTask.pr_description.summary}
+            >
+              {selectedTask.pr_description.summary}
+            </p>
           </div>
         )}
 
@@ -412,12 +454,12 @@ export function DialogueSessionStep({
             value={artifactCode}
             onChange={(e) => setArtifactCode(e.target.value)}
             className={cn(
-              "min-h-60 w-full flex-1 resize-none overflow-x-auto whitespace-pre rounded-chip border border-line",
+              "min-h-28 w-full flex-1 resize-none overflow-x-auto whitespace-pre rounded-chip border border-line",
               "bg-surface-sunken p-3.5 font-mono text-data leading-relaxed text-ink focus:border-accent focus:outline-none",
             )}
           />
         ) : (
-          <div className="flex min-h-60 flex-1 flex-col space-y-1.5">
+          <div className="flex min-h-28 flex-1 flex-col space-y-1.5">
             <div className="flex shrink-0 items-center justify-between gap-2 rounded-chip border border-caution/25 bg-caution-wash px-3 py-1.5 text-caption text-ink-2">
               <span>
                 AIエージェントが作成したユニットテストです。正常系以外のテストが網羅されているか精査してください。
@@ -544,7 +586,7 @@ export function DialogueSessionStep({
           aria-label="AIエージェントへの指示・指摘入力"
           placeholder="AIエージェントに指示・指摘を入力（Enterで送信、Shift+Enterで改行。コード引用対応）…"
           className={cn(
-            "min-h-[76px] flex-1 resize-y rounded-chip border border-line-strong bg-surface px-4 py-2.5",
+            "min-h-[76px] flex-1 resize-none rounded-chip border border-line-strong bg-surface px-4 py-2.5",
             "text-caption text-ink focus:border-accent focus:outline-none",
           )}
         />
@@ -594,25 +636,37 @@ export function DialogueSessionStep({
   );
 
   /* 場面3：前提変化（緊急仕様変更）の通知。発火は進行役側（/api/dialogue/premise-shift）。
-     広い画面は作業領域が画面の高さに収まる作りなので、帯が伸びたぶんだけペインが潰れる。
-     見出し行と本文行の2段に固定し、本文は2行で切る。全文は対話欄と第1ペインの
-     受入基準・運用コンテキストにも出る。
-     （本文を見出しと同じ行に flex-1 で並べると、基準幅0のまま長いタイトルの横に押し込まれ、
-     数文字幅の列になって縦に伸びていた） */
+     広い画面は作業領域が画面の高さに収まる作りで、帯が伸びたぶんだけコード欄が潰れる
+     （1280x720 では2行の本文だけでエディタが3行ほどになった）。
+     そのため既定は1行（見出し・題名・通知ターン）だけにし、本文は「詳細」で開く。
+     全文は対話欄と第1ペインの受入基準・運用コンテキストにも出るので、情報は減らない。 */
   const premiseShiftBanner = premiseShiftState?.isInjected ? (
-    <div className="shrink-0 space-y-1 rounded-card border border-caution/40 bg-caution-wash px-cell py-row">
-      <div className="flex flex-wrap items-center gap-x-cell gap-y-1">
+    <div className="shrink-0 rounded-card border border-caution/40 bg-caution-wash px-cell py-1.5">
+      <div className="flex items-center gap-x-cell">
         <Badge tone="caution">場面3：前提変化</Badge>
-        <span className="text-label text-ink-2">緊急仕様変更・追加要件が通知されました</span>
-        <span className="min-w-0 flex-1 text-section text-ink">{premiseShiftState.title}</span>
+        <span className="shrink-0 whitespace-nowrap text-label text-ink-2">
+          緊急仕様変更・追加要件が通知されました
+        </span>
+        <span className="min-w-0 flex-1 truncate text-section text-ink" title={premiseShiftState.title}>
+          {premiseShiftState.title}
+        </span>
         <span className="shrink-0 whitespace-nowrap text-caption text-ink-3" data-numeric>
           ターン {premiseShiftState.injectedAtTurn ?? 2} で通知
         </span>
+        {premiseShiftState.announcement && (
+          <button
+            type="button"
+            onClick={() => setIsPremiseDetailOpen((v) => !v)}
+            aria-expanded={isPremiseDetailOpen}
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap text-caption text-accent hover:underline"
+          >
+            {isPremiseDetailOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            詳細
+          </button>
+        )}
       </div>
-      {premiseShiftState.announcement && (
-        <p className="line-clamp-2 text-caption text-ink-2" title={premiseShiftState.announcement}>
-          {premiseShiftState.announcement}
-        </p>
+      {isPremiseDetailOpen && premiseShiftState.announcement && (
+        <p className="mt-1 text-caption text-ink-2">{premiseShiftState.announcement}</p>
       )}
     </div>
   ) : null;
@@ -655,11 +709,11 @@ export function DialogueSessionStep({
         <Panel id="work" defaultSize="74%" minSize="45%">
           {isTelemetryOpen ? (
             <Group orientation="vertical" id="dialogue-work" className="h-full" {...workLayout}>
-              <Panel id="panes" defaultSize="66%" minSize="30%">
+              <Panel id="panes" defaultSize="75%" minSize="50%">
                 {panesGroup}
               </Panel>
               <ResizeHandle orientation="vertical" />
-              <Panel id="telemetry" defaultSize="34%" minSize="12%">
+              <Panel id="telemetry" defaultSize="25%" minSize="12%">
                 <div className="h-full overflow-y-auto pr-1">{telemetrySlot}</div>
               </Panel>
             </Group>
