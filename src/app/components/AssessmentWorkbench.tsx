@@ -126,6 +126,12 @@ export function AssessmentWorkbench({
 
   // 対話中は（広い画面で）作業領域を画面の高さに収める。高さは JS で測らず、
   // ヘッダーの固定の高さ（h-12）を引いた残りを flex で配る——測定はタイミング次第でずれる
+  // 演習の場面が替わったら、ページの先頭から見せる。意思決定の画面は縦に長く、確定ボタンを押す時点で
+  // 下までスクロールしている。そのまま診断画面へ替わると、見出しと評点が画面の上に切れて始まる。
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [dialogue.currentStep]);
+
   const isDialogueWorkspace = activeTab === "session" && dialogue.currentStep === "dialogue_session";
 
   return (
