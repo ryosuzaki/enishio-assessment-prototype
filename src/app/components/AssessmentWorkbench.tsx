@@ -268,8 +268,8 @@ export function AssessmentWorkbench({
                 cffActiveWarning={dialogue.cffActiveWarning}
                 isSubmitting={dialogue.isSubmitting}
                 premiseShiftState={dialogue.premiseShiftState}
-                onForcePremiseShiftForDebug={dialogue.forcePremiseShiftForDebug}
-                onProceedToPreliminaryJudgement={dialogue.proceedToPreliminaryJudgement}
+                reviewGate={dialogue.reviewGate}
+                onReviewAction={dialogue.performReviewAction}
                 onSendDialogueTurn={dialogue.sendDialogueTurn}
                 telemetrySlot={telemetryPanel}
                 isTelemetryOpen={showTelemetry}

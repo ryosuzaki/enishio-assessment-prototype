@@ -5,76 +5,47 @@ import { parseRequestBody } from "@/lib/request-validation";
 import { recordPromptTurn, resolveSessionContext } from "@/lib/telemetry";
 import { getDynamicTask } from "@/data/dynamic-task";
 import { prisma } from "@/lib/db";
-import {
-  PREMISE_SHIFT_MODEL_VERSION,
-  buildPremiseShiftNotification,
-  decidePremiseShift,
-} from "@/lib/premise-shift";
+import { PREMISE_SHIFT_MODEL_VERSION, buildPremiseShiftNotification } from "@/lib/premise-shift";
 
 /**
- * POST /api/dialogue/premise-shift — 前提変化（場面3: 緊急仕様変更・追加要件）を撃つか判定する。
+ * POST /api/dialogue/premise-shift — 前提変化（場面3: 緊急仕様変更・追加要件）を出す。
  *
- * **受講者は撃つ時点を選べない** `[D-100]`。判定の入力はサーバ側の対話ログだけで、
- * クライアントから渡るのは「どのセッションの何ターン目か」に限る。かつては受講者の画面に
- * 「⚡ 緊急仕様変更を発生させる」ボタンがあったが、身構えた状態での方針更新は不意の前提変化への
- * 適応ではなく、押さない自由がある限り領域4の証拠被覆率が受講者ごとに変わってしまう。
+ * 受講者が検証を提出した（「検証を提出する」を押した）時点で、進行役が出す `[D-135]`。
+ * 通知の本文は課題ごとに固定した文で、LLM は関与しない。出すタイミングは受講者の区切りに
+ * 合わせる。発話回数のような代用指標で自動的に撃つと、検証の途中の受講者から、学ぶ機会と
+ * 評価する機会を奪う。タイミングを判断する自動化は、必要になった時点で足す。
  *
- * **LLM を呼ばない。** 進行役の深掘り（/api/dialogue/probe）と違い、ここは決定論的に判定する。
- * モデルの可用性に左右されると、前提変化が撃たれたセッションと撃たれなかったセッションが
- * 外的要因で混在する。
+ * 同じセッションで2回は出さない（出し済みなら `injected: false`）。出し済みかどうかは、
+ * クライアントの申告ではなくサーバ側の対話ログから読む。
  */
 const PremiseShiftRequestSchema = z.object({
   sessionId: z.string().min(1),
   taskId: z.string().min(1),
   turnSeq: z.coerce.number().int().min(0),
-  /** 開発時のみ有効な手動発火。本番ビルドでは無視する（下の判定を参照） */
-  force: z.boolean().optional(),
 });
 
 export async function POST(req: Request) {
   try {
     const parsed = await parseRequestBody(req, PremiseShiftRequestSchema, "Premise shift");
     if (!parsed.ok) return parsed.response;
-    const { sessionId, taskId, turnSeq, force } = parsed.data;
+    const { sessionId, taskId, turnSeq } = parsed.data;
 
     await resolveSessionContext(sessionId);
     // taskId が未知のIDなら getDynamicTask が投げる（黙って別課題にすり替えない）
     const task = getDynamicTask(taskId);
     const shift = task.premise_shift;
 
-    // 手動発火は開発ビルド限定。**本番で効かせてはならない** —— 効くなら
-    // 「受講者が撃てない」という設計上の保証が運用でいつでも破れることになる。
-    const forceAllowed = force === true && process.env.NODE_ENV !== "production";
+    if (!shift) {
+      return NextResponse.json({ success: true, injected: false, reason: "no_premise_shift_defined" });
+    }
 
-    // 判定材料はサーバ側の記録から読む（クライアントの申告を信用しない）
     const priorTurns = await prisma.promptTurn.findMany({
       where: { session_id: sessionId },
-      select: { role: true, model_version: true },
+      select: { model_version: true },
     });
-    const userTurnCount = priorTurns.filter((t) => t.role === "user").length;
-    const alreadyInjected = priorTurns.some(
-      (t) => t.model_version === PREMISE_SHIFT_MODEL_VERSION
-    );
-
-    const decision = decidePremiseShift({
-      hasPremiseShift: !!shift,
-      alreadyInjected,
-      userTurnCount,
-      triggerAfterUserTurns: shift?.trigger_after_user_turns,
-    });
-
-    // force でも「課題に前提変化が無い」「すでに撃った」は覆せない。
-    // 覆すと二重注入で turn_seq が衝突する。
-    const injecting =
-      decision.inject || (forceAllowed && !!shift && !alreadyInjected);
-
-    if (!injecting || !shift) {
-      return NextResponse.json({
-        success: true,
-        injected: false,
-        reason: decision.inject ? "already_injected" : decision.reason,
-        userTurnCount,
-      });
+    if (priorTurns.some((t) => t.model_version === PREMISE_SHIFT_MODEL_VERSION)) {
+      // 二重に出すと turn_seq が衝突し、通知が2回ログに残る
+      return NextResponse.json({ success: true, injected: false, reason: "already_injected" });
     }
 
     const notification = buildPremiseShiftNotification(shift);
@@ -84,25 +55,17 @@ export async function POST(req: Request) {
     // AIエージェントにも事後の監査にも届かない。
     // 発言者は進行役（mediator）。AIエージェント（assistant）にすると、AIエージェントが
     // 自分で通知したことになり、採点側にも AIエージェントの発話として渡ってしまう。
-    await recordPromptTurn(
-      sessionId,
-      turnSeq,
-      "mediator",
-      notification,
-      PREMISE_SHIFT_MODEL_VERSION
-    );
+    await recordPromptTurn(sessionId, turnSeq, "mediator", notification, PREMISE_SHIFT_MODEL_VERSION);
 
     return NextResponse.json({
       success: true,
       injected: true,
       injectedAtTurn: turnSeq,
-      forced: !decision.inject,
       shiftId: shift.id,
       title: shift.title,
       announcement: shift.announcement,
       newRequirement: shift.new_requirement,
       notification,
-      userTurnCount,
     });
   } catch (error: unknown) {
     return apiErrorResponse("Premise shift error", error, "Premise shift failed");

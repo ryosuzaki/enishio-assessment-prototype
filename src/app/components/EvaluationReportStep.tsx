@@ -112,6 +112,10 @@ export function EvaluationReportStep({
    * **CFF 画面で最初に見るべきはここ**なので、文章だけでなく面の色でも示す。
    */
   const components = evaluation?.evidenceComponents ?? [];
+  // 前提変化（場面3）への応答。組み直した証拠があればそれを優先する
+  const shiftResponse =
+    components.find((c) => c?.component_type === "premise_shift_adaptation") ??
+    components.find((c) => c?.component_type === "premise_shift_neglect");
   const matchedFlaws = Array.from(
     new Set(
       components
@@ -285,8 +289,19 @@ export function EvaluationReportStep({
                   </span>
                 </AxisCell>
                 <AxisCell title="④ メタ認知・適応力">
-                  見る行動: 緊急仕様変更への方針の組み直し、反論に流されない応答
-                  <span className="block text-ink-3">観点別の集計は未実装（上の総合評点に含む）</span>
+                  見る行動: 前提変化（緊急仕様変更）への方針の組み直し
+                  <span className="block" data-testid="premise-shift-response">
+                    {shiftResponse?.component_type === "premise_shift_adaptation" && (
+                      <span className="font-semibold text-positive">方針を組み直した</span>
+                    )}
+                    {shiftResponse?.component_type === "premise_shift_neglect" && (
+                      <span className="font-semibold text-caution">組み直さなかった（Band 3 が上限）</span>
+                    )}
+                    {!shiftResponse && <span className="text-ink-3">前提変化は出ていない</span>}
+                  </span>
+                  {shiftResponse?.rationale_summary && (
+                    <span className="block text-ink-3">{shiftResponse.rationale_summary}</span>
+                  )}
                 </AxisCell>
               </div>
             </div>

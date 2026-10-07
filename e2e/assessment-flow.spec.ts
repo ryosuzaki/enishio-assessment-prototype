@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { submitReviewToDecision } from "./support/review-flow";
 
 test.describe("Assessment Prototype End-to-End Flow", () => {
   test.beforeEach(async ({ page }) => {
@@ -70,39 +71,34 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
       });
     });
 
-    // 前提変化（場面3）は受講者ではなくサーバ側が撃つ。1回目は「まだ撃たない」、
-    // 2回目で注入を返し、**発火時点がクライアント操作では動かない**ことを固定する [D-100]。
+    // 前提変化（場面3）は、受講者が検証を提出したときに進行役が出す [D-135]。1回目の呼び出しで
+    // 注入を返し、2回目以降は出し済みとして返す（同じセッションで2回は出さない）。
     let premiseShiftCalls = 0;
     await page.route("**/api/dialogue/premise-shift", async (route) => {
       premiseShiftCalls += 1;
-      if (premiseShiftCalls < 2) {
+      // 検証の提出（「検証を提出する」を押したとき）に1回だけ出す。2回目以降は出し済み [D-135]
+      if (premiseShiftCalls > 1) {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify({
-            success: true,
-            injected: false,
-            reason: "trigger_turn_not_reached",
-            userTurnCount: 1,
-          }),
+          body: JSON.stringify({ success: true, injected: false, reason: "already_injected" }),
         });
         return;
       }
+      const { turnSeq } = route.request().postDataJSON() as { turnSeq: number };
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           success: true,
           injected: true,
-          injectedAtTurn: 5,
-          forced: false,
+          injectedAtTurn: turnSeq,
           shiftId: "shift-fintech-vip-fallback",
           title: "【緊急仕様変更】セール時の最優先（VIP）加盟店フォールバック特例",
           announcement: "【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知",
           newRequirement: "VIP加盟店に限り最大30秒の縮退運転を許可すること",
           notification:
             "【⚡ 緊急仕様変更・追加要件の通知】\n【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知\n\nこれに伴い、以下の追加要件を満たす必要があります：\n「VIP加盟店に限り最大30秒の縮退運転を許可すること」",
-          userTurnCount: 2,
         }),
       });
     });
@@ -450,8 +446,15 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await quoteBtn.click();
     await expect(page.getByText("コードをチャット欄に引用しました")).toBeVisible();
 
-    // 場面3 前提変化：**受講者が発生させるボタンは存在しない** [D-100]
+    // 場面3 前提変化は、受講者が「検証を提出する」を押したときに進行役が出す [D-135]。
+    // 押す前には出ておらず、旧来の「緊急仕様変更を発生させる」ボタンも無い
     await expect(page.getByRole("button", { name: /緊急仕様変更を発生させる/ })).toHaveCount(0);
+    await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toHaveCount(0);
+
+    // 開始直後は提出できない（検証を始めていない）。名前は「完了」ではなく「提出」
+    const reviewAction = page.getByTestId("review-action-button");
+    await expect(reviewAction).toHaveText("検証を提出する");
+    await expect(reviewAction).toBeDisabled();
 
     // AIエージェントへメッセージ送信（1回目）
     const promptInput = page.getByPlaceholder(/AIエージェントに指示・指摘を入力/);
@@ -470,18 +473,12 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(page.getByText("進行役", { exact: true })).toBeVisible();
     await expect(page.getByText(/この推定を踏まえて選んだ手/)).toBeVisible();
 
-    // この時点ではまだ前提変化は撃たれていない（サーバ側がしきい値未達と判定した）
-    await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toHaveCount(0);
+    // 深掘りは必須。まだ1回も答えていないので提出できず、進み具合が出る
+    await expect(reviewAction).toBeDisabled();
+    await expect(page.getByTestId("review-gate-hint")).toContainText("0/3");
 
-    // 2回目の発話で、進行役側の判定により前提変化が自動注入される
-    await promptInput.fill("フェイルクローズの方針で修正してください。PCI DSS要件を優先します");
-    await page.getByRole("button", { name: "送信" }).click();
-
-    await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toBeVisible();
-    await expect(page.getByText(/【⚡ 緊急仕様変更・追加要件の通知】/)).toBeVisible();
-
-    // 2. レビュー完了 ➔ 暫定判断（CFF）へ進む
-    await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
+    // 深掘りに3回答えて提出 → 前提変化に応答 → 最終判断へ（意思決定の画面へ進む）
+    await submitReviewToDecision(page, { alreadySent: 1 });
 
     // CFF画面の確認
     await expect(page.getByText("場面4：意思決定")).toBeVisible();
@@ -569,14 +566,8 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(startSessionBtn).toBeVisible();
     await startSessionBtn.click();
 
-    // 1ターン対話
-    const promptInput = page.getByPlaceholder(/AIエージェントに指示・指摘を入力/);
-    await promptInput.fill("Redisの単一障害点について考慮が必要です");
-    await page.getByRole("button", { name: "送信" }).click();
-    await expect(page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時")).toBeVisible();
-
-    // CFF画面へ
-    await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
+    // 深掘りに答えて検証を提出し、前提変化に応答して、CFF画面へ
+    await submitReviewToDecision(page);
     await page.locator("input[value='remand']").check();
     const justificationTextarea = page.getByPlaceholder(/進行役の要約に補足|承認または.*と判断した具体的な根拠/);
     await justificationTextarea.fill("高可用性設計とフェイルオーバー要件を提示し、全面的に修正要求としたため。");
@@ -619,12 +610,7 @@ test.describe("Assessment Prototype End-to-End Flow", () => {
     await expect(startSessionBtn).toBeVisible();
     await startSessionBtn.click();
 
-    const promptInput = page.getByPlaceholder(/AIエージェントに指示・指摘を入力/);
-    await promptInput.fill("Redisの単一障害点について考慮が必要です");
-    await page.getByRole("button", { name: "送信" }).click();
-    await expect(page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時")).toBeVisible();
-
-    await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
+    await submitReviewToDecision(page);
     await page.locator("input[value='approve']").check();
     const justificationTextarea = page.getByPlaceholder(/進行役の要約に補足|承認または.*と判断した具体的な根拠/);
     await justificationTextarea.fill("デモ用の保留経路確認。");

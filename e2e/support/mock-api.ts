@@ -67,42 +67,34 @@ export async function installMockApi(page: Page) {
 
   // probe / blur は未モックのままだと DB へ抜けて例外になる（スクリーンショットが
   // 崩れる原因になるため塞ぐ）。
-  // 前提変化は進行役側が撃つ [D-100]。スクリーンショットには注入後の状態（緊急要件バナー）を
-  // 写す。**モックしないと dev ビルド限定の手動発火ボタンが提案書用の画像に写り込む。**
+  // 前提変化は、受講者が「検証を提出する」を押したときに進行役が出す [D-135]。
+  // スクリーンショットには、提出後の状態（緊急要件バナー）を写す。
   let premiseShiftCalls = 0;
   await page.route("**/api/dialogue/premise-shift", async (route) => {
     premiseShiftCalls += 1;
-    if (premiseShiftCalls < 2) {
-      // 1発話目では撃たない。深掘りと前提変化バナーの両方を1枚に収めるため
+    // 検証の提出（「検証を提出する」を押したとき）に1回だけ出す。2回目以降は出し済み [D-135]
+    if (premiseShiftCalls > 1) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          injected: false,
-          reason: "trigger_turn_not_reached",
-          userTurnCount: 1,
-        }),
+        body: JSON.stringify({ success: true, injected: false, reason: "already_injected" }),
       });
       return;
     }
+    const { turnSeq } = route.request().postDataJSON() as { turnSeq: number };
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
         success: true,
         injected: true,
-        injectedAtTurn: 4,
-        forced: false,
+        injectedAtTurn: turnSeq,
         shiftId: "shift-fintech-vip-fallback",
-        title: "【緊急仕様変更】セール時の最優先（VIP）加盟店フォールバック特例とレイテンシ要件の厳格化",
-        announcement:
-          "【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知：『来週の大型セールにおいて、特定の大手加盟店（VIP）については決済全停止を避けるため、Redis障害時でもローカルキャッシュによる最大30秒のフォールバックを許容する例外ポリシーが承認されました』",
-        newRequirement:
-          "4. 【緊急追加要件】VIP加盟店（ヘッダー x-merchant-vip: true）に限り、Redis瞬断・障害時でもローカルインメモリキャッシュによる最大30秒の縮退運転を許可し決済受付を継続すること。",
+        title: "【緊急仕様変更】セール時の最優先（VIP）加盟店フォールバック特例",
+        announcement: "【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知",
+        newRequirement: "VIP加盟店に限り最大30秒の縮退運転を許可すること",
         notification:
-          "【⚡ 緊急仕様変更・追加要件の通知】\n【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知：『来週の大型セールにおいて、特定の大手加盟店（VIP）については決済全停止を避けるため、Redis障害時でもローカルキャッシュによる最大30秒のフォールバックを許容する例外ポリシーが承認されました』\n\nこれに伴い、以下の追加要件を満たす必要があります：\n「4. 【緊急追加要件】VIP加盟店（ヘッダー x-merchant-vip: true）に限り、Redis瞬断・障害時でもローカルインメモリキャッシュによる最大30秒の縮退運転を許可し決済受付を継続すること。」\n\n現在の設計やコードで問題がないか、確認と修正方針の指示をお願いします！",
-        userTurnCount: 2,
+          "【⚡ 緊急仕様変更・追加要件の通知】\n【🚨 緊急仕様変更の発生】SREおよび事業部門より緊急告知\n\nこれに伴い、以下の追加要件を満たす必要があります：\n「VIP加盟店に限り最大30秒の縮退運転を許可すること」",
       }),
     });
   });

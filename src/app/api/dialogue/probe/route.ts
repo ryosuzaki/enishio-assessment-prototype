@@ -5,6 +5,7 @@ import {
   MediationUnavailableError,
   getMediatorModelVersion,
   MAX_PROBES_PER_SESSION,
+  MIN_PROBES_REQUIRED,
   type ProbeMove,
 } from "@/lib/mediator";
 import {
@@ -80,6 +81,8 @@ export async function POST(req: Request) {
         type: d.type,
       })),
       probesSoFar,
+      // 深掘りは必須（測定設計書 2.1 ステップ5）。最低回数に達するまでは「問わない」を選ばせない
+      mustProbe: probesSoFar.length < MIN_PROBES_REQUIRED,
       onUsage: (usage) => {
         // 記録の失敗で深掘りを止めない（recordLlmCall 側で握る）
         void recordLlmCall(sessionId, usage);

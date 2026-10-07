@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { installMockApi } from "./support/mock-api";
+import { submitReviewToDecision } from "./support/review-flow";
 
 /**
  * 演習の場面が替わったら、ページの先頭から見せる。意思決定の画面は縦に長く、確定ボタンを
@@ -11,10 +12,7 @@ test("意思決定から診断画面へ替わったとき、ページの先頭�
   await installMockApi(page);
   await page.goto("/");
   await page.getByRole("button", { name: "演習を開始する" }).click();
-  await page.getByPlaceholder(/AIエージェントに指示・指摘を入力/).fill("Redisの単一障害点について考慮が必要です。");
-  await page.getByRole("button", { name: "送信" }).click();
-  await page.getByText("ご指摘ありがとうございます。Redisのフェイルオーバー時").first().waitFor();
-  await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
+  await submitReviewToDecision(page);
   await page.locator("input[value='remand']").check();
 
   const submit = page.getByRole("button", { name: "判定を確定して採点する" });

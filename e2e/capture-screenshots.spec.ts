@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import fs from "fs";
 import path from "path";
 import { installMockApi } from "./support/mock-api";
+import { sendMessage } from "./support/review-flow";
 
 test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
   // A4 Word提出用：幅1280px、高DPI（deviceScaleFactor: 2）
@@ -140,11 +141,11 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
     ).toBeVisible();
     await expect(page.getByText("その判断の前提（SPOFリスク）を、仕様のどの記述")).toBeVisible();
 
-    // 2発話目で進行役側が前提変化を撃つ [D-100]。撃たれた手番には深掘りを重ねない
-    await promptInput.fill(
-      "一般加盟店はPCI DSS監査に従いフェイルクローズを維持する方針で修正してください。"
-    );
-    await page.getByRole("button", { name: "送信" }).click();
+    // 深掘りに3回答えて、検証を提出する。提出の時点で進行役が前提変化を出す [D-135]
+    await sendMessage(page, "指摘の根拠は、受入基準の耐障害性要件です。フォールバック処理を検討してください。", { expectProbe: true });
+    await sendMessage(page, "一般加盟店はPCI DSS監査に従いフェイルクローズを維持する方針で修正してください。", { expectProbe: true });
+    await sendMessage(page, "障害時の挙動と、監査ログへ残す内容も決めてください。", { expectProbe: true });
+    await page.getByTestId("review-action-button").click();
     await expect(page.getByText("緊急仕様変更・追加要件が通知されました")).toBeVisible();
 
     // 04. 動的対話画面 (2-Pane Dialogue with Code Quoting)
@@ -154,8 +155,11 @@ test.describe("Capture Proposal UI Screenshots (High DPI)", () => {
       fullPage: true,
     });
 
+    // 前提変化に応答して、最終判断へ進む
+    await sendMessage(page, "追加要件を踏まえて、VIP加盟店だけ縮退運転を許可する方針へ組み直してください。", { expectProbe: false });
+    await page.getByTestId("review-action-button").click();
+
     // 05. CFF暫定判断 (Force Decision First & Mandatory Justification)
-    await page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" }).click();
     await expect(page.getByText("場面4：意思決定")).toBeVisible();
     await page.locator("input[value='remand']").check();
     const justificationTextarea = page.getByPlaceholder(

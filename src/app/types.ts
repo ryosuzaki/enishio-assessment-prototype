@@ -80,6 +80,9 @@ export interface ChatMessage {
   // "mediator" はソクラテス型深掘り・What-if注入（測定設計書 2.1 ステップ5・6）の問い。
   // AIエージェント（assistant）とは別役割であり、画面上も区別して表示する。
   role: "user" | "assistant" | "system" | "mediator";
+  // 進行役（mediator）の発言の種類。深掘りの問いか、前提変化の通知か。
+  // 深掘りへの回答数を数えるのに使う（通知は深掘りに数えない）。
+  kind?: "probe" | "premise_shift";
   content: string;
 }
 
@@ -147,7 +150,6 @@ export interface EvidenceTargetState {
 export const PROBE_MOVES = [
   "deepen_rationale",
   "trace_grounding",
-  "what_if",
   "self_report_gap",
   "scope_refocus",
   "test_scenario_probe",
@@ -156,14 +158,15 @@ export const PROBE_MOVES = [
 
 export type ProbeMove = (typeof PROBE_MOVES)[number];
 
-// src/lib/mediator/index.ts の MAX_PROBES_PER_SESSION と一致させる（サーバ専用モジュールの
-// ため画面側では複製する）。測定設計書 2.1 ステップ5が「3〜4ターン」の深掘りを必須としている。
+// src/lib/mediator/index.ts の MIN_PROBES_REQUIRED・MAX_PROBES_PER_SESSION と一致させる
+// （サーバ専用モジュールのため画面側では複製する）。測定設計書 2.1 ステップ5が「3〜4ターン」の
+// 深掘りを必須としている。受講者が最低 MIN 回の深掘りに答えるまで、検証の提出はできない。
+export const MIN_PROBES_REQUIRED = 3;
 export const MAX_PROBES_PER_SESSION = 4;
 
 export const PROBE_MOVE_LABELS: Record<ProbeMove, string> = {
   deepen_rationale: "深掘り：なぜそう判断したか",
   trace_grounding: "深掘り：その根拠は文脈のどこから来ているか",
-  what_if: "What-if 注入：前提が変わったら指摘は変わるか",
   self_report_gap: "自己申告：見落とした観点はあるか",
   scope_refocus: "視座の引き上げ：非機能要件・運用基準の観点で懸念はあるか",
   test_scenario_probe: "異常系の想起：本番障害を防ぐためにどんなテストシナリオを想定すべきか",

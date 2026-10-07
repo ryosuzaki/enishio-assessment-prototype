@@ -5,14 +5,8 @@ import { ChevronDown, ChevronUp, Quote } from "lucide-react";
 import { Group, Panel, Separator, useDefaultLayout, type LayoutStorage } from "react-resizable-panels";
 import type { DynamicTaskScenario } from "@/data/dynamic-task";
 import type { ChatMessage, PremiseShiftState } from "../types";
+import type { ReviewGate } from "@/lib/review-gate";
 import { Badge, Button, cn } from "./ui";
-
-/**
- * 手動での前提変化注入を出してよいビルドか。`next build` 済みの本番ビルドでは false になり、
- * このフラグを見ているブロックはバンドルから落ちる。サーバ側（/api/dialogue/premise-shift）も
- * 同じ条件で force を無視するため、受講者が撃てないという保証は片側だけでは破れない `[D-100]`。
- */
-const IS_DEV_BUILD = process.env.NODE_ENV !== "production";
 
 /** PR説明をこの文字数より長いときだけ「全文を表示」の開閉を出す（2行に収まる目安） */
 const PR_SUMMARY_CLAMP_CHARS = 70;
@@ -97,8 +91,9 @@ interface DialogueSessionStepProps {
   cffActiveWarning: string | null;
   isSubmitting: boolean;
   premiseShiftState?: PremiseShiftState;
-  onForcePremiseShiftForDebug?: () => void;
-  onProceedToPreliminaryJudgement: () => void;
+  /** 検証の提出ボタンの名前と、押せる条件（前提変化の前後で替わる） */
+  reviewGate: ReviewGate;
+  onReviewAction: () => void;
   onSendDialogueTurn: () => void;
   /** 2ペインの下に置く計測ログ（閉じているときは「計測ログを表示」の戻し口） */
   telemetrySlot?: React.ReactNode;
@@ -149,8 +144,8 @@ export function DialogueSessionStep({
   cffActiveWarning,
   isSubmitting,
   premiseShiftState,
-  onForcePremiseShiftForDebug,
-  onProceedToPreliminaryJudgement,
+  reviewGate,
+  onReviewAction,
   onSendDialogueTurn,
   telemetrySlot,
   isTelemetryOpen = true,
@@ -615,29 +610,19 @@ export function DialogueSessionStep({
         <span className="mr-2 text-caption font-normal text-ink-3">{selectedTask.task_id}</span>
         {selectedTask.title}
       </h2>
-      {IS_DEV_BUILD && selectedTask.premise_shift && !premiseShiftState?.isInjected && (
-        /*
-         * 開発ビルドにだけ出る手動発火。**受講者の画面に出してはならない** `[D-100]`。
-         * 「これから前提が変わる」と予告した時点で不意打ちではなくなり、撃たない自由が
-         * あれば領域4の証拠が取れたセッションと取れないセッションが混在する。
-         * 本番ビルドではこのボタンごと出ず、サーバ側も force を無視する。
-         */
-        <Button
-          variant="secondary"
-          onClick={onForcePremiseShiftForDebug}
-          data-testid="debug-force-premise-shift"
-          title="DEV ONLY（本番ビルドでは表示されない）。場面3の前提変化は通常、進行役が対話ログから自動で注入する。これは開発・E2E用の手動発火。"
-          className="shrink-0 whitespace-nowrap border-dashed text-ink-3"
-        >
-          [dev] 前提変化を注入
-        </Button>
+      {reviewGate.hint && (
+        <span className="shrink-0 text-caption text-ink-3" data-testid="review-gate-hint">
+          {reviewGate.hint}
+        </span>
       )}
       <Button
         variant="primary"
-        onClick={onProceedToPreliminaryJudgement}
+        onClick={onReviewAction}
+        disabled={!reviewGate.canAct}
+        data-testid="review-action-button"
         className="shrink-0 whitespace-nowrap"
       >
-        レビュー完了 ➔ 暫定判断へ進む
+        {reviewGate.label}
       </Button>
     </div>
   );

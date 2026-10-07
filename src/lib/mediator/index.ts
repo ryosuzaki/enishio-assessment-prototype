@@ -1,5 +1,9 @@
 /**
- * ソクラテス型深掘り・What-if注入のプローブ選択器（測定設計書 2.1 ステップ5・6）。
+ * ソクラテス型深掘りのプローブ選択器（測定設計書 2.1 ステップ5）。
+ *
+ * 前提変化（ステップ6）はここでは扱わない。課題ごとに固定した通知を、受講者が検証を提出した
+ * 時点で出す（`src/lib/premise-shift`）。LLM が前提を作る仮定の問い（旧 `what_if`）は、前提変化と
+ * 役割が重なり、受講者ごとに内容も変わるので廃止した。
  *
  * ## これが何であって、何でないか
  *
@@ -56,23 +60,23 @@ export const EVIDENCE_TARGET_LABELS: Record<(typeof EVIDENCE_TARGETS)[number], s
   robustness_under_changed_premise: "前提が変わったときに判断がどう変わるか",
 };
 
-/** 打てる手。`none` は「十分に引き出せているので問わない」を明示的に選ぶための選択肢。 */
-export const PROBE_MOVES = [
+/** 問いを投げる手。 */
+export const ASKING_MOVES = [
   "deepen_rationale",
   "trace_grounding",
-  "what_if",
   "self_report_gap",
   "scope_refocus",
   "test_scenario_probe",
-  "none",
 ] as const;
+
+/** 打てる手。`none` は「十分に引き出せているので問わない」を明示的に選ぶための選択肢。 */
+export const PROBE_MOVES = [...ASKING_MOVES, "none"] as const;
 
 export type ProbeMove = (typeof PROBE_MOVES)[number];
 
 export const PROBE_MOVE_LABELS: Record<ProbeMove, string> = {
   deepen_rationale: "深掘り：なぜそう判断したか",
   trace_grounding: "深掘り：その根拠は文脈のどこから来ているか",
-  what_if: "What-if 注入：前提が変わったら指摘は変わるか",
   self_report_gap: "自己申告：見落とした観点はあるか",
   scope_refocus: "視座の引き上げ：非機能要件・運用基準の観点で懸念はあるか",
   test_scenario_probe: "異常系の想起：本番障害を防ぐためにどんなテストシナリオを想定すべきか",
@@ -106,6 +110,19 @@ export const ProbeSelectionSchema = z.object({
     .describe("なぜこの手を選んだか。どの根拠カテゴリが未取得だからか、を明示すること（監査用）"),
 });
 
+/**
+ * 深掘りが必須の間に使う選択スキーマ。`none`（問わない）を選べない。
+ * プロンプトで頼むだけでは、モデルが「十分に引き出せている」と判断して外すことがあるので、
+ * 出力の形で選べなくする。
+ */
+export const RequiredProbeSelectionSchema = ProbeSelectionSchema.extend({
+  probe_move: z.enum(ASKING_MOVES).describe("この状態推定を踏まえて次に打つ手。問わない選択肢は無い"),
+  probe_text: z
+    .string()
+    .min(1)
+    .describe("受講者へ投げる問いの本文。1〜2文。答えや正解の所在をほのめかしてはならない。"),
+});
+
 export type ProbeSelection = z.infer<typeof ProbeSelectionSchema>;
 
 // メディエーターモデルの選定設定（設定ファイル / 環境変数から動的取得）
@@ -121,7 +138,12 @@ export function getMediatorModelVersion(): string {
 export const MEDIATOR_MODEL_VERSION = getMediatorModelVersion();
 const MAX_TOKENS = 8000;
 
-/** 1セッションあたりの深掘りの上限（測定設計書 2.1 ステップ5は「3〜4ターン」を必須としている）。 */
+/**
+ * 深掘りの回数（測定設計書 2.1 ステップ5「必須・3〜4ターン」）。
+ * 受講者が最低 MIN 回の深掘りに答えるまで、検証の提出（前提変化へ進む）はできない。
+ * それまでの深掘りは「問わない」を選べない。上限は MAX。
+ */
+export const MIN_PROBES_REQUIRED = 3;
 export const MAX_PROBES_PER_SESSION = 4;
 
 /**
@@ -147,7 +169,6 @@ const SYSTEM_PROMPT = `あなたは業務判断のアセスメントにおける
 【打てる手】
 - deepen_rationale: 受講者が下した判断について「なぜそう判断したか」を言わせる
 - trace_grounding: 「その根拠は業務要件・制約・チーム情報のどこから来ているか」を言わせる
-- what_if: 「前提がこう変わったら、その指摘は変わるか」を問う（前提の変更はあなたが具体的に指定する）
 - self_report_gap: 「自分が見落としているかもしれない観点は何か」を自己申告させる
 - scope_refocus: 受講者がコードスタイルや変数名などの些細な表面上の議論に執着（迷走）している場合、「スタイルの議論は一旦置き、システムの非機能要件（可用性・耐障害性・セキュリティ等）やチーム運用基準の観点で他に気になる点はあるか」と視座を一段引き上げる
 - test_scenario_probe: 受講者が正常系のフローしか見ていなかったり、十分に検証しないまま安易にApproveしようとしている場合、「本番リリースで障害を防ぐため、どんな異常系シナリオ（外部サービスのダウン、通信の再送・重複、急激な高負荷など）を検証すべきか」とテスト観点の想起を促す
@@ -178,6 +199,8 @@ export async function selectProbe(params: {
   constraints: string[];
   contextDocuments?: { title: string; type: string }[];
   probesSoFar: ProbeMove[];
+  /** true のとき、必ず問いを1つ投げる（`none` を選べない）。深掘りが必須の間に使う */
+  mustProbe?: boolean;
   onUsage?: (usage: LlmUsage) => void;
 }): Promise<ProbeSelection> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -209,7 +232,11 @@ ${params.transcript
 【これまでに投げた手】
 ${params.probesSoFar.length > 0 ? params.probesSoFar.join(" → ") : "（まだ1手も投げていない）"}
 
-現時点の状態推定と、次に打つ手を1つ決めてください。同じ手を続けて打たないでください。`;
+現時点の状態推定と、次に打つ手を1つ決めてください。同じ手を続けて打たないでください。${
+    params.mustProbe
+      ? "\n深掘りは必須の段階です。『問わない』は選べません。まだ引き出せていない根拠カテゴリについて、受講者の直前の発言に接続する問いを必ず1つ投げてください（挨拶や確認だけの発言でも、判断を言わせる問いにしてください）。"
+      : ""
+  }`;
 
   const model = getMediatorModel();
   const res = await measured(
@@ -223,7 +250,10 @@ ${params.probesSoFar.length > 0 ? params.probesSoFar.join(" → ") : "（まだ1
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: promptText },
         ],
-        response_format: zodResponseFormat(ProbeSelectionSchema, "probe_selection"),
+        response_format: zodResponseFormat(
+          params.mustProbe ? RequiredProbeSelectionSchema : ProbeSelectionSchema,
+          "probe_selection"
+        ),
       }),
     params.onUsage
   );
@@ -240,7 +270,7 @@ ${params.probesSoFar.length > 0 ? params.probesSoFar.join(" → ") : "（まだ1
       `プローブ選択のJSON構文解析に失敗しました: ${err instanceof Error ? err.message : String(err)}`
     );
   }
-  const validated = ProbeSelectionSchema.safeParse(parsed);
+  const validated = (params.mustProbe ? RequiredProbeSelectionSchema : ProbeSelectionSchema).safeParse(parsed);
   if (!validated.success) {
     throw new MediationUnavailableError(
       `プローブ選択の構造化出力がスキーマに適合しませんでした: ${validated.error.message}`

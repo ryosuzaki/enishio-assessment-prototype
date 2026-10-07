@@ -19,6 +19,7 @@ import {
   MAX_PROBES_PER_SESSION,
   MEDIATOR_MODEL_VERSION,
   MediationUnavailableError,
+  ASKING_MOVES,
   PROBE_MOVES,
   PROBE_MOVE_LABELS,
   getMediatorModel,
@@ -149,10 +150,10 @@ describe("selectProbe に渡す文脈", () => {
   });
 
   it("これまでに打った手を渡す（同じ手を続けて打たせないため）", async () => {
-    await selectProbe(baseParams({ probesSoFar: ["deepen_rationale", "what_if"] }));
+    await selectProbe(baseParams({ probesSoFar: ["deepen_rationale", "self_report_gap"] }));
 
     const userPrompt = createMock.mock.calls[0][0].messages[1].content as string;
-    expect(userPrompt).toContain("deepen_rationale → what_if");
+    expect(userPrompt).toContain("deepen_rationale → self_report_gap");
   });
 
   it("1手も打っていないことも明示して渡す", async () => {
@@ -190,6 +191,46 @@ describe("selectProbe に渡す文脈", () => {
     const call = createMock.mock.calls[0][0];
     expect(call.response_format?.type).toBe("json_schema");
     expect(call.max_completion_tokens).toBeGreaterThan(0);
+  });
+});
+
+describe("深掘りが必須の間は「問わない」を選べない", () => {
+  beforeEach(() => {
+    process.env.OPENAI_API_KEY = "test-key";
+  });
+
+  const moveEnum = (call: { response_format?: unknown }) =>
+    (call.response_format as { json_schema: { schema: { properties: { probe_move: { enum: string[] } } } } })
+      .json_schema.schema.properties.probe_move.enum;
+
+  it("必須のときは、選択肢から none を外したスキーマで呼び、プロンプトにも書く", async () => {
+    createMock.mockResolvedValue(llmResponse(SELECTION));
+    await selectProbe(baseParams({ mustProbe: true }));
+
+    const call = createMock.mock.calls[0][0];
+    expect(moveEnum(call)).not.toContain("none");
+    expect(moveEnum(call)).toEqual([...ASKING_MOVES]);
+    expect(call.messages[1].content as string).toContain("深掘りは必須の段階です");
+  });
+
+  it("必須でないときは none を選べて、必須の注意書きも出ない", async () => {
+    createMock.mockResolvedValue(llmResponse(SELECTION));
+    await selectProbe(baseParams({ mustProbe: false }));
+
+    const call = createMock.mock.calls[0][0];
+    expect(moveEnum(call)).toContain("none");
+    expect(call.messages[1].content as string).not.toContain("深掘りは必須の段階です");
+  });
+
+  it("必須なのにモデルが none を返したら、定型文で埋めず MediationUnavailableError にする", async () => {
+    createMock.mockResolvedValue(llmResponse({ ...SELECTION, probe_move: "none", probe_text: "" }));
+    await expect(selectProbe(baseParams({ mustProbe: true }))).rejects.toBeInstanceOf(MediationUnavailableError);
+  });
+
+  it("必須でなければ none を受け付ける", async () => {
+    createMock.mockResolvedValue(llmResponse({ ...SELECTION, probe_move: "none", probe_text: "" }));
+    const result = await selectProbe(baseParams({ mustProbe: false }));
+    expect(result.probe_move).toBe("none");
   });
 });
 

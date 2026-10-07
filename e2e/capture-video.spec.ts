@@ -2,6 +2,7 @@ import { test, expect, type Locator, type Page } from "@playwright/test";
 import fs from "fs";
 import path from "path";
 import { installMockApi } from "./support/mock-api";
+import { sendMessage } from "./support/review-flow";
 
 /**
  * README 用の動作確認動画を撮る（npm run capture:video）。実務演習セッションと固定設問の2本。
@@ -27,8 +28,8 @@ const OVERLAY_SCRIPT = `
     if (document.getElementById("__demo-cursor")) return;
     const style = document.createElement("style");
     style.textContent = \`
-      /* 開発ビルドにしか出ない部品は本番の見た目に合わせて隠す [D-100] */
-      [data-testid="debug-force-premise-shift"], nextjs-portal { display: none !important; }
+      /* 開発ビルドにしか出ない部品（Next.js の開発用ポータル）は隠す */
+      nextjs-portal { display: none !important; }
       #__demo-cursor { position: fixed; left: 0; top: 0; width: 22px; height: 22px; z-index: 2147483647;
         pointer-events: none; transform: translate(-3px, -2px); transition: transform 0.08s; }
       #__demo-cursor.down svg { transform: scale(0.85); }
@@ -262,23 +263,34 @@ test("session: 実務演習セッションの動作確認動画", async ({ page 
   await reveal(page, probe);
   await pause(page, 3500);
 
-  // ── 3. 前提変化 ──────────────────────────────
-  await caption(page, "場面2　検証対話", "方針を指示すると……");
+  // ── 3. 検証の提出と前提変化 ──────────────────
+  await caption(page, "場面2　検証対話", "進行役の深掘りに答えながら検証を進める（深掘りは必須）");
   await reveal(page, promptInput);
-  await humanType(page, promptInput, "一般加盟店はPCI DSS監査に従いフェイルクローズを維持する方針で修正してください。");
-  await humanClick(page, page.getByRole("button", { name: "送信" }));
+  await sendMessage(page, "指摘の根拠は、受入基準の耐障害性要件です。フォールバック処理を検討してください。", { expectProbe: true });
+  await sendMessage(page, "一般加盟店はPCI DSS監査に従いフェイルクローズを維持する方針で修正してください。", { expectProbe: true });
+  await sendMessage(page, "障害時の挙動と、監査ログへ残す内容も決めてください。", { expectProbe: true });
+  await pause(page, 1500);
+  const reviewAction = page.getByTestId("review-action-button");
+  await expect(reviewAction).toBeEnabled();
+  await caption(page, "検証を提出する", "深掘りに3回答えると、検証を提出できる");
+  await reveal(page, reviewAction);
+  await humanClick(page, reviewAction);
   const shiftNotice = page.getByText("緊急仕様変更・追加要件が通知されました");
   await expect(shiftNotice).toBeVisible();
   mark("premise-shift");
-  await caption(page, "場面3　前提変化", "方針が固まったところで、進行役が緊急の仕様変更を自動で注入する");
+  await caption(page, "場面3　前提変化", "提出の時点で、進行役が緊急の仕様変更を出す");
   await reveal(page, shiftNotice);
   await pause(page, 2500);
-  await smoothScrollTo(page, 0);
   await caption(page, "場面3　前提変化", "当初の方針に固執せず、組み直せるかを見る");
-  await pause(page, 3000);
+  await reveal(page, promptInput);
+  await humanType(page, promptInput, "追加要件を踏まえて、VIP加盟店だけ縮退運転を許可する方針へ組み直してください。");
+  await humanClick(page, page.getByRole("button", { name: "送信" }));
+  await expect(reviewAction).toBeEnabled();
+  await pause(page, 2000);
 
   // ── 4. 意思決定 ──────────────────────────────
-  const toDecision = page.getByRole("button", { name: "レビュー完了 ➔ 暫定判断へ進む" });
+  const toDecision = reviewAction;
+  await expect(toDecision).toHaveText("最終判断へ進む");
   await reveal(page, toDecision);
   await humanClick(page, toDecision);
   await expect(page.getByText("場面4：意思決定")).toBeVisible();

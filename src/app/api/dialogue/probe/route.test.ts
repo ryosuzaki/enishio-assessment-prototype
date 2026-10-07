@@ -32,7 +32,12 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { EVIDENCE_TARGETS, MAX_PROBES_PER_SESSION, MediationUnavailableError } from "@/lib/mediator";
+import {
+  EVIDENCE_TARGETS,
+  MAX_PROBES_PER_SESSION,
+  MIN_PROBES_REQUIRED,
+  MediationUnavailableError,
+} from "@/lib/mediator";
 import { getDynamicTask } from "@/data/dynamic-task";
 import { getInjectedFlaws } from "@/data/dynamic-task.server";
 import { POST } from "./route";
@@ -46,9 +51,9 @@ const SELECTION = {
     status: "not_elicited" as const,
     basis: "まだ言及がない",
   })),
-  probe_move: "what_if" as const,
-  probe_text: "前提が変わったら、その指摘は変わりますか。",
-  selection_rationale: "robustness_under_changed_premise が未取得のため",
+  probe_move: "deepen_rationale" as const,
+  probe_text: "その判断は何を根拠にしていますか。",
+  selection_rationale: "premise_articulation が未取得のため",
 };
 
 function post(body: unknown) {
@@ -144,13 +149,38 @@ describe("深掘りの回数上限", () => {
 
   it("上限の1手前なら打てる", async () => {
     mediationProbeFindMany.mockResolvedValue(
-      Array.from({ length: MAX_PROBES_PER_SESSION - 1 }, () => ({ probe_move: "what_if" }))
+      Array.from({ length: MAX_PROBES_PER_SESSION - 1 }, () => ({ probe_move: "deepen_rationale" }))
     );
 
     const json = await (await post(validBody())).json();
 
     expect(json.probeIssued).toBe(true);
     expect(json.probesSoFar).toBe(MAX_PROBES_PER_SESSION);
+  });
+
+  it("深掘りが最低回数に届くまでは「問わない」を選ばせず、届いたら選べるようにする", async () => {
+    mediationProbeFindMany.mockResolvedValue(
+      Array.from({ length: MIN_PROBES_REQUIRED - 1 }, () => ({ probe_move: "deepen_rationale" }))
+    );
+    await post(validBody());
+    expect(selectProbe.mock.calls[0][0].mustProbe).toBe(true);
+
+    selectProbe.mockClear();
+    mediationProbeFindMany.mockResolvedValue(
+      Array.from({ length: MIN_PROBES_REQUIRED }, () => ({ probe_move: "deepen_rationale" }))
+    );
+    await post(validBody());
+    expect(selectProbe.mock.calls[0][0].mustProbe).toBe(false);
+  });
+
+  it("「問わない」を選んだ手は、最低回数に数えない", async () => {
+    mediationProbeFindMany.mockResolvedValue([
+      { probe_move: "none" },
+      { probe_move: "none" },
+      { probe_move: "deepen_rationale" },
+    ]);
+    await post(validBody());
+    expect(selectProbe.mock.calls[0][0].mustProbe).toBe(true);
   });
 
   it("これまでの手番はクライアントの申告ではなくサーバのログから読む", async () => {
@@ -184,7 +214,7 @@ describe("打った手の記録", () => {
 
     expect(recordMediationProbe).toHaveBeenCalledOnce();
     const record = recordMediationProbe.mock.calls[0][0];
-    expect(record.probeMove).toBe("what_if");
+    expect(record.probeMove).toBe("deepen_rationale");
     expect(record.selectionRationale).toBe(SELECTION.selection_rationale);
     expect(record.stateEstimate.targets).toHaveLength(EVIDENCE_TARGETS.length);
     expect(record.mediatorModelVersion).toBeTruthy();

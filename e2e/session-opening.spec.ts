@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { installMockApi } from "./support/mock-api";
+import { sendMessage } from "./support/review-flow";
 
 /**
  * 対話は受講者の最初の入力から始まる。AIエージェントは受講者の指示に応じて話す側で、
@@ -30,12 +31,11 @@ test.describe("対話の始まりと発言者", () => {
   });
 
   test("前提変化の通知は、AIエージェントではなく進行役の発言として出る", async ({ page }) => {
-    const input = page.getByPlaceholder(/AIエージェントに指示・指摘を入力/);
-    await input.fill("Redisの単一障害点について考慮が必要です。");
-    await page.getByRole("button", { name: "送信" }).click();
-    await expect(page.getByText("その判断の前提（SPOFリスク）を、仕様のどの記述")).toBeVisible();
-    await input.fill("フェイルクローズを維持する方針で修正してください。");
-    await page.getByRole("button", { name: "送信" }).click();
+    // 深掘りに3回答えて、検証を提出する
+    for (let i = 1; i <= 4; i += 1) {
+      await sendMessage(page, `指摘${i}: Redisの単一障害点について考慮が必要です。`, { expectProbe: true });
+    }
+    await page.getByTestId("review-action-button").click();
 
     const notice = page.getByText(/【⚡ 緊急仕様変更・追加要件の通知】/);
     await expect(notice).toBeVisible();

@@ -316,6 +316,32 @@ describe("第1段階（根拠抽出）", () => {
       ScoringUnavailableError
     );
   });
+
+  it("前提変化への応答（組み直した／組み直さなかった）を根拠要素として通す", async () => {
+    for (const type of ["premise_shift_adaptation", "premise_shift_neglect"]) {
+      createMock.mockResolvedValue(
+        llmResponse({
+          ...SAMPLE_EVIDENCE,
+          components: [
+            { ...SAMPLE_EVIDENCE.components[0], component_type: type, injected_flaw_id: null },
+          ],
+        })
+      );
+      const result = await extractEvidence([], "", "TASK-FINTECH-AUTH-01");
+      expect(result.components[0].component_type).toBe(type);
+    }
+  });
+
+  it("前提変化への応答の判定方法を、抽出のプロンプトに書いている", async () => {
+    createMock.mockResolvedValue(llmResponse(SAMPLE_EVIDENCE));
+    await extractEvidence([], "", "TASK-FINTECH-AUTH-01");
+
+    const prompt = createMock.mock.calls[0][0].messages[0].content as string;
+    expect(prompt).toContain("premise_shift_adaptation");
+    expect(prompt).toContain("premise_shift_neglect");
+    // 通知が無いログでは抽出させない（前提変化が出ていないセッションを罰しない）
+    expect(prompt).toContain("通知が対話ログに無いときは、どちらも抽出しない");
+  });
 });
 
 describe("第2段階（バンド採点）", () => {
@@ -331,6 +357,17 @@ describe("第2段階（バンド採点）", () => {
     expect(prompt).toContain("失効したトークンが24時間通ってしまうのでは");
     expect(prompt).toContain("Band 5");
     expect(result.rating_category).toBe(3);
+  });
+
+  it("前提変化に組み直さなかった場合は Band 3 を上限とする規則を、ルーブリックに載せる", async () => {
+    createMock.mockResolvedValue(llmResponse(SAMPLE_SCORING));
+    await computeBandScore(SAMPLE_EVIDENCE, "TASK-FINTECH-AUTH-01");
+
+    const prompt = createMock.mock.calls[0][0].messages[0].content as string;
+    expect(prompt).toContain("premise_shift_neglect がある場合");
+    expect(prompt).toContain("Band 3 を上限");
+    // 前提変化が出ていないセッションには、この規則を適用しない
+    expect(prompt).toContain("どちらも無い場合（前提変化が出ていない）は、この規則を適用しません");
   });
 
   it("0〜5 の範囲外のバンドを通さない", async () => {

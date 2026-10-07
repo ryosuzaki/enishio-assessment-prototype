@@ -4,7 +4,8 @@ import { useState } from "react";
 import { messageOf } from "@/lib/error-message";
 import { getDynamicTask } from "@/data/dynamic-task";
 import { getDefaultMirroringSummary } from "../components/PreliminaryJudgementStep";
-import { MAX_PROBES_PER_SESSION } from "../types";
+import { evaluateReviewGate } from "@/lib/review-gate";
+import { MAX_PROBES_PER_SESSION, MIN_PROBES_REQUIRED } from "../types";
 import type {
   ChatMessage,
   EvaluationResult,
@@ -49,7 +50,7 @@ export function useDialogueFlow({
     isInjected: false,
   });
 
-  // Mediation State (測定設計書 2.1 ステップ5・6: ソクラテス型深掘り・What-if注入)
+  // Mediation State (測定設計書 2.1 ステップ5: ソクラテス型深掘り)
   const [mediationStateEstimate, setMediationStateEstimate] = useState<
     EvidenceTargetState[] | null
   >(null);
@@ -57,6 +58,8 @@ export function useDialogueFlow({
   const [lastSelectionRationale, setLastSelectionRationale] = useState<string | null>(null);
   const [probesIssued, setProbesIssued] = useState<number>(0);
   const [isProbing, setIsProbing] = useState<boolean>(false);
+  // 深掘りを出せなかった（LLM が使えない等）ため、深掘りの必須を外した。受講者を詰まらせない
+  const [probeGateReleased, setProbeGateReleased] = useState<boolean>(false);
 
   // CFF: Force Decision First & Mandatory Justification State [MVP 2.5, T-17b, D-80]
   const [prelimAction, setPrelimAction] = useState<"approve" | "remand" | "comment" | "">("");
@@ -82,6 +85,7 @@ export function useDialogueFlow({
     setLastProbeMove(null);
     setLastSelectionRationale(null);
     setProbesIssued(0);
+    setProbeGateReleased(false);
     setPremiseShiftState({ isInjected: false });
   };
 
@@ -120,20 +124,16 @@ export function useDialogueFlow({
   };
 
   /**
-   * 前提変化（場面3: 緊急仕様変更・追加要件）の注入。
+   * 検証の提出（前提変化の注入）。
    *
-   * **受講者は撃たない。**発火するかどうかはサーバ側が対話ログだけを見て決定論的に判定する
-   * `[D-100]`。ここから渡せるのは「どのセッションの何ターン目か」だけで、
-   * クライアントは注入するか否かを決められない。
-   *
-   * `force` は開発ビルド限定の手動発火（E2E・デバッグ用）。本番ビルドではサーバ側が無視する。
+   * 受講者が「検証を提出する」を押した時点で、進行役が前提変化を出す `[D-135]`。
+   * 出すタイミングは受講者の区切りに合わせ、発話回数のような代用指標では自動的に撃たない。
+   * 通知の本文は課題ごとの固定文で、サーバが対話ログに記録する（AIエージェントも前提にする）。
+   * 課題に前提変化が無い、または出し済みなら、そのまま意思決定へ進む。
    */
-  const maybeInjectPremiseShift = async (
-    turnSeq: number,
-    historySoFar: ChatMessage[],
-    options?: { force?: boolean }
-  ): Promise<boolean> => {
-    if (premiseShiftState.isInjected) return false;
+  const submitReview = async () => {
+    setErrorMessage(null);
+    setIsSubmitting(true);
     try {
       const res = await fetch("/api/dialogue/premise-shift", {
         method: "POST",
@@ -141,17 +141,19 @@ export function useDialogueFlow({
         body: JSON.stringify({
           sessionId: sessionIdInUse,
           taskId: selectedTaskId,
-          turnSeq,
-          ...(options?.force ? { force: true } : {}),
+          turnSeq: turnCounter,
         }),
       });
       const data = await res.json();
       if (!data.success) {
-        // 前提変化が撃てなくても対話セッション自体は継続させる。ここで止めない。
-        addTelemetry(`Premise shift check failed: ${data.error}`);
-        return false;
+        setErrorMessage("検証の提出エラー: " + data.error);
+        return;
       }
-      if (!data.injected) return false;
+      if (!data.injected) {
+        addTelemetry(`Review submitted (no premise shift: ${data.reason}). Advancing to scene 4`);
+        proceedToPreliminaryJudgement();
+        return;
+      }
 
       setPremiseShiftState({
         isInjected: true,
@@ -162,26 +164,20 @@ export function useDialogueFlow({
       });
       // 通知は進行役の発言であって、AIエージェントの発言ではない（測定設計書 2.1 ステップ6）
       setChatHistory([
-        ...historySoFar,
-        { turnSeq: data.injectedAtTurn, role: "mediator", content: data.notification },
+        ...chatHistory,
+        { turnSeq: data.injectedAtTurn, role: "mediator", kind: "premise_shift", content: data.notification },
       ]);
       setTurnCounter(data.injectedAtTurn + 1);
-      addTelemetry(
-        `前提変化を注入${data.forced ? "（手動 / dev）" : "（進行役判定）"}: Turn #${data.injectedAtTurn} / ${data.title}`
-      );
-      return true;
+      addTelemetry(`Review submitted. 前提変化を提示: Turn #${data.injectedAtTurn} / ${data.title}`);
     } catch (e: unknown) {
-      addTelemetry(`Premise shift request failed: ${messageOf(e)}`);
-      return false;
+      setErrorMessage("検証の提出エラー: " + messageOf(e));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  /** 開発ビルド限定の手動発火。受講者UIからは呼ばれない（DialogueSessionStep 側で隠す）。 */
-  const forcePremiseShiftForDebug = () =>
-    maybeInjectPremiseShift(turnCounter, chatHistory, { force: true });
-
   /**
-   * ソクラテス型深掘り（測定設計書 2.1 ステップ5・6）。
+   * ソクラテス型深掘り（測定設計書 2.1 ステップ5）。
    *
    * AIエージェントの応答とは別の手番。**正答鍵（injected_flaw_map）はこの呼び出しに含めない**
    * ——渡っているのは taskId のみで、サーバ側で業務要件・制約と対話ログから
@@ -198,9 +194,11 @@ export function useDialogueFlow({
       const data = await res.json();
       if (!data.success) {
         // 深掘りが打てなくても対話セッション自体は継続させる。ここで止めない。
+        // 深掘りは必須だが、出せない状況で受講者を詰まらせないよう、必須を外す。
         if (!data.mediationUnavailable) {
           addTelemetry(`Mediation probe error: ${data.error}`);
         }
+        setProbeGateReleased(true);
         return;
       }
 
@@ -211,13 +209,17 @@ export function useDialogueFlow({
       if (data.probeIssued) {
         setProbesIssued((n) => n + 1);
         setTurnCounter(turnSeq + 1);
-        setChatHistory([...historySoFar, { turnSeq, role: "mediator", content: data.probeText }]);
+        setChatHistory([
+          ...historySoFar,
+          { turnSeq, role: "mediator", kind: "probe", content: data.probeText },
+        ]);
         addTelemetry(`Mediation probe issued (${data.probeMove}, Turn #${turnSeq})`);
       } else {
         addTelemetry(`Mediation: no probe needed (${data.reason ?? data.probeMove})`);
       }
     } catch (e: unknown) {
       addTelemetry(`Mediation probe request failed: ${messageOf(e)}`);
+      setProbeGateReleased(true);
     } finally {
       setIsProbing(false);
     }
@@ -289,16 +291,10 @@ export function useDialogueFlow({
       setTurnCounter(nextTurn);
 
       // 意図-行動ギャップのインターロック（正規表現ベース。別機構）が発火したターンには
-      // 前提変化も深掘りも重ねない。受講者が中身のある発話をしていない手番である。
-      if (!data.isInterlockTriggered) {
-        // 前提変化と深掘りは同じ手番に並べない。深掘りの状態推定は注入前のログに
-        // 基づいており、前提が変わった直後に投げても噛み合わない。
-        const shiftInjected = await maybeInjectPremiseShift(nextTurn, historyWithAssistant);
-
-        // 上限に達していれば深掘りは呼ばない。
-        if (!shiftInjected && probesIssued < MAX_PROBES_PER_SESSION) {
-          await runMediationProbe(nextTurn, historyWithAssistant);
-        }
+      // 深掘りを重ねない。受講者が中身のある発話をしていない手番である。
+      // 前提変化が出た後は、深掘りの段階は終わっているので問わない。
+      if (!data.isInterlockTriggered && !premiseShiftState.isInjected && probesIssued < MAX_PROBES_PER_SESSION) {
+        await runMediationProbe(nextTurn, historyWithAssistant);
       }
     } catch (e: unknown) {
       setErrorMessage("対話送信エラー: " + messageOf(e));
@@ -311,7 +307,7 @@ export function useDialogueFlow({
   const proceedToPreliminaryJudgement = () => {
     setErrorMessage(null);
     if (chatHistory.length < 2) {
-      setErrorMessage("最低1回以上AIエージェントに指示・対話してから完了してください。");
+      setErrorMessage("最低1回以上AIエージェントに指示・対話してから進んでください。");
       return;
     }
     setPrelimError(null);
@@ -424,6 +420,22 @@ export function useDialogueFlow({
     }
   };
 
+  // 検証の提出ボタンの名前と、押せる条件（前提変化の前後で替わる）
+  const reviewGate = evaluateReviewGate({
+    history: chatHistory,
+    premiseShiftInjected: premiseShiftState.isInjected,
+    probeGateReleased,
+    busy: isSubmitting || isProbing,
+    minProbes: MIN_PROBES_REQUIRED,
+  });
+
+  /** ボタンの押下。前提変化の前は検証の提出（前提変化を出す）、後は意思決定へ進む */
+  const performReviewAction = () => {
+    if (!reviewGate.canAct) return;
+    if (reviewGate.stage === "verify") void submitReview();
+    else proceedToPreliminaryJudgement();
+  };
+
   return {
     selectedTask,
     currentStep,
@@ -455,9 +467,9 @@ export function useDialogueFlow({
     disputeSubmitted,
     isSubmitting,
     startSession,
-    forcePremiseShiftForDebug,
+    reviewGate,
+    performReviewAction,
     sendDialogueTurn,
-    proceedToPreliminaryJudgement,
     confirmPreliminaryAndEvaluate,
     submitDispute,
   };
