@@ -485,7 +485,7 @@ describe("アンカーは無得点で記録する", () => {
     // 「動かなかった（0）」は最も重要な応答なので、未回答として潰してはならない
     expect(rows[0].stage3_selection).toBe(0);
 
-    // アンカーに 0 点を入れるとルーブリックの Level 0 と区別できなくなる
+    // アンカーに 0 点を入れるとルーブリックの Band 0 と区別できなくなる
     expect(await prisma.rating.count({ where: { session_id: sessionId } })).toBe(before);
   });
 

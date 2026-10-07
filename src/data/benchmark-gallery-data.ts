@@ -63,7 +63,7 @@ export const SCENARIO_DEBRIEFINGS: ScenarioDebriefingData[] = [
     shortSummary:
       "急増するトラフィックに対応するためにAIエージェントが作成したPR。トークン失効チェックのスキップやRedis単一障害点（SPOF）が潜む。",
     totalSessions: 148,
-    topPerformerDefinition: "上位11%（Level 4〜5到達者・実務7年以上のシニアエンジニア層）の客観的行動ログ分析",
+    topPerformerDefinition: "上位11%（Band 4〜5到達者・実務7年以上のシニアエンジニア層）の客観的行動ログ分析",
     trapArchitecture: {
       title: "最も多かった落とし穴：Vitestテストの「全件パス (3/3)」による確証バイアス",
       statHighlight: "受講者の67%がユニットテストの合格表示を見て、異常系テストの欠落を見落とした",
@@ -253,7 +253,7 @@ export const SCENARIO_DEBRIEFINGS: ScenarioDebriefingData[] = [
     shortSummary:
       "セール期間中の多重キャンセル要求に対応するPR。外部決済APIとDBロールバックの非整合による二重返金リスクが潜む。",
     totalSessions: 112,
-    topPerformerDefinition: "上位13%（Level 4〜5到達者・トランザクション設計経験者）の客観的行動ログ分析",
+    topPerformerDefinition: "上位13%（Band 4〜5到達者・トランザクション設計経験者）の客観的行動ログ分析",
     trapArchitecture: {
       title: "最も多かった落とし穴：AIの流暢なコード解説とハッピーパスへの安心感",
       statHighlight: "受講者の59%がAIの『決済整合性を確保しました』という説明に納得し、タイムアウト時の二重返金を見落とした",
@@ -391,7 +391,7 @@ export const SCENARIO_DEBRIEFINGS: ScenarioDebriefingData[] = [
     shortSummary:
       "全社ナレッジ検索にRAGを導入するPR。システムプロンプトの指示のみに頼り、DB層のアクセス制御が欠落している脆弱性が潜む。",
     totalSessions: 94,
-    topPerformerDefinition: "上位10%（Level 4〜5到達者・AIセキュリティ・データガバナンス経験者）の客観的行動ログ分析",
+    topPerformerDefinition: "上位10%（Band 4〜5到達者・AIセキュリティ・データガバナンス経験者）の客観的行動ログ分析",
     trapArchitecture: {
       title: "最も多かった落とし穴：システムプロンプト（指示文）による防壁の過信",
       statHighlight: "受講者の72%が『役員情報には回答しない』というプロンプト指示を見てセキュアだと判断した",

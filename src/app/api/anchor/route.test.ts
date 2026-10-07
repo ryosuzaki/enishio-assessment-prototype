@@ -272,7 +272,7 @@ describe("POST — 応答の記録", () => {
     expect(json.success).toBe(true);
     expect(json.scored).toBe(false);
     expect(recordAnchorResponse).toHaveBeenCalledOnce();
-    // アンカーに 0 点を入れるとルーブリックの Level 0 と区別できなくなる
+    // アンカーに 0 点を入れるとルーブリックの Band 0 と区別できなくなる
     expect(recordAnchorResponse.mock.calls[0][0]).not.toHaveProperty("ratingCategory");
   });
 

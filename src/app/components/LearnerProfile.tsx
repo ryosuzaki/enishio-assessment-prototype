@@ -471,25 +471,25 @@ export function LearnerProfile({ onStartSession }: LearnerProfileProps) {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:col-span-2">
               <DomainCard
                 title="① 評価的判断力"
-                level="Level 3.8"
+                level="Band 3.8"
                 description="暗黙前提や非機能要件の不備を見抜く力。正常箇所の弁別精度を高めることでさらに手戻りが削減されます。"
                 subPoints="欠陥特定 / 前提看破 / 正常箇所弁別"
               />
               <DomainCard
                 title="② 高次認知・動的思考"
-                level="Level 3.4"
+                level="Band 3.4"
                 description="曖昧な要求の構造化と仮説構築力。トレードオフに直面した際の優先順位判断の言語化が確立されています。"
                 subPoints="曖昧性解消 / 仮説駆動アプローチ / トレードオフ決断"
               />
               <DomainCard
                 title="③ 対話的共創力"
-                level="Level 3.2"
+                level="Band 3.2"
                 description="AIエージェントへの境界設定と指示力。客観規格を引用してAIの出力を適正に制御・収束させる対話力が秀でています。"
                 subPoints="論理的指示設計 / エビデンス納得形成 / 他者視点取得"
               />
               <DomainCard
                 title="④ メタ認知・適応力"
-                level="Level 3.6"
+                level="Band 3.6"
                 description="自身の盲点の自覚とWhat-if前提変化への適応。急な要件変更に対して迅速に設計を再調整できています。"
                 subPoints="思考客観化 / 前提変化適応 / 学習敏捷性"
               />

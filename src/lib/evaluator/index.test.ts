@@ -75,7 +75,7 @@ const SAMPLE_SCORING = {
   rating_category: 3,
   scoring_confidence: 0.82,
   evidence_summary: "失効未考慮を要件へ接続して指摘している",
-  diagnostic_feedback: "正常箇所の妥当性判断まで踏み込むと Level 4 に届く",
+  diagnostic_feedback: "正常箇所の妥当性判断まで踏み込むと Band 4 に届く",
 };
 
 describe("levelLabelFor", () => {
@@ -85,7 +85,7 @@ describe("levelLabelFor", () => {
     }
   });
 
-  it("範囲外のバンドは Level 0 のラベルへ落とす（undefined を返さない）", () => {
+  it("範囲外のバンドは Band 0 のラベルへ落とす（undefined を返さない）", () => {
     expect(levelLabelFor(6)).toBe(AXIS4_LEVEL_LABELS[0]);
     expect(levelLabelFor(-1)).toBe(AXIS4_LEVEL_LABELS[0]);
   });
@@ -93,7 +93,7 @@ describe("levelLabelFor", () => {
   it("ラベルは6段で、バンド番号と見出しが一致している", () => {
     expect(AXIS4_LEVEL_LABELS).toHaveLength(6);
     AXIS4_LEVEL_LABELS.forEach((label, band) => {
-      expect(label.startsWith(`Level ${band}:`)).toBe(true);
+      expect(label.startsWith(`Band ${band}:`)).toBe(true);
     });
   });
 });

@@ -271,7 +271,7 @@ export function BenchmarkGallery({
         />
 
         <p className="mb-4 text-caption text-ink-2">
-          上位者層（Level
+          上位者層（Band
           4〜5）は、単一の手順に依存せず、自身の強みやシチュエーションに応じた複数の有効な検証ルートを採用していました。
         </p>
 

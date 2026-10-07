@@ -170,7 +170,7 @@ describe("確信度の閾値（pending_human への分岐）", () => {
 
     expect(json.isPendingHumanReview).toBe(false);
     expect(json.ratingCategory).toBe(4);
-    expect(json.levelLabel).toContain("Level 4");
+    expect(json.levelLabel).toContain("Band 4");
 
     const rating = recordedRating();
     expect(rating.raterType).toBe("llm");

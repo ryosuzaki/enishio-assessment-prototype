@@ -205,7 +205,7 @@ export async function POST(req: Request) {
     // アンカーは無得点で記録する [MVP 2.6.2, D-51]。
     //
     // **ratings（評点の正本）には行を作らない。**アンカーには評点が存在しないため、
-    // rating_category に 0 を入れるとルーブリック上の「Level 0: 無批判受容」と
+    // rating_category に 0 を入れるとルーブリック上の「Band 0: 無批判受容」と
     // 区別できなくなり、将来の較正（D-51 の基準関連相関）を汚す。
     // 学習者・session_seq は anchor_responses → sessions を辿れば復元できる。
     //

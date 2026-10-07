@@ -74,7 +74,7 @@ export type EvidenceExtractionOutput = z.infer<typeof EvidenceExtractionOutputSc
 // Stage 2 Schema: Axis 4 Band Scoring (0..5 Band) [MVP 2.6, W4]
 //
 // level_label はスキーマに含めない。バンドとラベルを別フィールドで返させると
-// rating_category=2 と "Level 5" のような相互矛盾が構造的に起こりうるため、
+// rating_category=2 と "Band 5" のような相互矛盾が構造的に起こりうるため、
 // ラベルは rating_category から一意に導出する。
 export const ScoringOutputSchema = z.object({
   axis_id: z.literal("axis_4"),
@@ -91,12 +91,12 @@ export const ScoringOutputSchema = z.object({
 export type ScoringOutput = z.infer<typeof ScoringOutputSchema>;
 
 export const AXIS4_LEVEL_LABELS = [
-  "Level 0: 無批判受容 / 判定不能",
-  "Level 1: 盲目的追従（AI出力を無検証で承認）",
-  "Level 2: 漠然とした違和感（指摘が曖昧・理由不詳）",
-  "Level 3: 前提・トレードオフの具体的言語化（不備の正確な摘発）",
-  "Level 4: 卓越（多角的な視点・非機能要件と正常箇所の正確な弁別）",
-  "Level 5: 指導的検証力（修正コードの提示と長期的ガバナンス評価）",
+  "Band 0: 無批判受容 / 判定不能",
+  "Band 1: 盲目的追従（AI出力を無検証で承認）",
+  "Band 2: 漠然とした違和感（指摘が曖昧・理由不詳）",
+  "Band 3: 前提・トレードオフの具体的言語化（不備の正確な摘発）",
+  "Band 4: 卓越（多角的な視点・非機能要件と正常箇所の正確な弁別）",
+  "Band 5: 指導的検証力（修正コードの提示と長期的ガバナンス評価）",
 ] as const;
 
 export function levelLabelFor(ratingCategory: number): string {
@@ -305,6 +305,9 @@ export async function computeBandScore(
   const client = getClient("score");
   const rubricHint = getRubricHint(taskId);
 
+  // 画面の呼称は「Band」に統一した（Level はカークパトリックの Level 1〜4 と紛れるため）。
+  // **プロンプト本文は「Level 0〜5」のまま残している。**文言を変えると採点器への入力が変わるので、
+  // 揃えるときは採点器の版（getScorerModelVersion の score-v*）を上げ、同じ入力で測り直すこと。
   const promptText = `
 あなたは教育測定学に基づくアセスメントの「第2段階：動的コンピテンシー（評価的判断・適応力）バンド採点器」です。
 第1段階で抽出された【構造化根拠データ】のみを入力として、受講者の動的コンピテンシー（前提・トレードオフの可視化力、不備摘発、過剰指摘回避、適応力）を0〜5バンドで厳密に判定してください。
