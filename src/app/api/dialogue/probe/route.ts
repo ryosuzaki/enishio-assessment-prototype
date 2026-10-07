@@ -111,7 +111,7 @@ export async function POST(req: Request) {
     }
 
     // 問いは対話ログにも残す。受講者が何に答えたのかが分からないと、
-    // 第1エージェントが応答の一貫性を判定できない。
+    // 採点時に受講者の発言の文脈を読めない。
     await recordPromptTurn(sessionId, turnSeq, "mediator", selection.probe_text, getMediatorModelVersion());
 
     return NextResponse.json({

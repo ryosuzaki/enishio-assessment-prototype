@@ -91,7 +91,7 @@ export async function resolveSessionContext(sessionId: string) {
  * `mediator` は AIエージェント（`assistant`）とは別の役割である——AIエージェントはコードを書く相手、
  * メディエーターは受講者の判断を引き出す相手（測定設計書 2.1 ステップ5・6）。
  * **同じ role にまとめてはならない。**受講者が検証したのかメディエーターが問うたのかを
- * 事後に分離できなくなり、第1エージェントが応答の一貫性を判定できなくなる。
+ * 事後に分離できなくなる。
  */
 export type PromptTurnRole = "user" | "assistant" | "system" | "mediator";
 
@@ -182,12 +182,6 @@ export interface RecordRatingParams {
     | "verification";
   stimulusFeatures: Prisma.InputJsonObject;
   scoringConfidence?: number | null;
-  /**
-   * ソクラテス型深掘り（測定設計書 2.1 ステップ5）への応答の一貫性（MVP 4.4）。
-   * 深掘りが1回も走らなかったセッションでは null にする。0 を入れてはならない
-   * ——「一貫していなかった」と「そもそも問うていない」は別である。
-   */
-  probeConsistencyScore?: number | null;
 }
 
 /**
@@ -235,7 +229,6 @@ export async function recordRating(params: RecordRatingParams, tx?: Prisma.Trans
       stakes_context: params.stakesContext ?? "formative",
       stimulus_features: params.stimulusFeatures,
       scoring_confidence: params.scoringConfidence ?? null,
-      probe_consistency_score: params.probeConsistencyScore ?? null,
     },
   });
 }

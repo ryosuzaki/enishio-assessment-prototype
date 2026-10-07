@@ -114,7 +114,6 @@ const EVIDENCE = {
   ],
   identified_flaws_count: 1,
   avoided_false_positives: false,
-  probe_consistency: { score: 0.8, rationale: "深掘りへの応答が直前の発言と整合している" },
 };
 
 function scoring(confidence: number, ratingCategory = 3) {
@@ -371,7 +370,8 @@ describe("縦切り: セッション開始から評価レポート・異議申�
     expect(rating.session_seq).toBe(1);
     expect(rating.stimulus_type).toBe("generated");
     expect(rating.stakes_context).toBe("formative");
-    expect(rating.probe_consistency_score).toBeCloseTo(0.8, 5);
+    // 深掘りへの応答の一貫性は、プロトタイプでは書き込まない
+    expect(rating.probe_consistency_score).toBeNull();
     expect(rating.scorer_model_version).toContain("/extract-");
 
     // 根拠そのものが評点と同じ rating_id に紐づいて残る

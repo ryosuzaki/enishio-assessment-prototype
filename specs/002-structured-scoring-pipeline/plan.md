@@ -71,18 +71,17 @@ LLMによる直接採点（生ログ → 点数＋理由）で発生するハル
 * **セッション全体フラグ**:
   * `identified_flaws_count`: 指摘できた不備数
   * `avoided_false_positives`: 正常箇所を明示的に妥当と判断したか（言及なしは `false`）
-  * `probe_consistency`: メディエーターの深掘りに対する応答の一貫性（0..1、深掘りなし時は `null`）
 
 ### 2.3 第2段階：軸4 能力ルーブリック基準
 
 | バンド | ラベル | 採点基準（ルーブリック） |
 | :---: | :--- | :--- |
-| **Level 0** | 無批判受容 / 判定不能 | 根拠要素が空、または検証行動が1件も抽出されていない。 |
-| **Level 1** | 盲目的追従 | AIの提案を無批判に受け入れている（`blind_acceptance` が存在）。 |
-| **Level 2** | 漠然とした違和感 | 不備には気づいているが、理由やトレードオフが言語化できず曖昧（`grounding` が `none` または `asserted`）。 |
-| **Level 3** | 前提・トレードオフの具体的言語化 | 業務要件・制約から生じる前提やリスクを具体的に指摘できている（`grounding` が `tied_to_requirement` の `flaw_detection` / `premise_identification`）。 |
-| **Level 4** | 卓越（正常箇所の弁別） | 不備を正確に指摘しつつ、正常だが疑わしい箇所を過剰指摘せず**明示的に正当と判断している**（`avoided_false_positives = true`）。 |
-| **Level 5** | 指導的検証力 | 代替アーキテクチャやフォールバック設計を明確に指示できている（`alternative_design_proposal` が存在）。 |
+| **Band 0** | 無批判受容 / 判定不能 | 根拠要素が空、または検証行動が1件も抽出されていない。 |
+| **Band 1** | 盲目的追従 | AIの提案を無批判に受け入れている（`blind_acceptance` が存在）。 |
+| **Band 2** | 漠然とした違和感 | 不備には気づいているが、理由やトレードオフが言語化できず曖昧（`grounding` が `none` または `asserted`）。 |
+| **Band 3** | 前提・トレードオフの具体的言語化 | 業務要件・制約から生じる前提やリスクを具体的に指摘できている（`grounding` が `tied_to_requirement` の `flaw_detection` / `premise_identification`）。 |
+| **Band 4** | 卓越（正常箇所の弁別） | 不備を正確に指摘しつつ、正常だが疑わしい箇所を過剰指摘せず**明示的に正当と判断している**（`avoided_false_positives = true`）。 |
+| **Band 5** | 指導的検証力 | 代替アーキテクチャやフォールバック設計を明確に指示できている（`alternative_design_proposal` が存在）。 |
 
 ### 2.4 適正依存指標の計算仕様 (Reliance Metrics)
 仕込み不備集合 $F$（`is_flaw=true`）および正常箇所集合 $V$（`is_flaw=false`）に対して算出:
@@ -119,7 +118,7 @@ LLMによる直接採点（生ログ → 点数＋理由）で発生するハル
       "ratingId": "...",
       "axisId": "axis_4",
       "ratingCategory": 3,
-      "levelLabel": "Level 3: 前提・トレードオフの具体的言語化（不備の正確な摘発）",
+      "levelLabel": "Band 3: 前提・トレードオフの具体的言語化（不備の正確な摘発）",
       "isPending": false,
       "scoringConfidence": 0.85,
       "evidenceSummary": "...",

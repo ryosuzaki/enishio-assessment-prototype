@@ -85,9 +85,9 @@ model Rating {
   rating_category         Int? // 0..5。null = 未採点（アンカー無得点 / HITL確認待ち）
   rater_type              String // "llm" | "human" | "pending_human"
   scoring_confidence      Float? // 第2エージェントの自己申告確信度。閾値未満は pending_human へ回す
-  // ソクラテス型深掘り（測定設計書 2.1 ステップ5）への応答の一貫性（MVP 4.4）。
-  // 第1エージェントが構造化出力として返す0..1の自己申告値であり、統計量ではない。
-  // 深掘りが1回も走らなかったセッションでは null（「一貫していた」ではない）。
+  // ソクラテス型深掘り（測定設計書 2.1 ステップ5）への応答の一貫性（代行検知の信号）。
+  // **プロトタイプでは書き込まない（常に null）。**使い道が無く、採点器も抽出しない。
+  // 列を残すのは、Phase 2 の代行検知で再開するときにマイグレーションを要さないため。
   probe_consistency_score Float?
   rater_id                String
   scorer_model_version    String // "model_id/extract-v1/score-v1"

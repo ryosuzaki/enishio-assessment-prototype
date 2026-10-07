@@ -185,14 +185,14 @@ const SUB_DIMENSIONS: SubDimension[] = [
     id: "meta-3",
     domainId: "meta",
     domainName: "メタ認知・適応力",
-    name: "介入への一貫性と学習敏捷性",
+    name: "学習敏捷性",
     band: 3,
     score: 3.2,
-    description: "進行役の深掘りに対する論理的一貫性と、指摘からの迅速な学び",
+    description: "進行役の深掘りや指摘を受けて、迅速に学び、修正へ反映する力",
     observedEvidence: {
       turnIndex: 6,
       quote: "「先ほど指摘したべき等性トークンの生成基準に基づき、リトライ時も同一リクエストIDを保持する実装へ統一します」",
-      analysis: "以前の発言との整合性を保ちながら、深掘り質問の意図を汲んで即座に修正へ反映。",
+      analysis: "深掘り質問の意図を汲んで、即座に修正へ反映。",
     },
   },
 ];

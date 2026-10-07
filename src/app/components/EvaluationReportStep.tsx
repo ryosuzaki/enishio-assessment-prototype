@@ -318,27 +318,6 @@ export function EvaluationReportStep({
           <p className="text-caption text-ink-2">{evaluation.diagnosticFeedback}</p>
         </Card>
 
-        {evaluation.probeConsistency && (
-          <div data-testid="probe-consistency-block">
-            <Card title="深掘りへの応答の一貫性">
-              {evaluation.probeConsistency.score === null ? (
-                <p className="text-caption text-ink-2">
-                  このセッションでは深掘り（ソクラテス型深掘り・What-if注入）が発生しなかったため、
-                  判定対象がありません。
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  <p className="text-section text-ink" data-numeric>
-                    {evaluation.probeConsistency.score.toFixed(2)}
-                  </p>
-                  <p className="text-caption text-ink-2">
-                    {evaluation.probeConsistency.rationale}
-                  </p>
-                </div>
-              )}
-            </Card>
-          </div>
-        )}
       </div>
 
       {/* Dialogue Log with Evidence Highlights [根拠ハイライト] */}
@@ -357,7 +336,9 @@ export function EvaluationReportStep({
           </span>
         }
       >
-        <div className="max-h-96 space-y-cell overflow-y-auto pr-2">
+        {/* 高さで切らない。根拠ハイライトは後半のターンにもあり、枠内スクロールだと
+            診断画面を開いても目に入らない（実セッションでは6件中3件ぶんしか見えなかった） */}
+        <div className="space-y-cell">
           {chatHistory.map((msg, i) => {
             const turnComponents = evaluation.evidenceComponents.filter(
               (c) => c.turn_index === msg.turnSeq
@@ -366,7 +347,7 @@ export function EvaluationReportStep({
               msg.role === "user"
                 ? "あなた（受講者）"
                 : msg.role === "mediator"
-                  ? "進行役（深掘り）"
+                  ? "進行役"
                   : "AIエージェント";
             return (
               <div

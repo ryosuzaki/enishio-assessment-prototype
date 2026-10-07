@@ -123,7 +123,6 @@ export async function POST(req: Request) {
           stakesContext,
           scoringConfidence: scoring.scoring_confidence,
           // 深掘りが1手も入っていないセッションでは null が返る。0 で埋めない。
-          probeConsistencyScore: evidence.probe_consistency?.score ?? null,
           stimulusFeatures: {
             domain: task.domain,
             error_types: task.stimulus_features.injected_flaw_types,
@@ -170,7 +169,6 @@ export async function POST(req: Request) {
       evidenceSummary: scoring.evidence_summary,
       diagnosticFeedback: scoring.diagnostic_feedback,
       evidenceComponents: evidence.components,
-      probeConsistency: evidence.probe_consistency ?? null,
       scorerModelVersion: getScorerModelVersion(),
       stakesContext: ratingRecord.stakes_context,
     });

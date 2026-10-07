@@ -67,7 +67,6 @@ const SAMPLE_EVIDENCE: EvidenceExtractionOutput = {
   ],
   identified_flaws_count: 1,
   avoided_false_positives: false,
-  probe_consistency: { score: null, rationale: "MEDIATOR の発話が無い" },
 };
 
 const SAMPLE_SCORING = {
@@ -317,24 +316,6 @@ describe("第1段階（根拠抽出）", () => {
       ScoringUnavailableError
     );
   });
-
-  it("probe_consistency.score が null のまま通る（深掘り未実施を 0 に潰さない）", async () => {
-    createMock.mockResolvedValue(llmResponse(SAMPLE_EVIDENCE));
-    const result = await extractEvidence([], "", "TASK-FINTECH-AUTH-01");
-    expect(result.probe_consistency.score).toBeNull();
-  });
-
-  it("probe_consistency.score が 0〜1 の範囲外なら通さない", async () => {
-    createMock.mockResolvedValue(
-      llmResponse({
-        ...SAMPLE_EVIDENCE,
-        probe_consistency: { score: 1.4, rationale: "範囲外" },
-      })
-    );
-    await expect(extractEvidence([], "", "TASK-FINTECH-AUTH-01")).rejects.toBeInstanceOf(
-      ScoringUnavailableError
-    );
-  });
 });
 
 describe("第2段階（バンド採点）", () => {
@@ -348,7 +329,7 @@ describe("第2段階（バンド採点）", () => {
 
     const prompt = createMock.mock.calls[0][0].messages[0].content as string;
     expect(prompt).toContain("失効したトークンが24時間通ってしまうのでは");
-    expect(prompt).toContain("Level 5");
+    expect(prompt).toContain("Band 5");
     expect(result.rating_category).toBe(3);
   });
 

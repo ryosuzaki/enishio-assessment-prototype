@@ -117,7 +117,7 @@ export function getMediatorModelVersion(): string {
   return `${getMediatorModel()}/probe-v2`;
 }
 
-// モデルID＋プロンプト版。方針を変えたら必ず上げる。
+// モデルID＋プロンプト版。運用を始めてから、方針を変えたら必ず上げる（運用前の試行錯誤では上げない）。
 export const MEDIATOR_MODEL_VERSION = getMediatorModelVersion();
 const MAX_TOKENS = 8000;
 

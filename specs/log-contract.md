@@ -60,7 +60,7 @@
 | `rater_type` | String | `"llm"` ／ `"human"` ／ `"pending_human"`（確信度が閾値未満で人間の確認待ち） | |
 | `rater_id` | String | 人間の評価者は評価者ID。LLM は `scorer_model_version` と同じ値 | |
 | `scoring_confidence` | Float? | 採点器が自己申告した確信度。閾値未満は `pending_human` へ回し、値そのものは改変せず記録する | |
-| `probe_consistency_score` | Float? | ソクラテス型深掘りへの応答の一貫性（0〜1）。採点器の構造化出力による自己申告値であり統計量ではない。深掘りが1回も走らなかったセッションでは `null` | |
+| `probe_consistency_score` | Float? | ソクラテス型深掘りへの応答の一貫性（0〜1）。代行検知の信号として設計されたが、**プロトタイプでは書き込まない（常に `null`）**。採点器も抽出せず、診断画面にも出さない。Phase 2 の代行検知で再開するため、列だけ残している | |
 | `scorer_model_version` | String | 採点モデル識別子＋プロンプト版（例 `"model_id/extract-v1/score-v1"`）。版の異なる区間は分けて読む | ⛔ |
 | `stimulus_ref` | String | 評点が対応する刺激（AIエージェントのドラフトの該当箇所・受講者の応答）への参照 | |
 | `stimulus_type` | String | `"generated"`（受講者の文脈から生成した課題）／ `"anchor"`（共通アンカー） | ⛔ |
@@ -140,3 +140,4 @@
 
 ## 📅 更新履歴
 - 2026-10-01: 新設。ログのフィールド定義の正本を、非公開側の旧 MVP定義書 4.1・4.1.1・4.4・4.5 から本書へ移した。値域は実装（`schema.prisma`）に合わせた——`rater_type` は旧定義の `ai` ではなく `llm`・`pending_human` を持ち、`scoring_confidence`・`probe_consistency_score`・`anchor_status = "retired"` は旧定義に無かった
+- 2026-10-08: `probe_consistency_score` を「プロトタイプでは書き込まない」に変更。代行検知の信号として設計したが、Phase 1 では使い道が無く、採点器の抽出・診断画面の表示も外した。列は Phase 2 で再開するため残す。

@@ -66,7 +66,6 @@ const EVIDENCE = {
   ],
   identified_flaws_count: 1,
   avoided_false_positives: false,
-  probe_consistency: { score: null, rationale: "MEDIATOR の発話が無い" },
 };
 
 function scoring(confidence: number, ratingCategory = 3) {
@@ -310,24 +309,6 @@ describe("2段階分離と正答鍵の扱い", () => {
     expect(rating.stimulusType).toBe("generated");
     expect(rating.anchorId).toBeNull();
     expect(rating.axisId).toBe("axis_4");
-  });
-
-  it("深掘りが1手も入っていないセッションでは probe_consistency を null のまま記録する", async () => {
-    await post(validBody());
-
-    // 0 を入れると「一貫していなかった」と「そもそも問うていない」が区別できなくなる
-    expect(recordedRating().probeConsistencyScore).toBeNull();
-  });
-
-  it("深掘りがあった場合はその一貫性スコアを記録する", async () => {
-    extractEvidence.mockResolvedValue({
-      ...EVIDENCE,
-      probe_consistency: { score: 0.75, rationale: "整合している" },
-    });
-
-    await post(validBody());
-
-    expect(recordedRating().probeConsistencyScore).toBe(0.75);
   });
 });
 

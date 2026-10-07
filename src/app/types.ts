@@ -99,11 +99,6 @@ export interface EvidenceComponent {
   rationale_summary: string;
 }
 
-export interface ProbeConsistency {
-  score: number | null;
-  rationale: string;
-}
-
 export interface EvaluationResult {
   ratingId: string;
   isPendingHumanReview: boolean;
@@ -117,7 +112,6 @@ export interface EvaluationResult {
   evidenceSummary: string;
   diagnosticFeedback: string;
   evidenceComponents: EvidenceComponent[];
-  probeConsistency: ProbeConsistency | null;
   scorerModelVersion: string;
 }
 
